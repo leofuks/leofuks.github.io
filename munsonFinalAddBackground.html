@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sintetizador ISO 226 - Equal Loudness (Alta Precisão)</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0;
+            overflow: hidden; 
+            background: #f4e7d3;
+            color: #333; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        canvas { 
+            display: block; 
+            cursor: crosshair;
+            background-image: url('background.png');
+            background-size: 100% 100%; 
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        
+        /*
+         * ============================================
+         * PAINEL COM TRANSPARÊNCIA AUMENTADA (50%)
+         * ============================================
+         * Alterado de rgba(255, 255, 255, 0.92) para rgba(255, 255, 255, 0.50)
+         * O quarto valor (alpha) controla a opacidade:
+         * - 1.0 = totalmente opaco
+         * - 0.5 = 50% transparente
+         * - 0.0 = totalmente transparente
+         */
+        #ui-layer {
+            position: absolute; 
+            top: 20px; 
+            left: 20px;
+            pointer-events: none; 
+            /* TRANSPARÊNCIA: 50% (alpha = 0.50) */
+            background: rgba(255, 255, 255, 0.50); 
+            padding: 15px 25px; 
+            border-radius: 10px;
+            border: 1px solid rgba(188, 175, 154, 0.6);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            /* backdrop-filter mantém leve blur para legibilidade */
+            backdrop-filter: blur(2px);
+            max-width: 560px;
+            opacity: 1;
+            transition: opacity 0.3s ease-in-out;
+        }
+        #ui-layer.hidden {
+            opacity: 0;
+        }
+        
+        /* Indicador de painel oculto */
+        #panel-hidden-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.75em;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: none;
+        }
+        #panel-hidden-indicator.visible {
+            opacity: 1;
+        }
+        
+        /*
+         * Cores dos labels ajustadas para melhor contraste
+         * com o fundo semi-transparente
+         */
+        .data-label { 
+            color: #b71c1c; /* Vermelho mais escuro para contraste */
+            font-weight: bold; 
+            font-family: 'Courier New', monospace; 
+            font-size: 1.1em;
+            text-shadow: 0 0 2px rgba(255,255,255,0.8);
+        }
+        .data-label-keyboard { 
+            color: #0d47a1; /* Azul mais escuro para contraste */
+            font-weight: bold; 
+            font-family: 'Courier New', monospace; 
+            font-size: 1.1em;
+            text-shadow: 0 0 2px rgba(255,255,255,0.8);
+        }
+        .data-label-phase {
+            color: #6a1b9a; /* Roxo mais escuro para contraste */
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            text-shadow: 0 0 2px rgba(255,255,255,0.8);
+        }
+        .mode-label { color: #1565c0; font-weight: bold; font-size: 0.9em; }
+        .semitone-label { color: #2e7d32; font-weight: bold; font-size: 0.9em; }
+        .status-label-on { color: #1b5e20; font-weight: bold; text-shadow: 0 0 2px rgba(255,255,255,0.8); }
+        .status-label-off { color: #b71c1c; font-weight: bold; text-shadow: 0 0 2px rgba(255,255,255,0.8); }
+        .fine-tune-active { color: #e65100; font-weight: bold; }
+
+        h2 { 
+            margin: 0 0 5px 0; 
+            font-size: 1.1em; 
+            color: #333;
+            border-bottom: 1px solid rgba(0,0,0,0.3); 
+            padding-bottom: 5px;
+            text-shadow: 0 0 3px rgba(255,255,255,0.9);
+        }
+        h3 {
+            margin: 10px 0 5px 0;
+            font-size: 0.95em;
+            color: #444;
+            border-bottom: 1px dashed rgba(0,0,0,0.2);
+            padding-bottom: 3px;
+            text-shadow: 0 0 2px rgba(255,255,255,0.8);
+        }
+        p { 
+            margin: 5px 0;
+            text-shadow: 0 0 2px rgba(255,255,255,0.6);
+        }
+        
+        /*
+         * Seções com fundo semi-transparente para destaque
+         */
+        .section-mouse { 
+            background: rgba(211, 47, 47, 0.15); 
+            padding: 8px; 
+            border-radius: 5px; 
+            margin: 8px 0;
+            border-left: 3px solid #d32f2f;
+        }
+        .section-keyboard { 
+            background: rgba(21, 101, 192, 0.15); 
+            padding: 8px; 
+            border-radius: 5px; 
+            margin: 8px 0;
+            border-left: 3px solid #1565c0;
+        }
+        .section-phase {
+            background: rgba(123, 31, 162, 0.15);
+            padding: 8px;
+            border-radius: 5px;
+            margin: 8px 0;
+            border-left: 3px solid #7b1fa2;
+        }
+        .instructions { 
+            font-size: 0.8em; 
+            color: #333; 
+            margin-top: 10px; 
+            font-style: italic;
+            background: rgba(245, 245, 245, 0.6);
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .keyboard-info, .semitone-info, .phase-info, .finetune-info, .panel-info {
+            font-size: 0.72em;
+            margin-top: 6px;
+            border-top: 1px solid rgba(0,0,0,0.15);
+            padding-top: 6px;
+        }
+        .keyboard-info { color: #0d47a1; }
+        .semitone-info { color: #2e7d32; }
+        .phase-info { color: #6a1b9a; }
+        .finetune-info { color: #e65100; }
+        .panel-info { color: #455a64; }
+        
+        /* Estilo para frequência de alta precisão */
+        .freq-precision {
+            font-size: 0.85em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Indicador quando o painel está oculto -->
+    <div id="panel-hidden-indicator">
+        Ctrl para mostrar painel
+    </div>
+
+    <div id="ui-layer">
+        <h2>Monitor de Áudio (Alta Precisão)</h2>
+        <p>Status: <span id="statusDisp" class="status-label-off">DESATIVADO (Pressione ESC)</span></p>
+        <p>Intensidade Geral: <span id="dbDisp" class="data-label">---</span> dB</p>
+        
+        <!-- Seção do Mouse -->
+        <div class="section-mouse">
+            <h3>🖱️ Oscilador do Mouse</h3>
+            <p>Frequência: <span id="mouseFreqDisp" class="data-label">0.000000</span> Hz 
+               <span id="fineTuneIndicator" class="fine-tune-active" style="display:none;">(Ajuste Fino)</span></p>
+        </div>
+
+        <!-- Seção de Fase -->
+        <div class="section-phase">
+            <h3>🔄 Fase do Oscilador do Mouse</h3>
+            <p>Fase: <span id="phaseDispDeg" class="data-label-phase">0</span>° (<span id="phaseDispRad" class="data-label-phase">0.000000</span> rad)</p>
+        </div>
+        
+        <!-- Seção do Teclado -->
+        <div class="section-keyboard">
+            <h3>⌨️ Oscilador do Teclado</h3>
+            <p>Tecla: <span id="keyDisp" class="data-label-keyboard">---</span></p>
+            <p>Frequência Base: <span id="keyBaseFreqDisp" class="data-label-keyboard">0.000000</span> Hz</p>
+            <p>Transposição: <span id="semitoneDisp" class="semitone-label">0</span> semitons</p>
+            <p>Frequência Final: <span id="keyFinalFreqDisp" class="data-label-keyboard">0.000000</span> Hz</p>
+        </div>
+        
+        <div class="instructions">
+            <strong>ESC:</strong> Liga/Desliga o som | <strong>Eixo Y:</strong> Controla intensidade de ambos
+        </div>
+        <div class="keyboard-info">
+            <strong>Teclado (2º som):</strong> Z-M (100-700Hz), A-Ç (800-1700Hz), Q-P (1800-2700Hz)
+        </div>
+        <div class="semitone-info">
+            <strong>Transposição:</strong> 1-9 (+1 a +9), 0 (+10), - (+11), = (+12), ' (reset)
+        </div>
+        <div class="phase-info">
+            <strong>Fase (Mouse):</strong> ESPAÇO (+10°) | * (-10°) — Estudo de interferência
+        </div>
+        <div class="finetune-info">
+            <strong>Ajuste Fino (Mouse):</strong> ] (+1 Hz) | [ (-1 Hz) — Sintonização precisa
+        </div>
+        <div class="panel-info">
+            <strong>Painel:</strong> Ctrl — Mostrar/Ocultar | Transparência: 50%
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        /*
+         * ================================================================
+         * CONFIGURAÇÕES DE PRECISÃO NUMÉRICA
+         * ================================================================
+         * 
+         * PROBLEMA ORIGINAL:
+         * Ao definir 200 Hz no mouse e 200 Hz no teclado com fase 0,
+         * ocorria modulação de amplitude devido a pequenas diferenças
+         * de frequência causadas por arredondamento.
+         * 
+         * SOLUÇÃO:
+         * 1. Frequências do teclado são valores EXATOS (inteiros)
+         * 2. Frequências do mouse usam 6 casas decimais
+         * 3. Exibição mostra 6 casas decimais para diagnóstico
+         * 4. Função de ajuste fino define valores EXATOS (inteiros)
+         * 
+         * CONSTANTE DE PRECISÃO:
+         */
+        const FREQUENCY_DECIMALS = 6; // Casas decimais para exibição e cálculo
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Display elements
+        const statusDisp = document.getElementById('statusDisp');
+        const dbDisp = document.getElementById('dbDisp');
+        const mouseFreqDisp = document.getElementById('mouseFreqDisp');
+        const fineTuneIndicator = document.getElementById('fineTuneIndicator');
+        const phaseDispDeg = document.getElementById('phaseDispDeg');
+        const phaseDispRad = document.getElementById('phaseDispRad');
+        const keyDisp = document.getElementById('keyDisp');
+        const keyBaseFreqDisp = document.getElementById('keyBaseFreqDisp');
+        const semitoneDisp = document.getElementById('semitoneDisp');
+        const keyFinalFreqDisp = document.getElementById('keyFinalFreqDisp');
+        
+        // Elementos do toggle de painel
+        const uiLayer = document.getElementById('ui-layer');
+        const panelHiddenIndicator = document.getElementById('panel-hidden-indicator');
+
+        // Configurações
+        const MIN_FREQ = 20;  
+        const MAX_FREQ = 15000;
+        const MAX_DB = 150;
+        
+        /*
+         * SEMITONE_RATIO com máxima precisão disponível em JavaScript
+         * 2^(1/12) = 1.0594630943592952645618252949463...
+         */
+        const SEMITONE_RATIO = Math.pow(2, 1/12); // Precisão máxima: 1.0594630943592953
+        
+        const PHASE_INCREMENT = (2 * Math.PI) / 36; // 10 graus em radianos
+
+        // Audio Context e Nodes
+        let audioCtx;
+        
+        // Oscilador 1: Mouse
+        let oscillatorMouse;
+        let gainNodeMouse;
+        
+        // Oscilador 2: Teclado
+        let oscillatorKeyboard;
+        let gainNodeKeyboard;
+        
+        let started = false;
+        let isMuted = true;
+        let isFineTuneMode = false;
+        let isPanelVisible = true;
+        let ctrlPressedAlone = false;
+        
+        // Estado
+        let currentMouseX = 0;
+        let currentMouseY = 0;
+        
+        /*
+         * ================================================================
+         * VARIÁVEIS DE FREQUÊNCIA COM ALTA PRECISÃO
+         * ================================================================
+         * mouseFrequency: número de ponto flutuante com precisão total
+         * keyboardBaseFrequency: INTEIRO EXATO para evitar modulação
+         */
+        let mouseFrequency = 0.0;
+        let keyboardBaseFrequency = 0; // Sempre inteiro exato
+        let semitoneTranspose = 0;
+        let currentKey = '---';
+        
+        // Estado da Fase
+        let currentPhase = 0;
+
+        /*
+         * ================================================================
+         * MAPEAMENTO DE FREQUÊNCIAS DO TECLADO
+         * ================================================================
+         * Valores INTEIROS EXATOS para garantir precisão perfeita
+         * quando comparados com o oscilador do mouse
+         */
+        const keyFreqMap = {
+            'z': 100, 'x': 200, 'c': 300, 'v': 400, 'b': 500, 'n': 600, 'm': 700,
+            'a': 800, 's': 900, 'd': 1000, 'f': 1100, 'g': 1200, 'h': 1300, 
+            'j': 1400, 'k': 1500, 'l': 1600, 'ç': 1700,
+            'q': 1800, 'w': 1900, 'e': 2000, 'r': 2100, 't': 2200, 'y': 2300,
+            'u': 2400, 'i': 2500, 'o': 2600, 'p': 2700
+        };
+
+        const semitoneMappingKeys = {
+            '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
+            '6': 6, '7': 7, '8': 8, '9': 9, '0': 10,
+            '-': 11, '=': 12, "'": 0 
+        };
+
+        /*
+         * ================================================================
+         * FUNÇÃO DE FORMATAÇÃO DE FREQUÊNCIA COM PRECISÃO
+         * ================================================================
+         * Exibe a frequência com o número especificado de casas decimais
+         * para permitir diagnóstico de problemas de precisão
+         */
+        function formatFrequency(freq, decimals = FREQUENCY_DECIMALS) {
+            return freq.toFixed(decimals);
+        }
+
+        // === FUNÇÃO DE TOGGLE DO PAINEL ===
+        
+        function togglePanelVisibility() {
+            isPanelVisible = !isPanelVisible;
+            
+            if (isPanelVisible) {
+                uiLayer.classList.remove('hidden');
+                panelHiddenIndicator.classList.remove('visible');
+            } else {
+                uiLayer.classList.add('hidden');
+                panelHiddenIndicator.classList.add('visible');
+            }
+        }
+
+        // === FUNÇÕES DE CONVERSÃO FREQUÊNCIA <-> POSIÇÃO ===
+        
+        function frequencyToPositionX(freq) {
+            const logMin = Math.log10(MIN_FREQ);
+            const logMax = Math.log10(MAX_FREQ);
+            const ratioX = (Math.log10(freq) - logMin) / (logMax - logMin);
+            return ratioX * canvas.width;
+        }
+
+        function positionXToFrequency(posX) {
+            const logMin = Math.log10(MIN_FREQ);
+            const logMax = Math.log10(MAX_FREQ);
+            const ratioX = posX / canvas.width;
+            return Math.pow(10, logMin + ratioX * (logMax - logMin));
+        }
+
+        // === FUNÇÕES DE AJUSTE FINO ===
+
+        /*
+         * ================================================================
+         * AJUSTE FINO COM PRECISÃO EXATA
+         * ================================================================
+         * Quando o usuário usa ajuste fino, a frequência é definida
+         * como um INTEIRO EXATO para permitir casamento perfeito
+         * com as frequências do teclado
+         */
+        function incrementFrequency() {
+            // Arredonda para inteiro e incrementa
+            mouseFrequency = Math.min(Math.round(mouseFrequency) + 1, MAX_FREQ);
+            currentMouseX = frequencyToPositionX(mouseFrequency);
+            activateFineTuneMode();
+            updateMouseFrequency();
+            updateFrame(currentMouseX, currentMouseY);
+        }
+
+        function decrementFrequency() {
+            // Arredonda para inteiro e decrementa
+            mouseFrequency = Math.max(Math.round(mouseFrequency) - 1, MIN_FREQ);
+            currentMouseX = frequencyToPositionX(mouseFrequency);
+            activateFineTuneMode();
+            updateMouseFrequency();
+            updateFrame(currentMouseX, currentMouseY);
+        }
+
+        function activateFineTuneMode() {
+            isFineTuneMode = true;
+            fineTuneIndicator.style.display = 'inline';
+        }
+
+        function deactivateFineTuneMode() {
+            isFineTuneMode = false;
+            fineTuneIndicator.style.display = 'none';
+        }
+
+        // === FUNÇÕES DE FASE ===
+
+        function createSineWaveWithPhase(phase) {
+            const real = new Float32Array([0, Math.sin(phase)]);
+            const imag = new Float32Array([0, Math.cos(phase)]);
+            return audioCtx.createPeriodicWave(real, imag, { disableNormalization: false });
+        }
+
+        function applyPhaseToMouseOscillator() {
+            if (!started || !oscillatorMouse) return;
+            const waveWithPhase = createSineWaveWithPhase(currentPhase);
+            oscillatorMouse.setPeriodicWave(waveWithPhase);
+        }
+
+        function updatePhaseDisplay() {
+            const phaseDegrees = (currentPhase * 180 / Math.PI);
+            phaseDispDeg.innerText = phaseDegrees.toFixed(1);
+            // Exibe radianos com 6 casas decimais para precisão
+            phaseDispRad.innerText = currentPhase.toFixed(FREQUENCY_DECIMALS);
+        }
+
+        function incrementPhase() {
+            currentPhase += PHASE_INCREMENT;
+            if (currentPhase >= 2 * Math.PI) {
+                currentPhase -= 2 * Math.PI;
+            }
+            applyPhaseToMouseOscillator();
+            updatePhaseDisplay();
+        }
+
+        function decrementPhase() {
+            currentPhase -= PHASE_INCREMENT;
+            if (currentPhase < 0) {
+                currentPhase += 2 * Math.PI;
+            }
+            applyPhaseToMouseOscillator();
+            updatePhaseDisplay();
+        }
+
+        // === FUNÇÕES DE ÁUDIO ===
+
+        function initAudio() {
+            if (started) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            oscillatorMouse = audioCtx.createOscillator();
+            gainNodeMouse = audioCtx.createGain();
+            
+            const initialWave = createSineWaveWithPhase(currentPhase);
+            oscillatorMouse.setPeriodicWave(initialWave);
+            
+            oscillatorMouse.connect(gainNodeMouse);
+            gainNodeMouse.connect(audioCtx.destination);
+            gainNodeMouse.gain.value = 0;
+            oscillatorMouse.start();
+            
+            oscillatorKeyboard = audioCtx.createOscillator();
+            gainNodeKeyboard = audioCtx.createGain();
+            oscillatorKeyboard.type = 'sine'; 
+            oscillatorKeyboard.connect(gainNodeKeyboard);
+            gainNodeKeyboard.connect(audioCtx.destination);
+            gainNodeKeyboard.gain.value = 0;
+            oscillatorKeyboard.frequency.value = 100;
+            oscillatorKeyboard.start();
+            
+            started = true;
+            updatePhaseDisplay();
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function updateFrame(mouseX, mouseY) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (mouseX > 0) {
+                const baseColor = isFineTuneMode ? 'rgba(255, 111, 0, 0.3)' : 'rgba(211, 47, 47, 0.2)';
+                const dotColor = isFineTuneMode ? '#ff6f00' : '#d32f2f';
+                
+                ctx.fillStyle = baseColor;
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = dotColor;
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        /*
+         * ================================================================
+         * CÁLCULO DE TRANSPOSIÇÃO COM ALTA PRECISÃO
+         * ================================================================
+         * Usa SEMITONE_RATIO calculado com Math.pow(2, 1/12)
+         * para máxima precisão disponível em JavaScript
+         */
+        function calculateTransposedFrequency(baseFreq, semitones) {
+            if (semitones === 0) return baseFreq;
+            return baseFreq * Math.pow(SEMITONE_RATIO, semitones);
+        }
+
+        /*
+         * ================================================================
+         * ATUALIZAÇÃO DE FREQUÊNCIA DO MOUSE
+         * ================================================================
+         * Aplica a frequência diretamente ao oscilador com precisão total
+         * Exibe com 6 casas decimais para diagnóstico
+         */
+        function updateMouseFrequency() {
+            if (!started) return;
+            // Aplica frequência com precisão total (sem arredondamento)
+            oscillatorMouse.frequency.setTargetAtTime(mouseFrequency, audioCtx.currentTime, 0.03);
+            // Exibe com precisão de 6 casas decimais
+            mouseFreqDisp.innerText = formatFrequency(mouseFrequency);
+        }
+
+        /*
+         * ================================================================
+         * ATUALIZAÇÃO DE FREQUÊNCIA DO TECLADO
+         * ================================================================
+         * Frequência base é sempre INTEIRA EXATA
+         * Transposição pode resultar em valor fracionário
+         * Exibe com 6 casas decimais para diagnóstico
+         */
+        function updateKeyboardFrequency() {
+            if (!started) return;
+            const finalFreq = calculateTransposedFrequency(keyboardBaseFrequency, semitoneTranspose);
+            // Aplica frequência com precisão total
+            oscillatorKeyboard.frequency.setTargetAtTime(finalFreq, audioCtx.currentTime, 0.03);
+            
+            keyDisp.innerText = currentKey.toUpperCase();
+            // Exibe frequência base como inteiro (é sempre exata)
+            keyBaseFreqDisp.innerText = formatFrequency(keyboardBaseFrequency);
+            semitoneDisp.innerText = semitoneTranspose;
+            // Exibe frequência final com alta precisão
+            keyFinalFreqDisp.innerText = formatFrequency(finalFreq);
+        }
+
+        function updateIntensity() {
+            if (!started) return;
+
+            if (isMuted) {
+                gainNodeMouse.gain.setTargetAtTime(0, audioCtx.currentTime, 0.03);
+                gainNodeKeyboard.gain.setTargetAtTime(0, audioCtx.currentTime, 0.03);
+                dbDisp.innerText = "MUDO (ESC)";
+                return;
+            }
+            
+            const ratioY = (canvas.height - currentMouseY) / canvas.height;
+            const db = ratioY * MAX_DB;
+
+            const gainValue = Math.max(0, ratioY); 
+            gainNodeMouse.gain.setTargetAtTime(gainValue, audioCtx.currentTime, 0.03);
+            
+            if (keyboardBaseFrequency > 0) {
+                gainNodeKeyboard.gain.setTargetAtTime(gainValue, audioCtx.currentTime, 0.03);
+            }
+            
+            dbDisp.innerText = Math.round(db);
+        }
+
+        function toggleMute() {
+            if (!started) initAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            isMuted = !isMuted;
+            
+            if (isMuted) {
+                statusDisp.innerText = "DESATIVADO (Pressione ESC)";
+                statusDisp.className = "status-label-off";
+            } else {
+                statusDisp.innerText = "ATIVO";
+                statusDisp.className = "status-label-on";
+            }
+
+            updateIntensity();
+        }
+
+        // === EVENT LISTENERS ===
+
+        window.addEventListener('mousemove', (e) => {
+            currentMouseX = e.clientX;
+            currentMouseY = e.clientY;
+
+            deactivateFineTuneMode();
+
+            // Calcula frequência com precisão total (não arredonda)
+            mouseFrequency = positionXToFrequency(e.clientX);
+            
+            updateMouseFrequency();
+            updateIntensity();
+            updateFrame(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('keydown', (e) => {
+            // Rastreia se Ctrl foi pressionado sozinho
+            if (e.key === 'Control') {
+                ctrlPressedAlone = true;
+                return;
+            }
+            
+            if (e.ctrlKey) {
+                ctrlPressedAlone = false;
+            }
+
+            // Interruptor ESC
+            if (e.key === 'Escape') {
+                toggleMute();
+                return;
+            }
+
+            // Ajuste Fino - ] (incrementa 1 Hz)
+            if (e.key === ']') {
+                if (!started) initAudio();
+                incrementFrequency();
+                return;
+            }
+
+            // Ajuste Fino - [ (decrementa 1 Hz)
+            if (e.key === '[') {
+                if (!started) initAudio();
+                decrementFrequency();
+                return;
+            }
+
+            // Controle de Fase - Espaço (incrementa 10°)
+            if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                if (!started) initAudio();
+                incrementPhase();
+                return;
+            }
+
+            // Controle de Fase - Asterisco (decrementa 10°)
+            if (e.key === '*') {
+                if (!started) initAudio();
+                decrementPhase();
+                return;
+            }
+
+            if (started && audioCtx.state === 'suspended') audioCtx.resume();
+
+            const key = e.key.toLowerCase();
+            
+            // Teclas de Frequência do Teclado (valores INTEIROS EXATOS)
+            if (keyFreqMap.hasOwnProperty(key)) {
+                currentKey = key;
+                keyboardBaseFrequency = keyFreqMap[key]; // Inteiro exato
+                updateKeyboardFrequency();
+                updateIntensity();
+            }
+            
+            // Teclas de Transposição
+            if (semitoneMappingKeys.hasOwnProperty(e.key)) {
+                semitoneTranspose = semitoneMappingKeys[e.key];
+                updateKeyboardFrequency();
+            }
+        });
+
+        // Toggle do painel apenas quando Ctrl é liberado sozinho
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'Control' && ctrlPressedAlone) {
+                togglePanelVisibility();
+            }
+            ctrlPressedAlone = false;
+        });
+
+        window.addEventListener('mousedown', () => {
+            if (started && audioCtx.state === 'suspended') audioCtx.resume();
+        });
+
+        window.addEventListener('resize', resize);
+        
+        // Início
+        resize();
+        currentMouseY = window.innerHeight / 2;
+        updatePhaseDisplay();
+    </script>
+</body>
+</html>
