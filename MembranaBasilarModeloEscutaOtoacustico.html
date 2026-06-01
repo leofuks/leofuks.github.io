@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Membrana Basilar — Acústica Musical Virtu-Real</title>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ARQUIVOS COMPLEMENTARES (devem estar na mesma pasta deste HTML):
+       • membranabasilarmodel.jpg  → ilustração da cóclea enrolada
+       • membrana basilar.jpeg     → arquivo de referência adicional
+     ════════════════════════════════════════════════════════════════ -->
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a2332 0%, #0d2137 50%, #1a2332 100%);
+    border-bottom: 1px solid #30363d;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 2px 16px #00000088;
+    flex-shrink: 0;
+  }
+  header .logo {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, #2ea043, #1f6feb);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: .4px; }
+  header p  { font-size: .72rem; color: #8b949e; margin-top: 2px; }
+
+  .mode-indicator {
+    margin-left: auto;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: .78rem; font-weight: 700;
+    letter-spacing: .5px;
+    transition: all .3s;
+    flex-shrink: 0;
+  }
+  .mode-tone { background:rgba(88,166,255,.15); border:1px solid #58a6ff55; color:#58a6ff; }
+  .mode-mic  { background:rgba(63,185,80,.15);  border:1px solid #3fb95055; color:#3fb950; }
+
+  .kb-hints {
+    display: flex; gap: 8px; align-items: center;
+    flex-shrink: 0; margin-right: 12px;
+  }
+  .kb-hint { display:flex; align-items:center; gap:5px; font-size:.68rem; color:#6e7681; }
+  .kb-key {
+    background:#21262d; border:1px solid #30363d;
+    border-radius:4px; padding:2px 6px;
+    font-size:.68rem; font-family:monospace; color:#8b949e;
+  }
+
+  .tab-bar {
+    display:flex; background:#161b22;
+    border-bottom:1px solid #30363d;
+    padding:0 20px; gap:4px; flex-shrink:0;
+  }
+  .tab-btn {
+    padding:10px 20px; border:none;
+    border-bottom:3px solid transparent;
+    background:transparent; color:#8b949e;
+    cursor:pointer; font-size:.88rem; font-weight:600;
+    transition:all .2s; display:flex; align-items:center; gap:8px;
+  }
+  .tab-btn:hover  { color:#e6edf3; }
+  .tab-btn.active { color:#58a6ff; border-bottom-color:#58a6ff; }
+
+  .main { display:flex; flex:1; min-height:0; overflow:hidden; }
+
+  .side-panel {
+    width:300px; min-width:260px;
+    background:#161b22;
+    border-right:1px solid #30363d;
+    overflow-y:auto;
+    padding:16px 14px;
+    display:flex; flex-direction:column; gap:14px;
+    flex-shrink:0;
+  }
+
+  .card {
+    background:#1c2128; border:1px solid #30363d;
+    border-radius:10px; padding:14px;
+  }
+  .card h3 {
+    font-size:.78rem; font-weight:700; color:#58a6ff;
+    text-transform:uppercase; letter-spacing:.8px;
+    margin-bottom:10px; display:flex; align-items:center; gap:7px;
+  }
+
+  .slider-group { display:flex; flex-direction:column; gap:5px; }
+  .slider-group label {
+    font-size:.76rem; color:#8b949e;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .slider-group label span { color:#e6edf3; font-weight:600; }
+
+  input[type=range] {
+    -webkit-appearance:none; width:100%; height:5px;
+    border-radius:3px; background:#30363d; outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background:linear-gradient(135deg,#58a6ff,#2ea043);
+    box-shadow:0 0 6px #58a6ff88; cursor:pointer; transition:transform .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform:scale(1.25); }
+
+  .btn {
+    padding:9px 14px; border:none; border-radius:7px;
+    cursor:pointer; font-size:.84rem; font-weight:600;
+    transition:all .2s; display:flex; align-items:center;
+    justify-content:center; gap:7px;
+  }
+  .btn-primary { background:linear-gradient(135deg,#1f6feb,#388bfd); color:#fff; }
+  .btn-success { background:linear-gradient(135deg,#2ea043,#3fb950); color:#fff; }
+  .btn-danger  { background:linear-gradient(135deg,#da3633,#f85149); color:#fff; }
+  .btn:hover   { filter:brightness(1.15); transform:translateY(-1px); }
+  .btn:active  { transform:translateY(0); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; transform:none; filter:none; }
+  .btn-row     { display:flex; gap:8px; }
+
+  .freq-big {
+    text-align:center; font-size:2.2rem; font-weight:800;
+    color:#58a6ff; letter-spacing:1px;
+    text-shadow:0 0 20px #58a6ff55; margin:4px 0;
+  }
+  .note-name { text-align:center; font-size:.88rem; color:#3fb950; font-weight:600; }
+
+  .region-badge {
+    display:inline-block; padding:2px 9px; border-radius:12px;
+    font-size:.72rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.4px; margin-top:3px;
+  }
+  .region-base { background:#1f4a2e; color:#3fb950; }
+  .region-mid  { background:#2d2a1e; color:#d29922; }
+  .region-apex { background:#2d1f1f; color:#f85149; }
+
+  .canvas-area {
+    flex:1; display:flex; flex-direction:column;
+    padding:12px; gap:10px; overflow:hidden;
+    background:#0d1117; min-width:0;
+  }
+
+  .panel-title {
+    font-size:.72rem; color:#8b949e; font-weight:600;
+    text-transform:uppercase; letter-spacing:.6px;
+    display:flex; align-items:center; gap:5px; flex-shrink:0;
+  }
+  .panel-title::before {
+    content:''; display:inline-block; width:7px; height:7px;
+    border-radius:50%; background:#58a6ff; box-shadow:0 0 5px #58a6ff;
+  }
+
+  canvas { border-radius:8px; border:1px solid #30363d; display:block; }
+
+  .cochlea-wrap { position:relative; flex:1; min-height:0; }
+  #cochleaCanvas { width:100%; height:100%; cursor:default; }
+
+  .bottom-row { display:flex; gap:10px; height:130px; flex-shrink:0; }
+  .bottom-row > div { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .bottom-row canvas { flex:1; width:100%; }
+
+  #bmTooltip {
+    position:absolute;
+    background:rgba(13,17,23,0.96);
+    border:1px solid #58a6ff44;
+    border-radius:8px; padding:8px 12px;
+    pointer-events:none; font-size:.75rem;
+    line-height:1.75; color:#e6edf3;
+    z-index:100; display:none;
+    white-space:nowrap;
+    box-shadow:0 4px 24px #00000099;
+  }
+  #bmTooltip .tt-freq  { color:#ff8844; font-weight:700; font-size:.88rem; }
+  #bmTooltip .tt-note  { color:#3fb950; }
+  #bmTooltip .tt-dist  { color:#58a6ff; }
+  #bmTooltip .tt-dist2 { color:#9b59b6; font-size:.68rem; }
+
+  .info-box {
+    background:#161b22; border:1px solid #30363d;
+    border-radius:7px; padding:9px 12px;
+    font-size:.74rem; color:#8b949e; line-height:1.6;
+  }
+  .info-box strong { color:#e6edf3; }
+
+  .kemp-note {
+    background: linear-gradient(135deg, rgba(155,89,182,0.12), rgba(88,166,255,0.08));
+    border: 1px solid #9b59b655;
+    border-left: 3px solid #9b59b6;
+    border-radius:7px; padding:9px 12px;
+    font-size:.72rem; color:#c9b3d9; line-height:1.55;
+  }
+  .kemp-note strong { color:#d8b4f8; }
+  .kemp-note em { color:#9b59b6; font-style:normal; font-weight:600; }
+
+  .mic-status {
+    display:flex; align-items:center; gap:8px; padding:7px 11px;
+    border-radius:7px; background:#21262d; border:1px solid #30363d; font-size:.8rem;
+  }
+  .mic-dot {
+    width:9px; height:9px; border-radius:50%;
+    background:#30363d; transition:background .3s; flex-shrink:0;
+  }
+  .mic-dot.active {
+    background:#3fb950; box-shadow:0 0 7px #3fb95099;
+    animation:pulse 1.2s ease-in-out infinite;
+  }
+  .mic-dot.error { background:#f85149; }
+
+  @keyframes pulse {
+    0%,100%{ box-shadow:0 0 4px #3fb95099; }
+    50%    { box-shadow:0 0 14px #3fb950cc; }
+  }
+
+  .legend { display:flex; flex-wrap:wrap; gap:7px; font-size:.72rem; }
+  .legend-item { display:flex; align-items:center; gap:5px; }
+  .legend-dot  { width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+
+  .vol-bar-wrap { background:#0d1117; border-radius:3px; height:7px; overflow:hidden; margin-top:4px; }
+  .vol-bar {
+    height:100%; width:0%;
+    background:linear-gradient(90deg,#2ea043,#d29922,#f85149);
+    border-radius:3px; transition:width .05s;
+  }
+
+  .peak-list {
+    list-style:none; display:flex; flex-direction:column; gap:3px;
+    max-height:150px; overflow-y:auto;
+  }
+  .peak-list li {
+    display:flex; justify-content:space-between;
+    font-size:.74rem; padding:4px 8px; border-radius:5px;
+    background:#21262d; border-left:3px solid #58a6ff;
+  }
+  .peak-list li span { color:#8b949e; }
+
+  .click-flash {
+    position:absolute; border-radius:50%; pointer-events:none;
+    animation:flashAnim .9s ease-out forwards;
+  }
+  @keyframes flashAnim {
+    0%  { transform:scale(0);   opacity:1; }
+    60% { transform:scale(1.5); opacity:.6; }
+    100%{ transform:scale(2.2); opacity:0; }
+  }
+
+  footer {
+    background:#0d1117; border-top:1px solid #21262d;
+    padding:7px 24px; font-size:.68rem; color:#484f58;
+    text-align:center; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    flex-wrap:wrap;
+  }
+  footer strong { color:#58a6ff; font-weight:700; }
+  footer .sep   { color:#30363d; }
+  footer .kemp-tag { color:#9b59b6; font-weight:600; }
+
+  .side-panel::-webkit-scrollbar { width:4px; }
+  .side-panel::-webkit-scrollbar-track { background:#0d1117; }
+  .side-panel::-webkit-scrollbar-thumb { background:#30363d; border-radius:2px; }
+
+  .hidden { display:none !important; }
+  #panel-tone, #panel-mic { display:flex; flex-direction:column; gap:14px; }
+
+  @media (max-width:768px) {
+    .side-panel { width:240px; }
+    .freq-big   { font-size:1.7rem; }
+    .kb-hints   { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">🦻</div>
+  <div>
+    <h1>Membrana Basilar — Simulador Interativo</h1>
+    <p>Acústica Musical Virtu-Real · Greenwood (1961/1990) · Zweig (1976) · von Békésy (1960) · Kemp (1978) · Leonardo Fuks</p>
+  </div>
+  <div class="kb-hints">
+    <div class="kb-hint"><span class="kb-key">ESC</span> Alternar modo</div>
+    <div class="kb-hint"><span class="kb-key">Space</span> Tocar/Parar</div>
+    <div class="kb-hint"><span class="kb-key">← →</span> Freq. fina</div>
+    <div class="kb-hint"><span class="kb-key">Click BM</span> Selecionar</div>
+  </div>
+  <div class="mode-indicator mode-tone" id="modeIndicator">🎵 MODO SENOIDAL</div>
+</header>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-tone" onclick="switchTab('tone')">
+    🎵 Gerador de Tom Senoidal
+  </button>
+  <button class="tab-btn" id="tab-mic" onclick="switchTab('mic')">
+    🎙️ Análise por Microfone
+  </button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="side-panel">
+
+    <!-- TONE PANEL -->
+    <div id="panel-tone">
+      <div class="card">
+        <h3>⚙️ Controle de Frequência</h3>
+        <div class="freq-big" id="freqDisplay">440 Hz</div>
+        <div class="note-name" id="noteName">Lá4</div>
+        <div style="text-align:center;margin-top:3px" id="regionBadge">
+          <span class="region-badge region-mid">Região Média</span>
+        </div>
+        <div style="margin-top:12px" class="slider-group">
+          <label>Frequência (log) <span id="freqVal">440 Hz</span></label>
+          <input type="range" id="freqSlider" min="0" max="1000"
+                 value="447" oninput="onFreqSlider(this.value)">
+        </div>
+        <div style="margin-top:8px" class="slider-group">
+          <label>Volume <span id="volVal">60%</span></label>
+          <input type="range" id="volSlider" min="0" max="100" value="60"
+                 oninput="onVolSlider(this.value)">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>▶️ Reprodução</h3>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnPlay" onclick="startTone()" style="flex:1">▶ Tocar</button>
+          <button class="btn btn-danger"  id="btnStop" onclick="stopTone()"  style="flex:1" disabled>■ Parar</button>
+        </div>
+        <div style="margin-top:10px" class="slider-group">
+          <label>Varredura automática <span id="sweepVal">Off</span></label>
+          <input type="range" id="sweepSlider" min="0" max="100" value="0"
+                 oninput="onSweepSlider(this.value)">
+        </div>
+        <div class="info-box" style="margin-top:7px;font-size:.7rem">
+          <strong>ESC</strong> alterna modo &nbsp;·&nbsp;
+          <strong>Espaço</strong> toca/para &nbsp;·&nbsp;
+          <strong>← →</strong> freq. fina &nbsp;·&nbsp;
+          <strong>Click BM</strong> seleciona e toca
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🗺️ Posição na Membrana</h3>
+        <div class="info-box" id="bmInfo">
+          Ajuste a frequência ou clique na membrana basilar.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🔬 Sobre o Som Emitido</h3>
+        <div class="kemp-note">
+          Os sons de resposta gerados por este programa correspondem,
+          analogicamente, aos sons de <em>"eco coclear"</em> da
+          <strong>Emissão Otoacústica (EOA)</strong>, fenômeno descrito
+          originalmente por <strong>Kemp (1978)</strong> em
+          <em>Stimulated acoustic emissions from within the human auditory system</em>
+          (J. Acoust. Soc. Am.). A cóclea, ao ser estimulada, não apenas
+          recebe som — ela também o reemite, revelando a atividade ativa
+          das células ciliadas externas (o "amplificador coclear").
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📚 Legenda</h3>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3c6e91"></div>Membrana basilar</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ff4444"></div>Zona excitada</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ffaa00"></div>Onda viajante</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#00ff88"></div>Pico máximo</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>Régua mm</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>Régua Hz</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIC PANEL -->
+    <div id="panel-mic" class="hidden">
+      <div class="card">
+        <h3>🎙️ Microfone</h3>
+        <div class="mic-status">
+          <div class="mic-dot" id="micDot"></div>
+          <span id="micStatusText">Microfone desativado</span>
+        </div>
+        <div style="margin-top:10px" class="btn-row">
+          <button class="btn btn-success" id="btnMicOn"  onclick="startMic()" style="flex:1">🎙️ Ativar</button>
+          <button class="btn btn-danger"  id="btnMicOff" onclick="stopMic()"  style="flex:1" disabled>✕ Parar</button>
+        </div>
+        <div style="margin-top:7px" class="slider-group">
+          <label>Nível de entrada</label>
+          <div class="vol-bar-wrap"><div class="vol-bar" id="micVolBar"></div></div>
+        </div>
+        <div class="info-box" style="margin-top:8px;font-size:.7rem">
+          Pressione <strong>ESC</strong> para voltar ao modo senoidal.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🔍 Picos Detectados</h3>
+        <ul class="peak-list" id="peakList">
+          <li><span>Aguardando microfone…</span></li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>⚙️ Sensibilidade</h3>
+        <div class="slider-group">
+          <label>Threshold <span id="threshVal">-40 dB</span></label>
+          <input type="range" id="threshSlider" min="-80" max="-10" value="-40"
+                 oninput="onThreshSlider(this.value)">
+        </div>
+        <div style="margin-top:7px" class="slider-group">
+          <label>Máx. picos <span id="maxPeaksVal">5</span></label>
+          <input type="range" id="maxPeaksSlider" min="1" max="12" value="5"
+                 oninput="onMaxPeaksSlider(this.value)">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🔬 Eco Coclear (Kemp, 1978)</h3>
+        <div class="kemp-note">
+          As respostas sonoras analisadas aqui são análogas às
+          <strong>Emissões Otoacústicas (OAEs)</strong> — os
+          <em>"ecos cocleares"</em> descritos por <strong>Kemp (1978)</strong>.
+          A cóclea atua como receptor e emissor, devolvendo energia
+          acústica ao canal auditivo após estimulação.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📚 Legenda</h3>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3c6e91"></div>Membrana basilar</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ff4444aa"></div>Excitação</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>Espectro FFT</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>Régua mm</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>Régua Hz</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /side-panel -->
+
+  <!-- CANVAS AREA -->
+  <div class="canvas-area">
+    <div class="panel-title">
+      Cóclea Desenrolada — Membrana Basilar · Mapa Tonotópico de Greenwood (1961/1990)
+    </div>
+    <div class="cochlea-wrap" id="cochleaWrap">
+      <canvas id="cochleaCanvas"></canvas>
+      <div id="bmTooltip"></div>
+    </div>
+    <div class="bottom-row">
+      <div>
+        <div class="panel-title">Forma de Onda</div>
+        <canvas id="waveCanvas"></canvas>
+      </div>
+      <div>
+        <div class="panel-title">Espectro FFT</div>
+        <canvas id="specCanvas"></canvas>
+      </div>
+      <div>
+        <div class="panel-title">Envelope da Onda Viajante</div>
+        <canvas id="envCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- FOOTER -->
+<footer>
+  <span>Desenvolvido por <strong>Leonardo Fuks</strong></span>
+  <span class="sep">|</span>
+  <span>Acústica Musical Virtu-Real</span>
+  <span class="sep">|</span>
+  <span>UFRJ — Escola de Música</span>
+  <span class="sep">|</span>
+  <span>Greenwood (1990) · Zweig (1976) · von Békésy (1960)</span>
+  <span class="sep">|</span>
+  <span class="kemp-tag">Eco Coclear · Kemp (1978)</span>
+</footer>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════
+// IMAGEM DA CÓCLEA ENROLADA (ilustração anatômica)
+// Arquivo:  membranabasilarmodel.jpg  (mesma pasta do HTML)
+// Arquivo de referência adicional: "membrana basilar.jpeg"
+// ═══════════════════════════════════════════
+const cochleaImg = new Image();
+let cochleaImgLoaded = false;
+cochleaImg.onload  = () => { cochleaImgLoaded = true; };
+cochleaImg.onerror = () => { console.warn('[Aviso] membranabasilarmodel.jpg não encontrado — a ilustração da cóclea enrolada não será exibida.'); };
+cochleaImg.src = 'membranabasilarmodel.jpg';
+
+// ═══════════════════════════════════════════
+// TABELA GREENWOOD
+// ═══════════════════════════════════════════
+const GREENWOOD_TABLE = [
+  {mm: 0, hz:20000},{mm: 1, hz:15886},{mm: 2, hz:12619},
+  {mm: 3, hz:10024},{mm: 4, hz: 7962},{mm: 5, hz: 6325},
+  {mm: 6, hz: 5024},{mm: 7, hz: 3981},{mm: 8, hz: 3162},
+  {mm: 9, hz: 2512},{mm:10, hz: 1995},{mm:11, hz: 1585},
+  {mm:12, hz: 1259},{mm:13, hz: 1000},{mm:14, hz:  794},
+  {mm:15, hz:  631},{mm:16, hz:  501},{mm:17, hz:  398},
+  {mm:18, hz:  316},{mm:19, hz:  251},{mm:20, hz:  200},
+  {mm:21, hz:  158},{mm:22, hz:  126},{mm:23, hz:  100},
+  {mm:24, hz:   79},{mm:25, hz:   63},{mm:26, hz:   50},
+  {mm:27, hz:   40},{mm:28, hz:   32},{mm:29, hz:   25},
+  {mm:30, hz:   20},
+];
+const BM_LENGTH_MM = 30;
+
+function freqToNorm(f) {
+  f = Math.max(20, Math.min(20000, f));
+  for (let i = 0; i < GREENWOOD_TABLE.length - 1; i++) {
+    const hi = GREENWOOD_TABLE[i], lo = GREENWOOD_TABLE[i+1];
+    if (f <= hi.hz && f >= lo.hz) {
+      const t = (hi.hz - f) / (hi.hz - lo.hz);
+      return (hi.mm + t*(lo.mm - hi.mm)) / BM_LENGTH_MM;
+    }
+  }
+  return f >= 20000 ? 0 : 1;
+}
+
+function normToFreq(norm) {
+  const mm = Math.max(0, Math.min(BM_LENGTH_MM, norm * BM_LENGTH_MM));
+  for (let i = 0; i < GREENWOOD_TABLE.length - 1; i++) {
+    const a = GREENWOOD_TABLE[i], b = GREENWOOD_TABLE[i+1];
+    if (mm >= a.mm && mm <= b.mm) {
+      const t = (mm - a.mm) / (b.mm - a.mm);
+      return a.hz + t*(b.hz - a.hz);
+    }
+  }
+  return mm <= 0 ? 20000 : 20;
+}
+
+function freqToMm(f) { return freqToNorm(f) * BM_LENGTH_MM; }
+
+// ═══════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════
+let audioCtx      = null;
+let oscillator    = null, gainNode = null;
+let analyser      = null;
+let micStream     = null, micSource = null;
+let animId        = null;
+
+let currentFreq   = 440;
+let currentVol    = 0.6;
+let sweepSpeed    = 0;
+let sweepPhase    = freqToNorm(440);
+let isTonePlaying = false;
+let isMicActive   = false;
+let appMode       = 'tone';
+
+let peakThreshold = -40;
+let maxPeaks      = 5;
+
+const FFT_SIZE    = 4096;
+
+let g_bmX = 0, g_bmY = 0, g_bmW = 0, g_bmBaseH = 0, g_bmApexH = 0;
+let g_dpr = 1;
+
+let mouseOverBM  = false;
+let hoverNorm    = -1;
+let clickFlashes = [];
+
+// ═══════════════════════════════════════════
+// ÁUDIO
+// ═══════════════════════════════════════════
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+    analyser.smoothingTimeConstant = 0.8;
+    analyser.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function startTone() {
+  ensureAudioCtx();
+  if (oscillator) { try { oscillator.stop(); } catch(e){} oscillator.disconnect(); }
+  if (gainNode)   { gainNode.disconnect(); }
+  gainNode   = audioCtx.createGain();
+  oscillator = audioCtx.createOscillator();
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(currentFreq, audioCtx.currentTime);
+  gainNode.gain.setValueAtTime(currentVol * 0.28, audioCtx.currentTime);
+  oscillator.connect(gainNode);
+  gainNode.connect(analyser);
+  oscillator.start();
+  isTonePlaying = true;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  startRenderLoop();
+}
+
+function stopTone() {
+  if (oscillator) {
+    try { oscillator.stop(); } catch(e){}
+    oscillator.disconnect(); oscillator = null;
+  }
+  if (gainNode) { gainNode.disconnect(); gainNode = null; }
+  isTonePlaying = false;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+}
+
+function setOscFreq(f) {
+  if (oscillator && audioCtx)
+    oscillator.frequency.setTargetAtTime(f, audioCtx.currentTime, 0.008);
+}
+
+async function startMic() {
+  ensureAudioCtx();
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
+    micSource = audioCtx.createMediaStreamSource(micStream);
+    micSource.connect(analyser);
+    isMicActive = true;
+    document.getElementById('micDot').classList.add('active');
+    document.getElementById('micStatusText').textContent = 'Microfone ativo — analisando';
+    document.getElementById('btnMicOn').disabled  = true;
+    document.getElementById('btnMicOff').disabled = false;
+    startRenderLoop();
+  } catch(e) {
+    document.getElementById('micDot').classList.add('error');
+    document.getElementById('micStatusText').textContent = 'Erro: ' + e.message;
+  }
+}
+
+function stopMic() {
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micSource) { micSource.disconnect(); micSource = null; }
+  isMicActive = false;
+  document.getElementById('micDot').classList.remove('active','error');
+  document.getElementById('micStatusText').textContent = 'Microfone desativado';
+  document.getElementById('btnMicOn').disabled  = false;
+  document.getElementById('btnMicOff').disabled = true;
+}
+
+// ═══════════════════════════════════════════
+// TECLADO
+// ═══════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') {
+    e.preventDefault();
+    if (appMode === 'tone') {
+      appMode = 'mic';
+      if (isTonePlaying) stopTone();
+      switchTab('mic');
+      startMic();
+    } else {
+      appMode = 'tone';
+      stopMic();
+      switchTab('tone');
+    }
+    updateModeIndicator();
+    return;
+  }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (appMode !== 'tone') return;
+    if (isTonePlaying) stopTone(); else startTone();
+    return;
+  }
+  if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+    if (appMode !== 'tone') return;
+    e.preventDefault();
+    const sl   = document.getElementById('freqSlider');
+    const step = e.shiftKey ? 25 : 6;
+    const val  = Math.max(0, Math.min(1000,
+      parseFloat(sl.value) + (e.code === 'ArrowRight' ? step : -step)));
+    sl.value = val;
+    onFreqSlider(val);
+  }
+});
+
+function updateModeIndicator() {
+  const el = document.getElementById('modeIndicator');
+  if (appMode === 'tone') {
+    el.textContent = '🎵 MODO SENOIDAL';
+    el.className   = 'mode-indicator mode-tone';
+  } else {
+    el.textContent = '🎙️ MODO MICROFONE';
+    el.className   = 'mode-indicator mode-mic';
+  }
+}
+
+// ═══════════════════════════════════════════
+// MOUSE — MEMBRANA BASILAR
+// ═══════════════════════════════════════════
+function getCanvasMouse(e) {
+  const canvas = document.getElementById('cochleaCanvas');
+  const rect   = canvas.getBoundingClientRect();
+  const dpr    = window.devicePixelRatio || 1;
+  return {
+    x:  (e.clientX - rect.left) * dpr,
+    y:  (e.clientY - rect.top)  * dpr,
+    cx: e.clientX - rect.left,
+    cy: e.clientY - rect.top,
+  };
+}
+
+function isInsideBM(mx, my) {
+  if (!g_bmW) return false;
+  if (mx < g_bmX || mx > g_bmX + g_bmW) return false;
+  const normX = (mx - g_bmX) / g_bmW;
+  const hw    = g_bmBaseH/2 + normX * (g_bmApexH/2 - g_bmBaseH/2);
+  return my >= (g_bmY - hw) && my <= (g_bmY + hw);
+}
+
+const _cc = document.getElementById('cochleaCanvas');
+
+_cc.addEventListener('mousemove', (e) => {
+  const {x, y, cx, cy} = getCanvasMouse(e);
+  const inside = isInsideBM(x, y);
+  _cc.style.cursor = inside ? 'crosshair' : 'default';
+  const tooltip = document.getElementById('bmTooltip');
+
+  if (inside) {
+    mouseOverBM = true;
+    const normX = (x - g_bmX) / g_bmW;
+    hoverNorm   = normX;
+    const f     = normToFreq(normX);
+    const mm    = (normX * BM_LENGTH_MM).toFixed(1);
+
+    currentFreq = Math.round(f);
+    const sv = Math.log(Math.max(20, f) / 20) / Math.log(1000) * 1000;
+    document.getElementById('freqSlider').value = sv;
+    updateFreqUI();
+    if (isTonePlaying) setOscFreq(currentFreq);
+
+    const wrap = document.getElementById('cochleaWrap');
+    const wr   = wrap.getBoundingClientRect();
+    let tx = cx + 16, ty = cy - 8;
+    if (tx + 185 > wr.width)  tx = cx - 190;
+    if (ty + 105 > wr.height) ty = cy - 110;
+    if (ty < 0) ty = 4;
+
+    tooltip.style.left    = tx + 'px';
+    tooltip.style.top     = ty + 'px';
+    tooltip.style.display = 'block';
+    tooltip.innerHTML =
+      `<div class="tt-freq">${formatFreq(Math.round(f))}</div>` +
+      `<div class="tt-note">♪ ${freqToNoteName(f)}</div>` +
+      `<div class="tt-dist">📏 ${mm} mm da Janela Oval</div>` +
+      `<div class="tt-dist2">↔ ${(BM_LENGTH_MM - parseFloat(mm)).toFixed(1)} mm do Helicotrema</div>`;
+  } else {
+    mouseOverBM = false;
+    hoverNorm   = -1;
+    tooltip.style.display = 'none';
+  }
+}, {passive: true});
+
+_cc.addEventListener('mouseleave', () => {
+  mouseOverBM = false;
+  hoverNorm   = -1;
+  document.getElementById('bmTooltip').style.display = 'none';
+  _cc.style.cursor = 'default';
+}, {passive: true});
+
+_cc.addEventListener('click', (e) => {
+  const {x, y, cx, cy} = getCanvasMouse(e);
+  if (!isInsideBM(x, y)) return;
+
+  const normX = (x - g_bmX) / g_bmW;
+  const f     = Math.round(normToFreq(normX));
+
+  if (appMode === 'mic') {
+    stopMic();
+    appMode = 'tone';
+    switchTab('tone');
+    updateModeIndicator();
+  }
+
+  currentFreq = f;
+  const sv = Math.log(Math.max(20, f) / 20) / Math.log(1000) * 1000;
+  document.getElementById('freqSlider').value = sv;
+  updateFreqUI();
+
+  if (isTonePlaying) {
+    setOscFreq(f);
+  } else {
+    startTone();
+  }
+
+  const dpr  = window.devicePixelRatio || 1;
+  const hw   = (g_bmBaseH/2 + normX*(g_bmApexH/2 - g_bmBaseH/2)) / dpr;
+  const sz   = Math.max(22, hw * 2.4);
+  const wrap = document.getElementById('cochleaWrap');
+  const fl   = document.createElement('div');
+  fl.className = 'click-flash';
+  fl.style.cssText =
+    `left:${cx - sz/2}px; top:${cy - sz/2}px;` +
+    `width:${sz}px; height:${sz}px;` +
+    `background:radial-gradient(circle,rgba(255,80,20,.78) 0%,rgba(255,180,0,.28) 55%,transparent 100%);` +
+    `border:2px solid rgba(255,80,20,.88);`;
+  wrap.appendChild(fl);
+  setTimeout(() => { if (fl.parentNode) fl.remove(); }, 950);
+
+  clickFlashes.push({ normX, t: performance.now() });
+}, {passive: true});
+
+// ═══════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════
+function onFreqSlider(v) {
+  const f = 20 * Math.pow(1000, v / 1000);
+  currentFreq = Math.round(f);
+  updateFreqUI();
+  if (isTonePlaying) setOscFreq(currentFreq);
+  if (!animId) requestAnimationFrame(renderAll);
+}
+
+function onVolSlider(v) {
+  currentVol = v / 100;
+  document.getElementById('volVal').textContent = v + '%';
+  if (gainNode && audioCtx)
+    gainNode.gain.setTargetAtTime(currentVol * 0.28, audioCtx.currentTime, 0.01);
+}
+
+function onSweepSlider(v) {
+  sweepSpeed = parseInt(v);
+  document.getElementById('sweepVal').textContent = sweepSpeed === 0 ? 'Off' : sweepSpeed + '%';
+  if (sweepSpeed > 0 && !isTonePlaying && appMode === 'tone') startTone();
+}
+
+function onThreshSlider(v) {
+  peakThreshold = parseInt(v);
+  document.getElementById('threshVal').textContent = v + ' dB';
+}
+
+function onMaxPeaksSlider(v) {
+  maxPeaks = parseInt(v);
+  document.getElementById('maxPeaksVal').textContent = v;
+}
+
+function formatFreq(f) {
+  if (f >= 10000) return (f/1000).toFixed(1) + ' kHz';
+  if (f >= 1000)  return (f/1000).toFixed(2).replace(/\.?0+$/, '') + ' kHz';
+  return Math.round(f) + ' Hz';
+}
+
+function freqToNoteName(f) {
+  const notes = ['Dó','Dó♯','Ré','Ré♯','Mi','Fá','Fá♯','Sol','Sol♯','Lá','Lá♯','Si'];
+  const sem   = Math.round(12 * Math.log2(Math.max(20, f) / 440));
+  const idx   = ((sem % 12) + 12 + 9) % 12;
+  const oct   = 4 + Math.floor((sem + 9) / 12);
+  return `${notes[idx]}${oct}`;
+}
+
+function updateFreqUI() {
+  const mm   = freqToMm(currentFreq);
+  const norm = freqToNorm(currentFreq);
+  document.getElementById('freqDisplay').textContent = formatFreq(currentFreq);
+  document.getElementById('freqVal').textContent     = formatFreq(currentFreq);
+  document.getElementById('noteName').textContent    = freqToNoteName(currentFreq);
+
+  let rc, rt, desc;
+  if (mm < 8) {
+    rc='region-base'; rt='Base (Altas freq.)';
+    desc='Membrana estreita e rígida — frequências mais agudas.';
+  } else if (mm < 20) {
+    rc='region-mid'; rt='Região Média';
+    desc='Região de transição — voz e instrumentos musicais.';
+  } else {
+    rc='region-apex'; rt='Ápice (Baixas freq.)';
+    desc='Membrana larga e flexível — frequências graves.';
+  }
+  document.getElementById('regionBadge').innerHTML =
+    `<span class="region-badge ${rc}">${rt}</span>`;
+  document.getElementById('bmInfo').innerHTML =
+    `<strong>Frequência:</strong> ${formatFreq(currentFreq)}<br>
+     <strong>Nota:</strong> ${freqToNoteName(currentFreq)}<br>
+     <strong>Da Janela Oval:</strong> ${mm.toFixed(1)} mm<br>
+     <strong>Do Helicotrema:</strong> ${(BM_LENGTH_MM - mm).toFixed(1)} mm<br>
+     <strong>Posição:</strong> ${(norm*100).toFixed(1)}% da base<br>
+     <strong>Região:</strong> ${rt}<br>
+     <em style="color:#484f58;font-size:.7rem">${desc}</em>`;
+}
+
+// ═══════════════════════════════════════════
+// SWEEP
+// ═══════════════════════════════════════════
+let lastSweepTime = 0;
+function updateSweep(ts) {
+  if (sweepSpeed === 0 || !isTonePlaying) return;
+  if (ts - lastSweepTime < 16) return;
+  lastSweepTime = ts;
+  sweepPhase += sweepSpeed * 0.000032;
+  if (sweepPhase > 1) sweepPhase = 0;
+  const f = Math.round(normToFreq(sweepPhase));
+  currentFreq = f;
+  document.getElementById('freqSlider').value =
+    Math.log(Math.max(20,f)/20) / Math.log(1000) * 1000;
+  updateFreqUI();
+  setOscFreq(f);
+}
+
+// ═══════════════════════════════════════════
+// TAB / MODE
+// ═══════════════════════════════════════════
+function switchTab(tab) {
+  document.getElementById('tab-tone').classList.toggle('active', tab==='tone');
+  document.getElementById('tab-mic' ).classList.toggle('active', tab==='mic');
+  document.getElementById('panel-tone').classList.toggle('hidden', tab!=='tone');
+  document.getElementById('panel-mic' ).classList.toggle('hidden', tab!=='mic');
+  if (tab==='mic'  && isTonePlaying) stopTone();
+  if (tab==='tone' && isMicActive)   stopMic();
+  appMode = tab;
+  updateModeIndicator();
+}
+
+// ═══════════════════════════════════════════
+// CANVAS SIZING
+// ═══════════════════════════════════════════
+function resizeCanvases() {
+  ['cochleaCanvas','waveCanvas','specCanvas','envCanvas'].forEach(id => {
+    const c = document.getElementById(id);
+    const r = c.parentElement.getBoundingClientRect();
+    const d = window.devicePixelRatio || 1;
+    if (r.width < 1 || r.height < 1) return;
+    c.width  = Math.floor(r.width  * d);
+    c.height = Math.floor(r.height * d);
+    c.style.width  = r.width  + 'px';
+    c.style.height = r.height + 'px';
+  });
+}
+window.addEventListener('resize', resizeCanvases);
+window.addEventListener('load', () => {
+  resizeCanvases(); updateFreqUI(); startRenderLoop();
+});
+
+// ═══════════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════════
+function startRenderLoop() {
+  if (animId) return;
+  function loop(ts) {
+    animId = requestAnimationFrame(loop);
+    updateSweep(ts);
+    renderAll();
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+function renderAll() {
+  const hasAudio = analyser && (isTonePlaying || isMicActive);
+  let timeDomain = null, freqDomain = null;
+  if (hasAudio) {
+    timeDomain = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(timeDomain);
+    freqDomain = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatFrequencyData(freqDomain);
+  }
+  const peaks = freqDomain
+    ? detectPeaks(freqDomain)
+    : (!isMicActive ? [{freq:currentFreq, amp:1.0, ampN:1.0}] : []);
+
+  const now = performance.now();
+  clickFlashes = clickFlashes.filter(f => now - f.t < 900);
+
+  drawCochlea(peaks);
+  drawWaveform(timeDomain);
+  drawSpectrum(freqDomain, peaks);
+  drawEnvelope(peaks);
+  if (isMicActive) updateMicUI(freqDomain, peaks);
+}
+
+// ═══════════════════════════════════════════
+// PEAK DETECTION
+// ═══════════════════════════════════════════
+function detectPeaks(freqData) {
+  if (!audioCtx) return [];
+  const sr   = audioCtx.sampleRate;
+  const bins = freqData.length;
+  const cand = [];
+  for (let i=2; i<bins-2; i++) {
+    const dB = freqData[i];
+    if (dB < peakThreshold) continue;
+    if (dB>freqData[i-1] && dB>freqData[i-2] &&
+        dB>freqData[i+1] && dB>freqData[i+2]) {
+      const f = i * sr / (bins*2);
+      if (f >= 20 && f <= 20000)
+        cand.push({freq:f, amp: Math.pow(10, dB/20)});
+    }
+  }
+  cand.sort((a,b) => b.amp - a.amp);
+  const top = cand.slice(0, maxPeaks);
+  if (top.length) { const mx=top[0].amp; top.forEach(p => p.ampN=p.amp/mx); }
+  return top;
+}
+
+// ═══════════════════════════════════════════
+// HELPER — roundRect
+// ═══════════════════════════════════════════
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+// ═══════════════════════════════════════════
+// DRAW — COCHLEA (com ilustração enrolada)
+// ═══════════════════════════════════════════
+function drawCochlea(peaks) {
+  const canvas = document.getElementById('cochleaCanvas');
+  const W = canvas.width, H = canvas.height;
+  if (W < 10 || H < 10) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = g_dpr = window.devicePixelRatio || 1;
+
+  ctx.clearRect(0, 0, W, H);
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0d1117'); bg.addColorStop(1, '#0f1823');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Layout — PAD_B aumentado para acomodar a régua Hz + ilustração 3×
+  const PAD_L  = 106*dpr, PAD_R = 106*dpr;
+  const PAD_T  = 70*dpr,  PAD_B = 140*dpr;
+  const bmW    = W - PAD_L - PAD_R;
+  const bmH    = Math.min(132*dpr, (H - PAD_T - PAD_B) * 0.50);
+  const bmY    = PAD_T + (H - PAD_T - PAD_B)*0.22 + bmH*0.5;
+  const bmX    = PAD_L;
+  const bmBaseH = bmH * 0.18;
+  const bmApexH = bmH;
+
+  g_bmX=bmX; g_bmY=bmY; g_bmW=bmW; g_bmBaseH=bmBaseH; g_bmApexH=bmApexH;
+
+  drawRulerMM(ctx, bmX, bmY, bmW, bmBaseH, bmApexH, dpr);
+
+  if (!isMicActive && peaks.length > 0) {
+    const pNorm = freqToNorm(peaks[0].freq);
+    const t     = performance.now() / 1000;
+    const N     = 400;
+    const wY    = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const xn   = i/(N-1);
+      const dist = xn - pNorm;
+      const env  = dist <= 0
+        ? Math.exp(-Math.pow(dist/0.12, 2))
+        : Math.exp(-Math.pow(dist/0.04, 2));
+      wY[i] = env * Math.sin(80*xn - 2*Math.PI*8*t) * bmH*0.36;
+    }
+    const gg = ctx.createLinearGradient(bmX, 0, bmX+bmW, 0);
+    gg.addColorStop(Math.max(0, pNorm-0.15), 'transparent');
+    gg.addColorStop(pNorm, 'rgba(255,120,0,0.16)');
+    gg.addColorStop(Math.min(1, pNorm+0.07), 'transparent');
+    ctx.fillStyle = gg;
+    ctx.fillRect(bmX, bmY-bmH*0.6, bmW, bmH*1.2);
+
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const x = bmX + (i/(N-1))*bmW;
+      if (i===0) ctx.moveTo(x, bmY+wY[i]);
+      else        ctx.lineTo(x, bmY+wY[i]);
+    }
+    ctx.strokeStyle = 'rgba(255,180,0,0.9)';
+    ctx.lineWidth   = 2*dpr;
+    ctx.shadowBlur  = 10*dpr;
+    ctx.shadowColor = '#ffaa00';
+    ctx.stroke();
+    ctx.shadowBlur  = 0;
+  }
+
+  // Scala vestibuli
+  ctx.beginPath();
+  ctx.moveTo(bmX,      bmY - bmBaseH/2);
+  ctx.lineTo(bmX+bmW,  bmY - bmApexH/2);
+  ctx.lineTo(bmX+bmW,  bmY - bmApexH/2 - 26*dpr);
+  ctx.lineTo(bmX,      bmY - bmBaseH/2 - 13*dpr);
+  ctx.closePath();
+  const sv = ctx.createLinearGradient(bmX, 0, bmX+bmW, 0);
+  sv.addColorStop(0, '#1e4a70'); sv.addColorStop(1, '#0e2233');
+  ctx.fillStyle = sv; ctx.fill();
+  ctx.strokeStyle = '#2a6090'; ctx.lineWidth = dpr; ctx.stroke();
+
+  // Scala tympani
+  ctx.beginPath();
+  ctx.moveTo(bmX,      bmY + bmBaseH/2);
+  ctx.lineTo(bmX+bmW,  bmY + bmApexH/2);
+  ctx.lineTo(bmX+bmW,  bmY + bmApexH/2 + 26*dpr);
+  ctx.lineTo(bmX,      bmY + bmBaseH/2 + 13*dpr);
+  ctx.closePath();
+  const st = ctx.createLinearGradient(bmX, 0, bmX+bmW, 0);
+  st.addColorStop(0, '#1a2e40'); st.addColorStop(1, '#0a1520');
+  ctx.fillStyle = st; ctx.fill();
+  ctx.strokeStyle = '#1e3c56'; ctx.lineWidth = dpr; ctx.stroke();
+
+  // BM body
+  ctx.beginPath();
+  ctx.moveTo(bmX,      bmY - bmBaseH/2);
+  ctx.lineTo(bmX+bmW,  bmY - bmApexH/2);
+  ctx.lineTo(bmX+bmW,  bmY + bmApexH/2);
+  ctx.lineTo(bmX,      bmY + bmBaseH/2);
+  ctx.closePath();
+  const bm = ctx.createLinearGradient(bmX, 0, bmX+bmW, 0);
+  bm.addColorStop(0, '#2a4a6e'); bm.addColorStop(0.5, '#1e3a56'); bm.addColorStop(1, '#0e2233');
+  ctx.fillStyle = bm; ctx.fill();
+
+  ctx.strokeStyle = 'rgba(100,180,255,0.11)'; ctx.lineWidth = dpr;
+  for (let i = 0; i < 50; i++) {
+    const t2 = i/49, x = bmX + t2*bmW;
+    const hw = bmBaseH/2 + t2*(bmApexH/2 - bmBaseH/2);
+    ctx.beginPath(); ctx.moveTo(x, bmY-hw); ctx.lineTo(x, bmY+hw); ctx.stroke();
+  }
+
+  ctx.lineWidth = 2*dpr; ctx.strokeStyle = '#4a8ab0';
+  ctx.beginPath(); ctx.moveTo(bmX, bmY-bmBaseH/2); ctx.lineTo(bmX+bmW, bmY-bmApexH/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bmX, bmY+bmBaseH/2); ctx.lineTo(bmX+bmW, bmY+bmApexH/2); ctx.stroke();
+
+  if (mouseOverBM && hoverNorm >= 0) {
+    const hx = bmX + hoverNorm * bmW;
+    const hw = bmBaseH/2 + hoverNorm*(bmApexH/2 - bmBaseH/2);
+    ctx.save();
+    ctx.setLineDash([3*dpr, 3*dpr]);
+    ctx.strokeStyle = 'rgba(88,166,255,0.55)';
+    ctx.lineWidth   = 1.5*dpr;
+    ctx.beginPath(); ctx.moveTo(hx, bmY-hw-8*dpr); ctx.lineTo(hx, bmY+hw+8*dpr); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(hx, bmY, 4*dpr, 0, Math.PI*2);
+    ctx.fillStyle   = 'rgba(88,166,255,0.7)';
+    ctx.shadowBlur  = 8*dpr;
+    ctx.shadowColor = '#58a6ff';
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+  }
+
+  for (const p of peaks) {
+    const norm = freqToNorm(p.freq);
+    const cx   = bmX + norm*bmW;
+    const hw   = bmBaseH/2 + norm*(bmApexH/2 - bmBaseH/2);
+    const amp  = p.ampN ?? 1.0;
+    const r    = hw * 2.5 * amp;
+
+    const blob = ctx.createRadialGradient(cx, bmY, 0, cx, bmY, r);
+    blob.addColorStop(0,    `rgba(255,50,50,${0.75*amp})`);
+    blob.addColorStop(0.35, `rgba(255,80,0,${0.40*amp})`);
+    blob.addColorStop(1,    'rgba(255,0,0,0)');
+    ctx.fillStyle = blob;
+    ctx.beginPath(); ctx.ellipse(cx, bmY, r, r*0.9, 0, 0, Math.PI*2); ctx.fill();
+
+    ctx.beginPath(); ctx.arc(cx, bmY, 5*dpr*Math.max(0.5, amp), 0, Math.PI*2);
+    ctx.fillStyle   = '#fff';
+    ctx.shadowBlur  = 12*dpr; ctx.shadowColor = '#ff4444';
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    const tickTop = bmY - hw - 14*dpr;
+    ctx.beginPath(); ctx.moveTo(cx, tickTop); ctx.lineTo(cx, bmY-hw);
+    ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2*dpr; ctx.stroke();
+  }
+
+  ctx.font      = `${9*dpr}px sans-serif`;
+  ctx.fillStyle = '#8b949e'; ctx.textAlign = 'center';
+  ctx.fillText('Scala vestibuli', bmX + bmW*0.40, bmY - bmApexH/2 - 33*dpr);
+  ctx.fillText('Scala tympani',   bmX + bmW*0.40, bmY + bmApexH/2 + 37*dpr);
+  ctx.fillStyle = '#58a6ff';
+  ctx.font      = `bold ${10*dpr}px sans-serif`;
+  ctx.fillText('Membrana Basilar', bmX + bmW*0.5, bmY - bmH*0.55);
+
+  ctx.font = `${8*dpr}px sans-serif`; ctx.fillStyle = '#6e7681';
+  ctx.strokeStyle = '#30363d'; ctx.lineWidth = dpr;
+  ctx.beginPath();
+  ctx.moveTo(bmX-22*dpr, bmY-bmBaseH/2-2*dpr);
+  ctx.lineTo(bmX-22*dpr, bmY+bmBaseH/2+2*dpr); ctx.stroke();
+  ctx.textAlign = 'right';
+  ctx.fillText('~0.1mm', bmX-26*dpr, bmY+3*dpr);
+  ctx.beginPath();
+  ctx.moveTo(bmX+bmW+22*dpr, bmY-bmApexH/2-2*dpr);
+  ctx.lineTo(bmX+bmW+22*dpr, bmY+bmApexH/2+2*dpr); ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.fillText('~0.5mm', bmX+bmW+26*dpr, bmY+3*dpr);
+
+  ctx.font = `italic ${9*dpr}px sans-serif`; ctx.textAlign = 'center';
+  ctx.fillStyle = '#3fb950';
+  ctx.fillText('Estreito · Rígido', bmX+bmW*0.1, bmY-bmApexH*0.55+4*dpr);
+  ctx.fillStyle = '#d29922';
+  ctx.fillText('Largo · Flexível',  bmX+bmW*0.9, bmY-bmApexH*0.55+4*dpr);
+
+  drawOvalWindow(ctx, bmX, bmY, bmBaseH, dpr, peaks);
+  drawHelicotrema(ctx, bmX+bmW, bmY, bmApexH, dpr);
+  drawRulerHz(ctx, bmX, bmY, bmW, bmBaseH, bmApexH, H, dpr, peaks);
+
+  // ═══════════════════════════════════════════
+  // ILUSTRAÇÃO DA CÓCLEA ENROLADA
+  // ⚠️ ÚNICA MODIFICAÇÃO: escala 3× e posição mais abaixo
+  // ═══════════════════════════════════════════
+  drawCochleaIllustration(ctx, bmX, bmY, bmW, bmApexH, W, H, dpr);
+
+  ctx.font      = `${8.5*dpr}px sans-serif`;
+  ctx.fillStyle = '#484f58'; ctx.textAlign = 'left';
+  ctx.fillText('Cóclea desenrolada · Greenwood (1961/1990) · BM = 30 mm · Emissão otoacústica: Kemp (1978)', bmX, 13*dpr);
+}
+
+// ═══════════════════════════════════════════
+// ILUSTRAÇÃO DA CÓCLEA ENROLADA
+// ⚠️ ÚNICA MODIFICAÇÃO APLICADA NESTA VERSÃO:
+//    • Escala 3× maior (de 150*dpr → 450*dpr)
+//    • Posição mais abaixo (de +78*dpr → +140*dpr)
+//    Demais elementos permanecem 100% inalterados.
+// ═══════════════════════════════════════════
+function drawCochleaIllustration(ctx, bmX, bmY, bmW, bmApexH, W, H, dpr) {
+  // ► ESCALA 3:1 — antes 150*dpr, agora 450*dpr
+  const imgW = 450 * dpr;
+  const aspect = cochleaImgLoaded
+    ? (cochleaImg.height / cochleaImg.width)
+    : 0.75;
+  const imgH = imgW * aspect;
+
+  // ► POSIÇÃO MAIS ABAIXO — afastamento ampliado
+  //   antes: bmY + bmApexH/2 + 78*dpr
+  //   agora: bmY + bmApexH/2 + 140*dpr  (afastada ~62*dpr a mais)
+  const imgX = bmX + bmW - imgW;
+  const imgY = bmY + bmApexH/2 + 140*dpr;
+
+  // Verifica se cabe no canvas; se não couber totalmente, ainda assim desenha
+  // o que for visível (sem distorcer a proporção 3×).
+  if (imgY > H - 40*dpr) return;
+
+  // Fundo da moldura
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,28,40,0.85)';
+  roundRect(ctx, imgX - 6*dpr, imgY - 6*dpr, imgW + 12*dpr, imgH + 30*dpr, 6*dpr);
+  ctx.fill();
+
+  // Glow sutil ao redor
+  ctx.shadowBlur = 12*dpr;
+  ctx.shadowColor = 'rgba(88,166,255,0.45)';
+  ctx.strokeStyle = '#58a6ff77';
+  ctx.lineWidth = 1.5*dpr;
+  roundRect(ctx, imgX - 6*dpr, imgY - 6*dpr, imgW + 12*dpr, imgH + 30*dpr, 6*dpr);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  if (cochleaImgLoaded) {
+    ctx.drawImage(cochleaImg, imgX, imgY, imgW, imgH);
+  } else {
+    // Fallback: desenho esquemático de espiral
+    ctx.strokeStyle = '#9b59b6';
+    ctx.lineWidth = 2*dpr;
+    const cx = imgX + imgW/2;
+    const cy = imgY + imgH/2;
+    const maxR = Math.min(imgW, imgH) * 0.42;
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 6; a += 0.05) {
+      const r = maxR * (1 - a / (Math.PI * 6));
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (a === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#8b949e';
+    ctx.font = `${9*dpr}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('(membranabasilarmodel.jpg)', cx, cy + maxR + 14*dpr);
+  }
+
+  // Legenda
+  ctx.font = `italic bold ${11*dpr}px sans-serif`;
+  ctx.fillStyle = '#c9b3d9';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cóclea enrolada (in vivo)', imgX + imgW/2, imgY + imgH + 14*dpr);
+
+  ctx.font = `${8.5*dpr}px sans-serif`;
+  ctx.fillStyle = '#6e7681';
+  ctx.fillText('forma anatômica natural · escala ampliada 3×', imgX + imgW/2, imgY + imgH + 26*dpr);
+
+  // Seta indicativa: do diagrama desenrolado para a ilustração enrolada
+  ctx.save();
+  ctx.strokeStyle = 'rgba(155,89,182,0.55)';
+  ctx.lineWidth = 1.5*dpr;
+  ctx.setLineDash([4*dpr, 4*dpr]);
+  ctx.beginPath();
+  const arrowStartX = bmX + bmW * 0.92;
+  const arrowStartY = bmY + bmApexH/2 + 14*dpr;
+  const arrowEndX = imgX + imgW * 0.5;
+  const arrowEndY = imgY - 8*dpr;
+  ctx.moveTo(arrowStartX, arrowStartY);
+  ctx.bezierCurveTo(
+    arrowStartX, arrowStartY + 50*dpr,
+    arrowEndX, arrowEndY - 50*dpr,
+    arrowEndX, arrowEndY
+  );
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Ponta da seta
+  ctx.beginPath();
+  ctx.moveTo(arrowEndX - 5*dpr, arrowEndY - 8*dpr);
+  ctx.lineTo(arrowEndX, arrowEndY);
+  ctx.lineTo(arrowEndX + 5*dpr, arrowEndY - 8*dpr);
+  ctx.strokeStyle = '#9b59b6';
+  ctx.lineWidth = 1.5*dpr;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ─── Janela Oval ──────────────────────────
+function drawOvalWindow(ctx, bmX, bmY, bmBaseH, dpr, peaks) {
+  const t   = performance.now() / 1000;
+  const vib = peaks.length > 0
+    ? Math.sin(t * Math.min(peaks[0].freq, 800) * 0.01) * 4*dpr : 0;
+  const ox = bmX - 14*dpr + vib;
+  const oy = bmY;
+  const rw = 13*dpr;
+  const rh = bmBaseH*0.9 + 12*dpr;
+
+  ctx.shadowBlur  = 10*dpr; ctx.shadowColor = '#58a6ff88';
+  ctx.beginPath(); ctx.ellipse(ox, oy, rw, rh, 0, 0, Math.PI*2);
+  ctx.fillStyle   = 'rgba(30,90,160,0.6)'; ctx.fill();
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1.5*dpr; ctx.stroke();
+  ctx.shadowBlur  = 0;
+
+  ctx.beginPath();
+  ctx.ellipse(ox-3*dpr, oy-rh*0.3, rw*0.35, rh*0.3, -0.3, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(180,220,255,0.2)'; ctx.fill();
+
+  ctx.save();
+  ctx.font = `bold ${9*dpr}px sans-serif`;
+  ctx.fillStyle = '#58a6ff'; ctx.textAlign = 'center';
+  ctx.translate(bmX - 62*dpr, bmY);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText('JANELA OVAL', 0, 0);
+  ctx.restore();
+
+  const ax = bmX - 26*dpr;
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1.5*dpr;
+  ctx.beginPath(); ctx.moveTo(ax-10*dpr, bmY); ctx.lineTo(ax, bmY); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(ax, bmY-4*dpr); ctx.lineTo(ax+4*dpr, bmY); ctx.lineTo(ax, bmY+4*dpr);
+  ctx.fillStyle = '#58a6ff'; ctx.fill();
+}
+
+// ─── Helicotrema ──────────────────────────
+function drawHelicotrema(ctx, cx, cy, bmApexH, dpr) {
+  const rx = 18*dpr;
+  const ry = bmApexH/2 + 14*dpr;
+
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, -Math.PI/2, Math.PI/2);
+  ctx.strokeStyle = '#9b59b6'; ctx.lineWidth = 2*dpr;
+  ctx.shadowBlur  = 8*dpr; ctx.shadowColor = '#9b59b688';
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, -Math.PI/2, Math.PI/2);
+  ctx.fillStyle = 'rgba(100,40,140,0.28)'; ctx.fill();
+
+  ctx.beginPath(); ctx.arc(cx+rx, cy, 5*dpr, 0, Math.PI*2);
+  ctx.fillStyle   = '#9b59b6';
+  ctx.shadowBlur  = 8*dpr; ctx.shadowColor = '#9b59b6';
+  ctx.fill(); ctx.shadowBlur = 0;
+
+  ctx.save();
+  ctx.font = `bold ${9*dpr}px sans-serif`;
+  ctx.fillStyle = '#9b59b6'; ctx.textAlign = 'center';
+  ctx.translate(cx + 64*dpr, cy);
+  ctx.rotate(Math.PI/2);
+  ctx.fillText('HELICOTREMA', 0, 0);
+  ctx.restore();
+}
+
+// ─── Régua MM ──────────────────────────
+function drawRulerMM(ctx, bmX, bmY, bmW, bmBaseH, bmApexH, dpr) {
+  const rulerY = bmY - bmApexH/2 - 38*dpr;
+
+  ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = dpr;
+  ctx.beginPath(); ctx.moveTo(bmX, rulerY); ctx.lineTo(bmX+bmW, rulerY); ctx.stroke();
+
+  ctx.font = `bold ${8.5*dpr}px sans-serif`;
+  ctx.fillStyle = '#58a6ff'; ctx.textAlign = 'right';
+  ctx.fillText('mm', bmX - 6*dpr, rulerY + 3*dpr);
+
+  for (let mm = 0; mm <= BM_LENGTH_MM; mm++) {
+    const norm  = mm / BM_LENGTH_MM;
+    const x     = bmX + norm*bmW;
+    const major = mm % 5 === 0;
+    const tickH = major ? 10*dpr : 5*dpr;
+    ctx.strokeStyle = major ? '#58a6ff' : '#2d3640';
+    ctx.lineWidth   = major ? 1.5*dpr : dpr;
+    ctx.beginPath(); ctx.moveTo(x, rulerY); ctx.lineTo(x, rulerY-tickH); ctx.stroke();
+    if (major) {
+      ctx.font      = `bold ${8*dpr}px sans-serif`;
+      ctx.fillStyle = '#58a6ff'; ctx.textAlign = 'center';
+      ctx.fillText(mm, x, rulerY - tickH - 4*dpr);
+    }
+  }
+
+  ctx.font = `${7.5*dpr}px sans-serif`;
+  ctx.fillStyle = '#484f58'; ctx.textAlign = 'left';
+  ctx.fillText('Distância da Janela Oval (mm)', bmX, rulerY - 22*dpr);
+}
+
+// ─── Régua Hz ──────────────────────────
+function drawRulerHz(ctx, bmX, bmY, bmW, bmBaseH, bmApexH, H, dpr, peaks) {
+  const rulerY = bmY + bmApexH/2 + 38*dpr;
+
+  const HZ_MARKS = [
+    {hz:20000,label:'20k'},{hz:16000,label:'16k'},{hz:10000,label:'10k'},
+    {hz:8000,label:'8k'},{hz:6000,label:'6k'},{hz:4000,label:'4k'},
+    {hz:3000,label:'3k'},{hz:2000,label:'2k'},{hz:1500,label:'1.5k'},
+    {hz:1000,label:'1k'},{hz:800,label:'800'},{hz:630,label:'630'},
+    {hz:500,label:'500'},{hz:400,label:'400'},{hz:315,label:'315'},
+    {hz:250,label:'250'},{hz:200,label:'200'},{hz:160,label:'160'},
+    {hz:125,label:'125'},{hz:100,label:'100'},{hz:80,label:'80'},
+    {hz:63,label:'63'},{hz:50,label:'50'},{hz:40,label:'40'},
+    {hz:32,label:'32'},{hz:25,label:'25'},{hz:20,label:'20'},
+  ];
+
+  const minSep = 18*dpr;
+  let lastX    = -999;
+  const visible = [];
+  for (const m of HZ_MARKS) {
+    const norm = freqToNorm(m.hz);
+    const x    = bmX + norm*bmW;
+    if (x - lastX >= minSep) { visible.push({...m, x}); lastX = x; }
+  }
+
+  ctx.strokeStyle = '#d29922'; ctx.lineWidth = dpr;
+  ctx.beginPath(); ctx.moveTo(bmX, rulerY); ctx.lineTo(bmX+bmW, rulerY); ctx.stroke();
+
+  ctx.font = `bold ${8.5*dpr}px sans-serif`;
+  ctx.fillStyle = '#d29922'; ctx.textAlign = 'right';
+  ctx.fillText('Hz', bmX-6*dpr, rulerY+3*dpr);
+
+  for (const m of visible) {
+    ctx.strokeStyle = '#d29922'; ctx.lineWidth = 1.5*dpr;
+    ctx.beginPath(); ctx.moveTo(m.x, rulerY); ctx.lineTo(m.x, rulerY+10*dpr); ctx.stroke();
+    ctx.font      = `${7.5*dpr}px sans-serif`;
+    ctx.fillStyle = '#d29922'; ctx.textAlign = 'center';
+    ctx.fillText(m.label, m.x, rulerY+20*dpr);
+  }
+
+  ctx.font      = `${7.5*dpr}px sans-serif`;
+  ctx.fillStyle = '#484f58'; ctx.textAlign = 'left';
+  ctx.fillText('Frequência característica (Hz) — Mapa de Greenwood', bmX, rulerY+32*dpr);
+
+  if (peaks.length > 0) {
+    const f    = peaks[0].freq;
+    const norm = freqToNorm(f);
+    const x    = bmX + norm*bmW;
+    const rulerMMy = bmY - bmApexH/2 - 38*dpr;
+
+    ctx.save();
+    ctx.setLineDash([4*dpr, 4*dpr]);
+    ctx.strokeStyle = 'rgba(255,80,80,0.65)';
+    ctx.lineWidth   = 1.5*dpr;
+    ctx.beginPath();
+    ctx.moveTo(x, rulerY+12*dpr);
+    ctx.lineTo(x, rulerMMy-16*dpr);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.moveTo(x-5*dpr, rulerY+14*dpr);
+    ctx.lineTo(x+5*dpr, rulerY+14*dpr);
+    ctx.lineTo(x,        rulerY+3*dpr);
+    ctx.closePath();
+    ctx.fillStyle   = '#ff4444';
+    ctx.shadowBlur  = 8*dpr; ctx.shadowColor = '#ff4444';
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    ctx.beginPath();
+    ctx.moveTo(x-5*dpr, rulerMMy-14*dpr);
+    ctx.lineTo(x+5*dpr, rulerMMy-14*dpr);
+    ctx.lineTo(x,        rulerMMy-3*dpr);
+    ctx.closePath();
+    ctx.fillStyle   = '#ff4444';
+    ctx.shadowBlur  = 8*dpr; ctx.shadowColor = '#ff4444';
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    const mm    = freqToMm(f).toFixed(1);
+    const lbl1  = formatFreq(Math.round(f));
+    const lbl2  = mm + ' mm';
+    const boxX  = Math.max(bmX+4*dpr, Math.min(x-37*dpr, bmX+bmW-78*dpr));
+    const boxY  = rulerY + 24*dpr;
+    ctx.fillStyle   = 'rgba(18,18,26,0.92)';
+    ctx.strokeStyle = '#ff4444'; ctx.lineWidth = dpr;
+    roundRect(ctx, boxX, boxY, 76*dpr, 29*dpr, 5*dpr);
+    ctx.fill(); ctx.stroke();
+    ctx.font      = `bold ${9*dpr}px sans-serif`;
+    ctx.fillStyle = '#ff6644'; ctx.textAlign = 'left';
+    ctx.fillText(lbl1, boxX+5*dpr, boxY+11*dpr);
+    ctx.font      = `${8*dpr}px sans-serif`;
+    ctx.fillStyle = '#58a6ff';
+    ctx.fillText(lbl2, boxX+5*dpr, boxY+22*dpr);
+  }
+}
+
+// ═══════════════════════════════════════════
+// DRAW — WAVEFORM
+// ═══════════════════════════════════════════
+function drawWaveform(data) {
+  const canvas = document.getElementById('waveCanvas');
+  const W = canvas.width, H = canvas.height;
+  if (W<4||H<4) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio||1;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,W,H);
+
+  ctx.strokeStyle='#161b22'; ctx.lineWidth=dpr;
+  for(let i=1;i<4;i++){
+    ctx.beginPath(); ctx.moveTo(0,H*i/4); ctx.lineTo(W,H*i/4); ctx.stroke();
+  }
+  ctx.strokeStyle='#21262d';
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+
+  if (!data) {
+    ctx.fillStyle='#30363d'; ctx.font=`${10*dpr}px sans-serif`;
+    ctx.textAlign='center';
+    ctx.fillText('Sem sinal', W/2, H/2+4*dpr); return;
+  }
+
+  const slice = Math.floor(data.length/W);
+  ctx.beginPath();
+  for(let i=0;i<W;i++){
+    const v = data[i*slice]||0;
+    const y = H/2 - v*H*0.45;
+    if(i===0) ctx.moveTo(i,y); else ctx.lineTo(i,y);
+  }
+  const wg = ctx.createLinearGradient(0,0,W,0);
+  wg.addColorStop(0,'#1f6feb'); wg.addColorStop(0.5,'#58a6ff'); wg.addColorStop(1,'#1f6feb');
+  ctx.strokeStyle=wg; ctx.lineWidth=1.5*dpr;
+  ctx.shadowBlur=6*dpr; ctx.shadowColor='#58a6ff66';
+  ctx.stroke(); ctx.shadowBlur=0;
+}
+
+// ═══════════════════════════════════════════
+// DRAW — SPECTRUM
+// ═══════════════════════════════════════════
+function drawSpectrum(data, peaks) {
+  const canvas = document.getElementById('specCanvas');
+  const W = canvas.width, H = canvas.height;
+  if (W<4||H<4) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio||1;
+
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0d1117'; ctx.fillRect(0,0,W,H);
+
+  const dbLines=[-80,-60,-40,-20,0];
+  ctx.strokeStyle='#161b22'; ctx.lineWidth=dpr;
+  for(const db of dbLines){
+    const y=H-(db+100)/100*H;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    ctx.fillStyle='#30363d'; ctx.font=`${7*dpr}px sans-serif`; ctx.textAlign='right';
+    ctx.fillText(db+'dB', W-2*dpr, y-2*dpr);
+  }
+
+  if (!data) {
+    ctx.fillStyle='#30363d'; ctx.font=`${10*dpr}px sans-serif`;
+    ctx.textAlign='center';
+    ctx.fillText('Sem sinal', W/2, H/2+4*dpr); return;
+  }
+
+  const sr   = audioCtx?.sampleRate||44100;
+  const bins = data.length;
+  const fMin = Math.log10(20), fMax = Math.log10(20000);
+
+  ctx.beginPath();
+  let started=false;
+  for(let i=1;i<bins;i++){
+    const f=i*sr/(bins*2);
+    if(f<20||f>20000) continue;
+    const xN=(Math.log10(f)-fMin)/(fMax-fMin);
+    const dB=Math.max(-100,Math.min(0,data[i]));
+    const y=H-(dB+100)/100*H;
+    if(!started){ctx.moveTo(xN*W,y);started=true;}else ctx.lineTo(xN*W,y);
+  }
+  ctx.lineTo(W,H); ctx.lineTo(0,H);
+  const sg=ctx.createLinearGradient(0,0,0,H);
+  sg.addColorStop(0,'rgba(88,166,255,0.5)'); sg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=sg; ctx.fill();
+
+  ctx.beginPath(); started=false;
+  for(let i=1;i<bins;i++){
+    const f=i*sr/(bins*2);
+    if(f<20||f>20000) continue;
+    const xN=(Math.log10(f)-fMin)/(fMax-fMin);
+    const dB=Math.max(-100,Math.min(0,data[i]));
+    const y=H-(dB+100)/100*H;
+    if(!started){ctx.moveTo(xN*W,y);started=true;}else ctx.lineTo(xN*W,y);
+  }
+  ctx.strokeStyle='#58a6ff'; ctx.lineWidth=1.5*dpr; ctx.stroke();
+
+  for(const p of peaks){
+    const xN=(Math.log10(Math.max(20,p.freq))-fMin)/(fMax-fMin);
+    const x=xN*W;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H);
+    ctx.strokeStyle='rgba(255,68,68,0.5)'; ctx.lineWidth=dpr; ctx.stroke();
+    ctx.fillStyle='#ff4444'; ctx.font=`bold ${8*dpr}px sans-serif`; ctx.textAlign='center';
+    ctx.fillText(formatFreq(Math.round(p.freq)), x, 11*dpr);
+  }
+
+  const rFreqs=[100,500,1000,5000,10000];
+  ctx.fillStyle='#484f58'; ctx.font=`${7*dpr}px sans-serif`;
+  for(const f of rFreqs){
+    const xN=(Math.log10(f)-fMin)/(fMax-fMin);
+    ctx.textAlign='center';
+    ctx.fillText(f>=1000?(f/1000)+'k':f, xN*W, H-3*dpr);
+  }
+}
+
+// ═══════════════════════════════════════════
+// DRAW — ENVELOPE DA ONDA VIAJANTE
+// ═══════════════════════════════════════════
+function drawEnvelope(peaks) {
+  const canvas = document.getElementById('envCanvas');
+  const W = canvas.width, H = canvas.height;
+  if (W < 4 || H < 4) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#161b22'; ctx.lineWidth = dpr;
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath(); ctx.moveTo(0, H*i/4); ctx.lineTo(W, H*i/4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*i/4, 0); ctx.lineTo(W*i/4, H); ctx.stroke();
+  }
+
+  ctx.fillStyle = '#484f58';
+  ctx.font = `${7*dpr}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('Base', 2*dpr, H - 3*dpr);
+  ctx.textAlign = 'right';
+  ctx.fillText('Ápice', W - 2*dpr, H - 3*dpr);
+
+  if (peaks.length === 0) {
+    ctx.fillStyle = '#30363d'; ctx.font = `${10*dpr}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Sem pico', W/2, H/2 + 4*dpr);
+    return;
+  }
+
+  for (let pi = 0; pi < peaks.length; pi++) {
+    const p = peaks[pi];
+    const pNorm = freqToNorm(p.freq);
+    const amp = p.ampN ?? 1.0;
+
+    ctx.beginPath();
+    const N = 200;
+    for (let i = 0; i < N; i++) {
+      const xn = i / (N - 1);
+      const dist = xn - pNorm;
+      const env = dist <= 0
+        ? Math.exp(-Math.pow(dist / 0.12, 2))
+        : Math.exp(-Math.pow(dist / 0.04, 2));
+      const x = xn * W;
+      const y = H - env * amp * H * 0.85 - 2*dpr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W, H); ctx.lineTo(0, H);
+    ctx.closePath();
+
+    const color = pi === 0 ? '255,80,80' : '255,180,0';
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, `rgba(${color},${0.5*amp})`);
+    grad.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = grad; ctx.fill();
+
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const xn = i / (N - 1);
+      const dist = xn - pNorm;
+      const env = dist <= 0
+        ? Math.exp(-Math.pow(dist / 0.12, 2))
+        : Math.exp(-Math.pow(dist / 0.04, 2));
+      const x = xn * W;
+      const y = H - env * amp * H * 0.85 - 2*dpr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = `rgba(${color},0.9)`;
+    ctx.lineWidth = 1.5*dpr;
+    ctx.stroke();
+  }
+
+  if (peaks.length > 0) {
+    const x = freqToNorm(peaks[0].freq) * W;
+    ctx.strokeStyle = 'rgba(0,255,136,0.7)';
+    ctx.lineWidth = dpr;
+    ctx.setLineDash([3*dpr, 3*dpr]);
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#00ff88';
+    ctx.font = `bold ${8*dpr}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(formatFreq(Math.round(peaks[0].freq)), x, 10*dpr);
+  }
+}
+
+// ═══════════════════════════════════════════
+// UPDATE — MIC UI
+// ═══════════════════════════════════════════
+function updateMicUI(freqData, peaks) {
+  if (!freqData) return;
+
+  let sum = 0;
+  for (let i = 0; i < freqData.length; i++) {
+    const lin = Math.pow(10, freqData[i] / 20);
+    sum += lin;
+  }
+  const avg = sum / freqData.length;
+  const pct = Math.min(100, avg * 1500);
+  const bar = document.getElementById('micVolBar');
+  if (bar) bar.style.width = pct + '%';
+
+  const ul = document.getElementById('peakList');
+  if (!ul) return;
+  if (peaks.length === 0) {
+    ul.innerHTML = '<li><span>Nenhum pico detectado</span></li>';
+    return;
+  }
+  ul.innerHTML = peaks.map(p => {
+    const mm = freqToMm(p.freq).toFixed(1);
+    return `<li>
+      <span><strong style="color:#58a6ff">${formatFreq(Math.round(p.freq))}</strong>
+      · ${freqToNoteName(p.freq)}</span>
+      <span>${mm} mm</span>
+    </li>`;
+  }).join('');
+}
+
+</script>
+</body>
+</html>
