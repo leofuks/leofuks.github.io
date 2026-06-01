@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Movimento de Helmholtz em Cordas Friccionadas</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0e0e12;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 12px 30px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 14px;
+    max-width: 1000px;
+  }
+
+  h1 {
+    color: #ffcc33;
+    font-size: clamp(1.15rem, 2.8vw, 1.7rem);
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(255, 204, 51, 0.4);
+    line-height: 1.3;
+  }
+
+  .autor {
+    font-style: italic;
+    color: #bbb;
+    margin-top: 6px;
+    font-size: clamp(0.85rem, 2vw, 1rem);
+  }
+
+  #palco {
+    width: 92vw;
+    max-width: 1000px;
+    height: 420px;
+    border: 2px solid #ffcc33;
+    border-radius: 6px;
+    background: #000;
+    box-shadow: 0 0 18px rgba(255, 204, 51, 0.25);
+    touch-action: none;
+    cursor: ns-resize;
+    display: block;
+  }
+
+  .painel {
+    margin-top: 16px;
+    width: 92vw;
+    max-width: 1000px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    background: #16161d;
+    padding: 14px 18px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 180px;
+  }
+
+  label {
+    color: #ffcc33;
+    font-size: 0.88rem;
+    font-weight: 500;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    min-width: 180px;
+    accent-color: #ffcc33;
+  }
+
+  button {
+    background: #222;
+    color: #e0e0e0;
+    border: 1px solid #ffcc33;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  button:hover { background: #2a2a2a; }
+  button.ativo { background: #ffcc33; color: #000; font-weight: bold; }
+
+  .valor {
+    display: inline-block;
+    min-width: 55px;
+    color: #fff;
+    font-weight: bold;
+    text-align: right;
+  }
+
+  .freqFund { color: #66ccff; font-weight: bold; }
+
+  .statusPainel {
+    width: 92vw;
+    max-width: 1000px;
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .statusBox {
+    background: #16161d;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-height: 72px;
+  }
+
+  .statusBox h3 {
+    color: #ffcc33;
+    font-size: 0.92rem;
+    margin-bottom: 6px;
+  }
+
+  .statusValor {
+    font-size: 1rem;
+    font-weight: bold;
+  }
+
+  .ok    { color: #7dffb0; }
+  .warn  { color: #ffd36a; }
+  .bad   { color: #ff8080; }
+  .info  { color: #66ccff; }
+
+  .legenda {
+    width: 92vw;
+    max-width: 1000px;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #16161d;
+    border-left: 3px solid #ffcc33;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #bbb;
+    line-height: 1.6;
+  }
+
+  .legenda b { color: #fff; }
+  .legenda .amarelo { color: #ffcc33; }
+  .legenda .vermelho { color: #ff5566; }
+  .legenda .azul { color: #66ccff; }
+  .legenda .verde { color: #00ff88; }
+  .legenda .preto { color: #fff; background: #000; padding: 0 4px; border: 1px solid #666; }
+  .legenda .branco { color: #000; background: #fff; padding: 0 4px; border: 1px solid #666; }
+
+  @media (max-width: 600px) {
+    #palco { height: 320px; }
+    .grupo { min-width: 140px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Movimento de Helmholtz em Cordas Friccionadas</h1>
+  <div class="autor">Desenvolvido por Leonardo Fuks — versão com força arco-corda</div>
+</header>
+
+<canvas id="palco"></canvas>
+
+<div class="painel">
+  <div class="grupo">
+    <label>Modo: <span id="valorModo" class="valor" style="min-width:80px;">Manual</span></label>
+    <button id="botaoModo">Alternar modo</button>
+  </div>
+
+  <div class="grupo">
+    <label>Áudio: <span id="valorAudio" class="valor" style="min-width:80px;">Desligado</span></label>
+    <button id="botaoAudio">Ligar áudio</button>
+  </div>
+
+  <div class="grupo">
+    <label for="tensao">Tensão (T): <span id="valorTensao" class="valor"></span> N</label>
+    <input type="range" id="tensao" min="20" max="400" step="5">
+  </div>
+
+  <div class="grupo">
+    <label for="densidade">Densidade linear (μ): <span id="valorDensidade" class="valor"></span> g/m</label>
+    <input type="range" id="densidade" min="0.2" max="8" step="0.1">
+  </div>
+
+  <div class="grupo">
+    <label for="beta">Posição do arco β (x/L): <span id="valorBeta" class="valor"></span></label>
+    <input type="range" id="beta" min="0.05" max="0.5" step="0.01">
+  </div>
+
+  <div class="grupo">
+    <label for="forcaArco">Força arco-corda: <span id="valorForcaArco" class="valor"></span> N</label>
+    <input type="range" id="forcaArco" min="0.02" max="3.00" step="0.01">
+  </div>
+
+  <div class="grupo">
+    <label for="lentidao">Câmera lenta (×): <span id="valorLentidao" class="valor"></span></label>
+    <input type="range" id="lentidao" min="1" max="1000" step="1">
+  </div>
+
+  <div class="grupo">
+    <label for="velocArco">Velocidade do arco (auto): <span id="valorVelocArco" class="valor"></span> cm/s</label>
+    <input type="range" id="velocArco" min="2" max="40" step="1">
+  </div>
+
+  <div class="grupo">
+    <label for="volumeMestre">Volume mestre: <span id="valorVolumeMestre" class="valor"></span></label>
+    <input type="range" id="volumeMestre" min="0" max="1" step="0.01">
+  </div>
+
+  <div class="grupo">
+    <label>Frequência fundamental f₁ = <span id="valorFreqFund" class="freqFund">—</span> Hz
+      <br><small style="color:#888; font-weight:normal;">(determinada por T, μ, L — não é ajustada diretamente)</small>
+    </label>
+  </div>
+</div>
+
+<div class="statusPainel">
+  <div class="statusBox">
+    <h3>Estado local do contato</h3>
+    <div id="estadoContato" class="statusValor">—</div>
+  </div>
+  <div class="statusBox">
+    <h3>Regime global</h3>
+    <div id="estadoHelmholtz" class="statusValor">—</div>
+  </div>
+  <div class="statusBox">
+    <h3>Janela estimada de força</h3>
+    <div id="faixaForca" class="statusValor info">—</div>
+  </div>
+  <div class="statusBox">
+    <h3>Leitura sonora simulada</h3>
+    <div id="estadoSonoro" class="statusValor">—</div>
+  </div>
+</div>
+
+<div class="legenda">
+  <b>Guia visual:</b>
+  <span class="amarelo">■ Corda</span> vibrando.
+  <span class="vermelho">Linha vermelha</span> = posição do arco (β).
+  <span class="preto">● preto</span> = contato em <b>STICK</b>;
+  <span class="branco">● branco</span> = contato em <b>SLIP</b>.
+  <span class="verde">Seta verde</span> = velocidade do arco.
+  <span class="azul">Janela azul</span> = forma de onda no cavalete.
+  A <b>barra vertical magenta</b> desenhada sobre o ponto de contato representa a
+  <b>força de interação arco-corda</b>.
+</div>
+
+<script>
+/* ============================================================================
+   MOVIMENTO DE HELMHOLTZ EM CORDAS FRICCIONADAS
+   VERSÃO REESTRUTURADA COM:
+   - força arco-corda;
+   - indicação explícita de stick/slip;
+   - detecção de regime compatível com Helmholtz;
+   - áudio sem hiss, mas com caráter suave / estável / raucous.
+   ============================================================================ */
+
+// ---------- CONFIGURAÇÕES PADRÃO ----------
+const L_FISICO              = 0.33;
+const TENSAO_PADRAO         = 80;
+const DENSIDADE_PADRAO      = 1.2;
+const BETA_PADRAO           = 0.12;
+const FORCA_ARCO_PADRAO     = 0.45;
+const LENTIDAO_PADRAO       = 100;
+const VELOC_ARCO_PADRAO     = 10;
+const VOLUME_MESTRE_PADRAO  = 0.35;
+
+const NUM_HARMONICOS        = 24;
+
+// Cores
+const COR_CORDA        = '#ffcc33';
+const COR_KINK         = '#ff5566';
+const COR_ENVELOPE     = 'rgba(255, 204, 51, 0.25)';
+const COR_ARCO         = '#00ff88';
+const COR_FUNDO_GRID   = 'rgba(255, 204, 51, 0.08)';
+const COR_STICK        = '#00ff88';
+const COR_SLIP         = '#ff5566';
+const COR_PONTO_STICK  = '#000000';
+const COR_PONTO_SLIP   = '#ffffff';
+const COR_OSCILO       = '#66ccff';
+const COR_FORCA        = '#ff44cc';
+
+// ---------- DOM ----------
+const canvas = document.getElementById('palco');
+const ctx    = canvas.getContext('2d');
+
+const sTensao       = document.getElementById('tensao');
+const sDensidade    = document.getElementById('densidade');
+const sBeta         = document.getElementById('beta');
+const sForcaArco    = document.getElementById('forcaArco');
+const sLentidao     = document.getElementById('lentidao');
+const sVelocArco    = document.getElementById('velocArco');
+const sVolumeMestre = document.getElementById('volumeMestre');
+
+const lTensao       = document.getElementById('valorTensao');
+const lDensidade    = document.getElementById('valorDensidade');
+const lBeta         = document.getElementById('valorBeta');
+const lForcaArco    = document.getElementById('valorForcaArco');
+const lLentidao     = document.getElementById('valorLentidao');
+const lVelocArco    = document.getElementById('valorVelocArco');
+const lVolumeMestre = document.getElementById('valorVolumeMestre');
+const lFreqFund     = document.getElementById('valorFreqFund');
+const lModo         = document.getElementById('valorModo');
+const lAudio        = document.getElementById('valorAudio');
+const btnModo       = document.getElementById('botaoModo');
+const btnAudio      = document.getElementById('botaoAudio');
+
+const estadoContatoEl   = document.getElementById('estadoContato');
+const estadoHelmholtzEl = document.getElementById('estadoHelmholtz');
+const faixaForcaEl      = document.getElementById('faixaForca');
+const estadoSonoroEl    = document.getElementById('estadoSonoro');
+
+// ---------- ESTADO GERAL ----------
+let W = 0, H = 0;
+let tensao       = TENSAO_PADRAO;
+let densidade    = DENSIDADE_PADRAO;
+let beta         = BETA_PADRAO;
+let forcaArco    = FORCA_ARCO_PADRAO;
+let lentidao     = LENTIDAO_PADRAO;
+let velocArco    = VELOC_ARCO_PADRAO;
+let volumeMestre = VOLUME_MESTRE_PADRAO;
+
+let modoAuto    = false;
+let audioLigado = false;
+
+let faseCiclo   = 0;
+let faseManual  = 0;
+
+let ponteiroAtivo = false;
+let yPonteiro = null, yPonteiroAnt = null;
+let tPonteiroAnt = 0;
+let velocMouse = 0;
+let direcaoArco = 1;
+
+let tAnt = performance.now();
+
+const TAMANHO_OSCILO = 512;
+let bufferOscilo = new Float32Array(TAMANHO_OSCILO);
+
+// ---------- ÁUDIO ----------
+let audioCtx = null;
+let osciladoresHarmonicos = [];
+let ganhosHarmonicos = [];
+let ganhoMestre = null;
+let osciladorRugosidade = null;
+let ganhoRugosidade = null;
+
+// ---------- FÍSICA ----------
+function calcularVelocidadeOnda() {
+  const mu = densidade * 1e-3;
+  return Math.sqrt(tensao / mu);
+}
+
+function calcularFrequenciaFundamental() {
+  return calcularVelocidadeOnda() / (2 * L_FISICO);
+}
+
+/*
+  Janela de força estimada para regime de Helmholtz.
+  Implementação pedagógica compatível com a lógica pedida:
+  - beta pequeno exige maior controle;
+  - velocidade maior exige maior força mínima;
+  - tensão/frequência elevam a exigência.
+*/
+function calcularJanelaForcaHelmholtz() {
+  const f1 = calcularFrequenciaFundamental();
+  const fatorPonticello = 1 / beta;
+  const fatorVel = velocArco / 10.0;
+  const fatorTensao = Math.sqrt(tensao / 80.0);
+  const fatorFreq = Math.sqrt(f1 / 220.0);
+
+  let fMin = 0.03 * fatorPonticello * fatorVel * fatorTensao * fatorFreq;
+  let fMax = 0.22 * fatorPonticello * Math.pow(fatorVel, 0.75) * fatorTensao * fatorFreq;
+
+  fMin = Math.max(0.02, fMin);
+  fMax = Math.max(fMin + 0.03, fMax);
+
+  return { fMin, fMax };
+}
+
+function classificarRegimeHelmholtz() {
+  const { fMin, fMax } = calcularJanelaForcaHelmholtz();
+
+  if (forcaArco < fMin) {
+    return {
+      ok: false,
+      tipo: 'forca-baixa',
+      texto: 'SEM HELMHOLTZ — força insuficiente',
+      cor: '#ffd36a'
+    };
+  }
+
+  if (forcaArco > fMax) {
+    return {
+      ok: false,
+      tipo: 'forca-alta',
+      texto: 'SEM HELMHOLTZ — força excessiva / raucous',
+      cor: '#ff8080'
+    };
+  }
+
+  return {
+    ok: true,
+    tipo: 'ok',
+    texto: 'HELMHOLTZ OK',
+    cor: '#7dffb0'
+  };
+}
+
+// ---------- MODELO DE HELMHOLTZ ----------
+function estadoKink(faseNorm) {
+  const f = ((faseNorm % 1) + 1) % 1;
+  if (f < 0.5) {
+    const p = f / 0.5;
+    return { xRel: 1 - p, sinal: +1 };
+  } else {
+    const p = (f - 0.5) / 0.5;
+    return { xRel: p, sinal: -1 };
+  }
+}
+
+function estaEmSlip(faseNorm, betaVal) {
+  const f = ((faseNorm % 1) + 1) % 1;
+  const limiteCima  = 0.5 * (1 - betaVal);
+  const limiteBaixo = 0.5 + 0.5 * betaVal;
+  if (f >= limiteCima && f < 0.5) return true;
+  if (f >= 0.5 && f < limiteBaixo) return true;
+  return false;
+}
+
+function calcularInterseccaoArcoCorda(xArco_px, x0, x1, yCentro, xK_px, yK_px) {
+  if (xArco_px <= xK_px) {
+    const denom = (xK_px - x0) || 1;
+    const t = (xArco_px - x0) / denom;
+    return { x: xArco_px, y: yCentro + t * (yK_px - yCentro) };
+  } else {
+    const denom = (x1 - xK_px) || 1;
+    const t = (xArco_px - xK_px) / denom;
+    return { x: xArco_px, y: yK_px + t * (yCentro - yK_px) };
+  }
+}
+
+// ---------- OSCILOGRAMA ----------
+function amplitudeHarmonicoHelmholtz(n, betaVal) {
+  const arg = n * Math.PI * betaVal;
+  const denom = n * n * Math.PI * Math.PI * betaVal * (1 - betaVal);
+  return (2.0 / denom) * Math.sin(arg);
+}
+
+function atualizarBufferOscilograma() {
+  const amplitudes = [];
+  let soma2 = 0;
+
+  for (let n = 1; n <= NUM_HARMONICOS; n++) {
+    const a = amplitudeHarmonicoHelmholtz(n, beta);
+    amplitudes.push(a);
+    soma2 += a * a;
+  }
+
+  const norm = 1.0 / Math.sqrt(soma2 + 1e-9);
+  const regime = classificarRegimeHelmholtz();
+
+  for (let i = 0; i < TAMANHO_OSCILO; i++) {
+    const t = i / TAMANHO_OSCILO;
+    let y = 0;
+
+    for (let n = 1; n <= NUM_HARMONICOS; n++) {
+      y += amplitudes[n - 1] * norm * Math.sin(2 * Math.PI * n * t);
+    }
+
+    if (!regime.ok) {
+      if (regime.tipo === 'forca-baixa') {
+        y *= 0.35;
+      } else if (regime.tipo === 'forca-alta') {
+        y += 0.18 * Math.sin(2 * Math.PI * 7 * t) * Math.sin(2 * Math.PI * 3 * t);
+      }
+    }
+
+    bufferOscilo[i] = y;
+  }
+}
+
+// ---------- ÁUDIO ----------
+function inicializarAudio() {
+  if (audioCtx) return;
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  ganhoMestre = audioCtx.createGain();
+  ganhoMestre.gain.value = 0;
+  ganhoMestre.connect(audioCtx.destination);
+
+  const f1 = calcularFrequenciaFundamental();
+
+  for (let n = 1; n <= NUM_HARMONICOS; n++) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = n * f1;
+
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+
+    osc.connect(g);
+    g.connect(ganhoMestre);
+    osc.start();
+
+    osciladoresHarmonicos.push(osc);
+    ganhosHarmonicos.push(g);
+  }
+
+  // Oscilador áspero para sensação de som forçado/raucous
+  osciladorRugosidade = audioCtx.createOscillator();
+  osciladorRugosidade.type = 'sawtooth';
+  osciladorRugosidade.frequency.value = 90;
+
+  ganhoRugosidade = audioCtx.createGain();
+  ganhoRugosidade.gain.value = 0;
+
+  osciladorRugosidade.connect(ganhoRugosidade);
+  ganhoRugosidade.connect(ganhoMestre);
+  osciladorRugosidade.start();
+}
+
+function ligarAudio() {
+  inicializarAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  audioLigado = true;
+  lAudio.textContent = 'Ligado';
+  btnAudio.textContent = 'Desligar áudio';
+  btnAudio.classList.add('ativo');
+}
+
+function desligarAudio() {
+  if (audioCtx) audioCtx.suspend();
+  audioLigado = false;
+  lAudio.textContent = 'Desligado';
+  btnAudio.textContent = 'Ligar áudio';
+  btnAudio.classList.remove('ativo');
+}
+
+function atualizarEspectroTonal() {
+  if (!audioCtx) return;
+
+  const agora = audioCtx.currentTime;
+  const f1 = calcularFrequenciaFundamental();
+  const regime = classificarRegimeHelmholtz();
+
+  let soma2 = 0;
+  const amplitudes = [];
+  for (let n = 1; n <= NUM_HARMONICOS; n++) {
+    const a = amplitudeHarmonicoHelmholtz(n, beta);
+    amplitudes.push(a);
+    soma2 += a * a;
+  }
+  const norm = 1.0 / Math.sqrt(soma2 + 1e-9);
+
+  let ganhoBase = 0.28;
+  if (!regime.ok && regime.tipo === 'forca-baixa') ganhoBase = 0.08;
+  if (!regime.ok && regime.tipo === 'forca-alta') ganhoBase = 0.18;
+
+  for (let i = 0; i < NUM_HARMONICOS; i++) {
+    const n = i + 1;
+    const freqN = n * f1;
+    osciladoresHarmonicos[i].frequency.setTargetAtTime(freqN, agora, 0.02);
+
+    const ativo = (freqN < audioCtx.sampleRate * 0.45);
+    const g = ativo ? Math.abs(amplitudes[i]) * norm * ganhoBase : 0;
+    ganhosHarmonicos[i].gain.setTargetAtTime(g, agora, 0.03);
+  }
+}
+
+function atualizarAudio() {
+  if (!audioCtx) return;
+
+  const agora = audioCtx.currentTime;
+  const regime = classificarRegimeHelmholtz();
+  const slip = estaEmSlip(modoAuto ? faseCiclo : faseManual, beta);
+
+  ganhoMestre.gain.setTargetAtTime(volumeMestre * (audioLigado ? 1 : 0), agora, 0.05);
+
+  atualizarEspectroTonal();
+
+  // Sem hiss/ruído branco.
+  // Som áspero cresce com força alta.
+  let rugosidade = 0;
+
+  if (!regime.ok && regime.tipo === 'forca-alta') {
+    const { fMax } = calcularJanelaForcaHelmholtz();
+    rugosidade = Math.min(0.22, 0.06 + 0.20 * ((forcaArco - fMax) / Math.max(0.05, fMax)));
+  } else if (!regime.ok && regime.tipo === 'forca-baixa') {
+    rugosidade = slip ? 0.015 : 0.005;
+  } else {
+    rugosidade = 0.01;
+  }
+
+  osciladorRugosidade.frequency.setTargetAtTime(
+    regime.tipo === 'forca-alta' ? 140 + forcaArco * 60 : 70,
+    agora,
+    0.03
+  );
+  ganhoRugosidade.gain.setTargetAtTime(Math.max(0, rugosidade), agora, 0.05);
+}
+
+// ---------- INIT ----------
+function init() {
+  sTensao.value       = TENSAO_PADRAO;
+  sDensidade.value    = DENSIDADE_PADRAO;
+  sBeta.value         = BETA_PADRAO;
+  sForcaArco.value    = FORCA_ARCO_PADRAO;
+  sLentidao.value     = LENTIDAO_PADRAO;
+  sVelocArco.value    = VELOC_ARCO_PADRAO;
+  sVolumeMestre.value = VOLUME_MESTRE_PADRAO;
+
+  atualizarLabels();
+  redimensionar();
+
+  window.addEventListener('resize', redimensionar);
+
+  sTensao.addEventListener('input',       () => { tensao       = +sTensao.value;       atualizarLabels(); });
+  sDensidade.addEventListener('input',    () => { densidade    = +sDensidade.value;    atualizarLabels(); });
+  sBeta.addEventListener('input',         () => { beta         = +sBeta.value;         atualizarLabels(); });
+  sForcaArco.addEventListener('input',    () => { forcaArco    = +sForcaArco.value;    atualizarLabels(); });
+  sLentidao.addEventListener('input',     () => { lentidao     = +sLentidao.value;     atualizarLabels(); });
+  sVelocArco.addEventListener('input',    () => { velocArco    = +sVelocArco.value;    atualizarLabels(); });
+  sVolumeMestre.addEventListener('input', () => { volumeMestre = +sVolumeMestre.value; atualizarLabels(); });
+
+  btnModo.addEventListener('click', () => {
+    modoAuto = !modoAuto;
+    lModo.textContent = modoAuto ? 'Automático' : 'Manual';
+    btnModo.classList.toggle('ativo', modoAuto);
+  });
+
+  btnAudio.addEventListener('click', () => {
+    if (audioLigado) desligarAudio();
+    else ligarAudio();
+  });
+
+  canvas.addEventListener('pointerdown',   aoPressionar);
+  canvas.addEventListener('pointermove',   aoMover);
+  canvas.addEventListener('pointerup',     aoSoltar);
+  canvas.addEventListener('pointercancel', aoSoltar);
+  canvas.addEventListener('pointerleave',  aoSoltar);
+  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  canvas.addEventListener('touchmove',  e => e.preventDefault(), { passive: false });
+
+  requestAnimationFrame(loop);
+}
+
+function atualizarLabels() {
+  lTensao.textContent       = tensao.toFixed(0);
+  lDensidade.textContent    = densidade.toFixed(1);
+  lBeta.textContent         = beta.toFixed(2);
+  lForcaArco.textContent    = forcaArco.toFixed(2);
+  lLentidao.textContent     = lentidao.toFixed(0);
+  lVelocArco.textContent    = velocArco.toFixed(0);
+  lVolumeMestre.textContent = volumeMestre.toFixed(2);
+  lFreqFund.textContent     = calcularFrequenciaFundamental().toFixed(1);
+
+  atualizarPainelDeEstado();
+}
+
+function atualizarPainelDeEstado() {
+  const regime = classificarRegimeHelmholtz();
+  const { fMin, fMax } = calcularJanelaForcaHelmholtz();
+  const fase = modoAuto ? faseCiclo : faseManual;
+  const slip = estaEmSlip(fase, beta);
+
+  estadoContatoEl.textContent = slip ? 'SLIP' : 'STICK';
+  estadoContatoEl.className = 'statusValor ' + (slip ? 'bad' : 'ok');
+
+  estadoHelmholtzEl.textContent = regime.texto;
+  estadoHelmholtzEl.className = 'statusValor ' + (regime.ok ? 'ok' : regime.tipo === 'forca-baixa' ? 'warn' : 'bad');
+
+  faixaForcaEl.textContent = `${fMin.toFixed(2)} N  –  ${fMax.toFixed(2)} N`;
+
+  if (regime.ok) {
+    estadoSonoroEl.textContent = 'Som estável / tonal';
+    estadoSonoroEl.className = 'statusValor ok';
+  } else if (regime.tipo === 'forca-baixa') {
+    estadoSonoroEl.textContent = 'Som suave / escorregante';
+    estadoSonoroEl.className = 'statusValor warn';
+  } else {
+    estadoSonoroEl.textContent = 'Som rouco / forçado (raucous)';
+    estadoSonoroEl.className = 'statusValor bad';
+  }
+}
+
+function redimensionar() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width  = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ---------- ENTRADA ----------
+function aoPressionar(e) {
+  ponteiroAtivo = true;
+  canvas.setPointerCapture(e.pointerId);
+  const r = canvas.getBoundingClientRect();
+  yPonteiro = yPonteiroAnt = e.clientY - r.top;
+  tPonteiroAnt = performance.now();
+  velocMouse = 0;
+}
+
+function aoMover(e) {
+  if (!ponteiroAtivo) return;
+  const r = canvas.getBoundingClientRect();
+  yPonteiro = e.clientY - r.top;
+}
+
+function aoSoltar() {
+  ponteiroAtivo = false;
+}
+
+// ---------- RENDERIZAÇÃO ----------
+function desenhar() {
+  ctx.clearRect(0, 0, W, H);
+
+  const margemX = 60, margemY = 40;
+  const x0 = margemX, x1 = W - margemX - 160;
+  const xOsciA = W - margemX - 150, xOsciB = W - margemX;
+  const yCentro = H / 2;
+  const larguraTela = x1 - x0;
+  const amplitudePx = (H / 2) * 0.55;
+
+  // Grade
+  ctx.strokeStyle = COR_FUNDO_GRID;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= 10; i++) {
+    const x = x0 + (i / 10) * larguraTela;
+    ctx.moveTo(x, margemY);
+    ctx.lineTo(x, H - margemY);
+  }
+  for (let j = 0; j <= 6; j++) {
+    const y = margemY + (j / 6) * (H - 2 * margemY);
+    ctx.moveTo(x0, y);
+    ctx.lineTo(x1, y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.moveTo(x0, yCentro);
+  ctx.lineTo(x1, yCentro);
+  ctx.stroke();
+
+  // Envelope parabólico
+  ctx.strokeStyle = COR_ENVELOPE;
+  ctx.setLineDash([6, 6]);
+  ctx.lineWidth = 1.5;
+  for (const sinal of [1, -1]) {
+    ctx.beginPath();
+    for (let i = 0; i <= 100; i++) {
+      const u = i / 100;
+      const x = x0 + u * larguraTela;
+      const y = yCentro - sinal * amplitudePx * 4 * u * (1 - u);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  const fase = modoAuto ? faseCiclo : faseManual;
+  const kink = estadoKink(fase);
+  const sinalY = kink.sinal * direcaoArco;
+  const xK_rel = kink.xRel;
+  const xK_px  = x0 + xK_rel * larguraTela;
+  const yK_px  = yCentro - sinalY * amplitudePx * 4 * xK_rel * (1 - xK_rel);
+
+  // Corda
+  const espessura = Math.max(1.2, Math.min(10, 1 + densidade * 1.1));
+  ctx.strokeStyle = COR_CORDA;
+  ctx.lineWidth = espessura;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = COR_CORDA;
+  ctx.beginPath();
+  ctx.moveTo(x0, yCentro);
+  ctx.lineTo(xK_px, yK_px);
+  ctx.lineTo(x1, yCentro);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Fixadores
+  ctx.fillStyle = '#888';
+  ctx.fillRect(x0 - 6, yCentro - 16, 6, 32);
+  ctx.fillRect(x1,     yCentro - 16, 6, 32);
+  ctx.fillStyle = '#fff';
+  ctx.font = '11px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.fillText('Nut (pestana)', x0, H - margemY + 22);
+  ctx.fillText('Bridge (cavalete)', x1, H - margemY + 22);
+
+  // Canto
+  ctx.fillStyle = COR_KINK;
+  ctx.beginPath();
+  ctx.arc(xK_px, yK_px, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Linha do arco
+  const xArco_px = x0 + beta * larguraTela;
+  ctx.strokeStyle = COR_KINK;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(xArco_px, margemY);
+  ctx.lineTo(xArco_px, H - margemY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = COR_KINK;
+  ctx.textAlign = 'center';
+  ctx.fillText(`β = ${beta.toFixed(2)}`, xArco_px, margemY - 6);
+
+  // Interseção arco-corda
+  const interseccao = calcularInterseccaoArcoCorda(xArco_px, x0, x1, yCentro, xK_px, yK_px);
+  const emSlip = estaEmSlip(fase, beta);
+
+  // Ponto de contato stick/slip
+  ctx.fillStyle = emSlip ? COR_PONTO_SLIP : COR_PONTO_STICK;
+  ctx.strokeStyle = emSlip ? '#000' : '#fff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(interseccao.x, interseccao.y, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  if (emSlip) {
+    ctx.strokeStyle = COR_SLIP;
+    ctx.beginPath();
+    ctx.arc(interseccao.x, interseccao.y, 14, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Seta verde = velocidade do arco
+  let velocidadeExibida = modoAuto ? velocArco * direcaoArco : velocMouse;
+  const tamSeta = Math.max(-120, Math.min(120, velocidadeExibida * 3));
+  desenharSeta(interseccao.x + 14, interseccao.y, interseccao.x + 14, interseccao.y - tamSeta, COR_ARCO);
+
+  // Barra magenta = força arco-corda
+  const tamForca = Math.max(10, Math.min(120, forcaArco * 40));
+  ctx.strokeStyle = COR_FORCA;
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(interseccao.x - 18, interseccao.y - tamForca / 2);
+  ctx.lineTo(interseccao.x - 18, interseccao.y + tamForca / 2);
+  ctx.stroke();
+
+  ctx.fillStyle = COR_FORCA;
+  ctx.font = 'bold 11px Segoe UI';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${forcaArco.toFixed(2)} N`, interseccao.x - 24, interseccao.y - tamForca / 2 - 6);
+
+  // Textos
+  const c  = calcularVelocidadeOnda();
+  const f1 = calcularFrequenciaFundamental();
+  const regime = classificarRegimeHelmholtz();
+  const { fMin, fMax } = calcularJanelaForcaHelmholtz();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '12px Segoe UI';
+  ctx.textAlign = 'left';
+  ctx.fillText(`c = √(T/μ) = ${c.toFixed(1)} m/s`, x0, margemY - 22);
+  ctx.fillStyle = '#66ccff';
+  ctx.fillText(`f₁ = c/(2L) = ${f1.toFixed(1)} Hz`, x0, margemY - 6);
+
+  let regiaoTimbre;
+  if (beta < 0.12)      regiaoTimbre = 'SUL PONTICELLO (brilhante, harmônicos agudos fortes)';
+  else if (beta < 0.25) regiaoTimbre = 'Intermediário (timbre equilibrado)';
+  else                  regiaoTimbre = 'SUL TASTO (doce, fundamental predomina)';
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = emSlip ? COR_SLIP : COR_STICK;
+  ctx.font = 'bold 14px Segoe UI';
+  ctx.fillText(emSlip ? 'SLIP' : 'STICK', x0, H - margemY + 22);
+
+  ctx.fillStyle = '#aaa';
+  ctx.font = '11px Segoe UI';
+  ctx.fillText(regiaoTimbre, x0 + 60, H - margemY + 22);
+
+  ctx.font = 'bold 12px Segoe UI';
+  ctx.fillStyle = regime.cor;
+  ctx.fillText(regime.texto, x0, H - margemY + 40);
+
+  ctx.font = '11px Segoe UI';
+  ctx.fillStyle = '#bbb';
+  ctx.fillText(`Janela estimada: ${fMin.toFixed(2)} N – ${fMax.toFixed(2)} N`, x0 + 220, H - margemY + 40);
+
+  // Oscilograma
+  desenharOscilograma(xOsciA, margemY, xOsciB - xOsciA, H - 2 * margemY);
+
+  atualizarPainelDeEstado();
+}
+
+function desenharOscilograma(x, y, w, h) {
+  ctx.fillStyle = 'rgba(102, 204, 255, 0.05)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(102, 204, 255, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+
+  const yMeio = y + h / 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath();
+  ctx.moveTo(x, yMeio);
+  ctx.lineTo(x + w, yMeio);
+  ctx.stroke();
+
+  ctx.fillStyle = '#66ccff';
+  ctx.font = 'bold 10px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.fillText('Onda no cavalete', x + w / 2, y - 6);
+  ctx.font = '9px Segoe UI';
+  ctx.fillStyle = '#888';
+  ctx.fillText('(regime depende de β, velocidade e força)', x + w / 2, y + h + 14);
+
+  ctx.strokeStyle = COR_OSCILO;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < TAMANHO_OSCILO; i++) {
+    const xi = x + (i / (TAMANHO_OSCILO - 1)) * w;
+    const yi = yMeio - bufferOscilo[i] * (h / 2) * 0.85;
+    if (i === 0) ctx.moveTo(xi, yi); else ctx.lineTo(xi, yi);
+  }
+  ctx.stroke();
+}
+
+function desenharSeta(x1, y1, x2, y2, cor) {
+  ctx.strokeStyle = cor;
+  ctx.fillStyle = cor;
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const tam = 10;
+  if (Math.hypot(x2 - x1, y2 - y1) > 4) {
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - tam * Math.cos(ang - Math.PI / 6), y2 - tam * Math.sin(ang - Math.PI / 6));
+    ctx.lineTo(x2 - tam * Math.cos(ang + Math.PI / 6), y2 - tam * Math.sin(ang + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+// ---------- LOOP ----------
+function loop(tAgora) {
+  const dt = (tAgora - tAnt) / 1000;
+  tAnt = tAgora;
+
+  if (!modoAuto && ponteiroAtivo && yPonteiro !== null) {
+    const agora = performance.now();
+    const dtp = (agora - tPonteiroAnt) / 1000;
+    if (dtp > 0) {
+      const dyPx = yPonteiro - yPonteiroAnt;
+      const escala = (L_FISICO * 100) / W;
+      const v_cmps = -dyPx * escala / dtp;
+      velocMouse = velocMouse * 0.7 + v_cmps * 0.3;
+      if (Math.abs(velocMouse) > 0.5) direcaoArco = velocMouse >= 0 ? 1 : -1;
+    }
+    yPonteiroAnt = yPonteiro;
+    tPonteiroAnt = agora;
+  } else if (!modoAuto && !ponteiroAtivo) {
+    velocMouse *= 0.9;
+  }
+
+  const f1 = calcularFrequenciaFundamental();
+  const dtSim = dt / lentidao;
+
+  const regime = classificarRegimeHelmholtz();
+
+  if (modoAuto) {
+    if (regime.ok) {
+      faseCiclo = (faseCiclo + f1 * dtSim) % 1;
+    } else if (regime.tipo === 'forca-baixa') {
+      faseCiclo = (faseCiclo + 0.25 * f1 * dtSim) % 1;
+    } else {
+      faseCiclo = (faseCiclo + 1.2 * f1 * dtSim) % 1;
+    }
+    direcaoArco = 1;
+  } else {
+    const intensidade = Math.min(1, Math.abs(velocMouse) / 20);
+    let taxa = (0.05 + 0.95 * intensidade) * f1;
+
+    if (!regime.ok && regime.tipo === 'forca-baixa') taxa *= 0.25;
+    if (!regime.ok && regime.tipo === 'forca-alta') taxa *= 1.15;
+
+    faseManual = (faseManual + taxa * dtSim) % 1;
+  }
+
+  atualizarBufferOscilograma();
+  atualizarAudio();
+  desenhar();
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+
+</body>
+</html>
