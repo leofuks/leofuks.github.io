@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador Final de Corda Vibrante</title>
+  <style>
+    :root{
+      --bg:#0f1117;
+      --panel:#171b24;
+      --panel2:#1e2430;
+      --text:#e8ecf3;
+      --muted:#aab4c3;
+      --accent:#5cc8ff;
+      --accent2:#7ef29a;
+      --line:#2c3444;
+      --danger:#8f2d2d;
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:linear-gradient(180deg,#0c0f15,#151b25);
+      color:var(--text);
+    }
+
+    .container{
+      max-width:1400px;
+      margin:0 auto;
+      padding:20px;
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:20px;
+    }
+
+    .panel{
+      background:rgba(23,27,36,.96);
+      border:1px solid #2a3242;
+      border-radius:16px;
+      padding:18px;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+
+    h1{
+      margin:0 0 8px 0;
+      font-size:24px;
+    }
+
+    .subtitle{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.45;
+      margin-bottom:18px;
+    }
+
+    .control-group{
+      margin-bottom:18px;
+      padding-bottom:14px;
+      border-bottom:1px solid var(--line);
+    }
+
+    .control-group:last-child{
+      margin-bottom:0;
+      padding-bottom:0;
+      border-bottom:none;
+    }
+
+    label{
+      display:block;
+      font-size:14px;
+      margin-bottom:8px;
+      font-weight:bold;
+      color:#dfe6f2;
+    }
+
+    .value{
+      color:var(--accent);
+      font-weight:bold;
+      margin-left:8px;
+    }
+
+    input[type="range"]{
+      width:100%;
+      cursor:pointer;
+      accent-color:var(--accent);
+    }
+
+    .small{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+
+    .main{
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+
+    .canvas-wrap{
+      background:rgba(23,27,36,.96);
+      border:1px solid #2a3242;
+      border-radius:16px;
+      padding:14px;
+    }
+
+    canvas{
+      width:100%;
+      display:block;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+        #0d121b;
+      border-radius:12px;
+      border:1px solid #243041;
+      touch-action:none;
+    }
+
+    .controls-under-graph{
+      margin-top:14px;
+      border:1px solid #2a3242;
+      background:#121923;
+      border-radius:14px;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .modes-row{
+      display:grid;
+      grid-template-columns:repeat(5, minmax(100px, 1fr));
+      gap:8px;
+    }
+
+    .global-row{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:12px;
+    }
+
+    .mode-btn,
+    .action-btn{
+      background:var(--panel2);
+      color:var(--text);
+      border:1px solid #344055;
+      border-radius:10px;
+      padding:11px 10px;
+      cursor:pointer;
+      font-weight:bold;
+      min-height:44px;
+      transition:.15s ease;
+    }
+
+    .mode-btn.active{
+      color:#fff;
+      box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 0 18px rgba(255,255,255,.04);
+      transform:translateY(-1px);
+    }
+
+    .mode-btn .mode-label{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+    }
+
+    .mode-dot{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      flex:0 0 auto;
+    }
+
+    .action-btn.warn{
+      background:var(--danger);
+      border-color:#b24a4a;
+    }
+
+    .action-btn.sum{
+      background:#20405d;
+      border-color:#4d96ff;
+    }
+
+    .action-btn.active{
+      box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 0 18px rgba(255,255,255,.05);
+      transform:translateY(-1px);
+    }
+
+    .action-btn:hover,
+    .mode-btn:hover{
+      filter:brightness(1.08);
+    }
+
+    .master-volume{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      flex:1 1 360px;
+      min-width:260px;
+      padding:8px 10px;
+      border:1px solid #2f3a4f;
+      border-radius:10px;
+      background:#0f151e;
+    }
+
+    .master-volume label{
+      margin:0;
+      white-space:nowrap;
+      font-size:13px;
+    }
+
+    .master-volume input[type="range"]{
+      flex:1;
+    }
+
+    .vol-readout{
+      min-width:70px;
+      text-align:right;
+      color:var(--accent2);
+      font-weight:bold;
+      font-size:13px;
+    }
+
+    .legend{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:12px;
+      font-size:13px;
+    }
+
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      background:#151b24;
+      border:1px solid #2a3242;
+      color:#dfe6f2;
+    }
+
+    .dot{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      flex:0 0 auto;
+    }
+
+    .hint{
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.5;
+      margin-top:10px;
+    }
+
+    .button-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:10px;
+    }
+
+    button{
+      background:var(--panel2);
+      color:var(--text);
+      border:1px solid #344055;
+      border-radius:10px;
+      padding:10px 14px;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    button:hover{
+      background:#263043;
+    }
+
+    .info-grid{
+      display:grid;
+      grid-template-columns:repeat(6,1fr);
+      gap:12px;
+    }
+
+    .info-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+    }
+
+    .info-card .k{
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:4px;
+    }
+
+    .info-card .v{
+      font-size:18px;
+      font-weight:bold;
+      color:var(--accent2);
+    }
+
+    @media (max-width: 1150px){
+      .container{
+        grid-template-columns:1fr;
+      }
+
+      .info-grid{
+        grid-template-columns:repeat(2,1fr);
+      }
+    }
+
+    @media (max-width: 760px){
+      .modes-row{
+        grid-template-columns:repeat(2, minmax(100px, 1fr));
+      }
+
+      .info-grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <aside class="panel">
+      <h1>Simulador Final de Corda Vibrante</h1>
+      <div class="subtitle">
+        Simulação modal com amortecimento visual e sonoro, distribuição realista entre modos,
+        seleção individual e visualização opcional apenas da soma resultante.
+      </div>
+
+      <div class="control-group">
+        <label for="tension">
+          Tensão da corda
+          <span class="value" id="tensionValue">80 N</span>
+        </label>
+        <input id="tension" type="range" min="30" max="150" step="1" value="80" />
+        <div class="small">Controla a velocidade de propagação e a frequência fundamental.</div>
+      </div>
+
+      <div class="control-group">
+        <label for="density">
+          Densidade linear da corda
+          <span class="value" id="densityValue">0,00120 kg/m</span>
+        </label>
+        <input id="density" type="range" min="0.0003" max="0.008" step="0.0001" value="0.0012" />
+        <div class="small">Representa a massa por unidade de comprimento da corda.</div>
+      </div>
+
+      <div class="control-group">
+        <label for="pluckPosition">
+          Posição de excitação
+          <span class="value" id="pluckValue">20,0 cm</span>
+        </label>
+        <input id="pluckPosition" type="range" min="0.02" max="0.30" step="0.001" value="0.20" />
+        <div class="small">Define onde a corda é excitada.</div>
+      </div>
+
+      <div class="control-group">
+        <label for="slowMotion">
+          Câmera lenta
+          <span class="value" id="slowValue">1,000x</span>
+        </label>
+        <input id="slowMotion" type="range" min="0.002" max="1" step="0.002" value="1" />
+        <div class="small">Reduz a evolução temporal da animação.</div>
+      </div>
+
+      <div class="control-group">
+        <label for="damping">
+          Amortecimento global
+          <span class="value" id="dampingValue">0,00</span>
+        </label>
+        <input id="damping" type="range" min="0" max="3" step="0.01" value="0" />
+        <div class="small">
+          Um único controle global. Internamente, os modos mais baixos decaem mais lentamente
+          e os mais altos decaem mais rápido.
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="button-row">
+          <button id="pluckBtn">Excitar pela posição do slider</button>
+          <button id="resetBtn">Resetar</button>
+        </div>
+        <div class="hint">
+          Também é possível clicar e arrastar sobre a corda para escolher a posição e a amplitude da excitação.
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="canvas-wrap">
+        <canvas id="stringCanvas" width="1040" height="400"></canvas>
+
+        <div class="legend" id="legend"></div>
+
+        <div class="controls-under-graph">
+          <div class="modes-row" id="modeButtonsRow"></div>
+
+          <div class="global-row">
+            <button class="action-btn" id="allModesBtn">Ativar todos</button>
+            <button class="action-btn warn" id="clearModesBtn">Desativar todos</button>
+            <button class="action-btn sum" id="sumViewBtn">Soma dos modos</button>
+
+            <div class="master-volume">
+              <label for="masterVolume">Volume mestre</label>
+              <input id="masterVolume" type="range" min="0" max="1.06" step="0.01" value="0" />
+              <div class="vol-readout" id="masterVolumeValue">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hint">
+          Quando <strong>Soma dos modos</strong> estiver ativado, apenas a vibração resultante dos modos habilitados será exibida.
+        </div>
+      </section>
+
+      <section class="info-grid">
+        <div class="info-card">
+          <div class="k">Comprimento</div>
+          <div class="v">0,60 m</div>
+        </div>
+        <div class="info-card">
+          <div class="k">Velocidade na corda</div>
+          <div class="v" id="speedOut">258,20 m/s</div>
+        </div>
+        <div class="info-card">
+          <div class="k">Frequência fundamental</div>
+          <div class="v" id="f1Out">215,17 Hz</div>
+        </div>
+        <div class="info-card">
+          <div class="k">Ponto de excitação</div>
+          <div class="v" id="pointOut">0,20 m</div>
+        </div>
+        <div class="info-card">
+          <div class="k">Envelope médio</div>
+          <div class="v" id="envOut">1,000</div>
+        </div>
+        <div class="info-card">
+          <div class="k">Modos ativos</div>
+          <div class="v" id="activeModesOut">0</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const STRING_LENGTH = 0.60;
+    const MAX_MODES = 8;
+    const CANVAS_PADDING = 40;
+    const VISUAL_SCALE_Y = 2200;
+
+    const canvas = document.getElementById("stringCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const tension = document.getElementById("tension");
+    const density = document.getElementById("density");
+    const pluckPosition = document.getElementById("pluckPosition");
+    const slowMotion = document.getElementById("slowMotion");
+    const damping = document.getElementById("damping");
+
+    const tensionValue = document.getElementById("tensionValue");
+    const densityValue = document.getElementById("densityValue");
+    const pluckValue = document.getElementById("pluckValue");
+    const slowValue = document.getElementById("slowValue");
+    const dampingValue = document.getElementById("dampingValue");
+
+    const speedOut = document.getElementById("speedOut");
+    const f1Out = document.getElementById("f1Out");
+    const pointOut = document.getElementById("pointOut");
+    const envOut = document.getElementById("envOut");
+    const activeModesOut = document.getElementById("activeModesOut");
+
+    const pluckBtn = document.getElementById("pluckBtn");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const legend = document.getElementById("legend");
+    const modeButtonsRow = document.getElementById("modeButtonsRow");
+    const allModesBtn = document.getElementById("allModesBtn");
+    const clearModesBtn = document.getElementById("clearModesBtn");
+    const sumViewBtn = document.getElementById("sumViewBtn");
+    const masterVolume = document.getElementById("masterVolume");
+    const masterVolumeValue = document.getElementById("masterVolumeValue");
+
+    const modeColors = [
+      "#ff6b6b",
+      "#ffd93d",
+      "#6bcB77",
+      "#4d96ff",
+      "#c77dff",
+      "#ff9f1c",
+      "#00d1b2",
+      "#f72585"
+    ];
+
+    const state = {
+      excitation: {
+        x0: 0.20,
+        amp: 0.03
+      },
+      dragging: false,
+      dragPos: null,
+      excitationStartTime: performance.now(),
+      modes: Array.from({ length: MAX_MODES }, (_, i) => ({
+        id: i + 1,
+        active: false,
+        color: modeColors[i]
+      })),
+      sumViewOnly: false
+    };
+
+    const audioState = {
+      context: null,
+      preMasterGain: null,
+      masterGain: null,
+      nodes: []
+    };
+
+    function fmtBR(num, digits = 2){
+      return num.toLocaleString("pt-BR", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
+    }
+
+    function clamp(value, min, max){
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function getActiveModes(){
+      return state.modes.filter(mode => mode.active);
+    }
+
+    function isModeActive(n){
+      return state.modes[n - 1].active;
+    }
+
+    function setModeActive(n, active){
+      state.modes[n - 1].active = active;
+    }
+
+    function countActiveModes(){
+      return getActiveModes().length;
+    }
+
+    function waveSpeed(){
+      return Math.sqrt(parseFloat(tension.value) / parseFloat(density.value));
+    }
+
+    function fundamental(){
+      return waveSpeed() / (2 * STRING_LENGTH);
+    }
+
+    function triangularShape(x, x0, A){
+      if (x <= x0) return A * (x / x0);
+      return A * ((STRING_LENGTH - x) / (STRING_LENGTH - x0));
+    }
+
+    function modalCoefficient(n, x0, A){
+      const N = 2200;
+      let sum = 0;
+      const dx = STRING_LENGTH / N;
+
+      for(let i = 0; i <= N; i++){
+        const x = i * dx;
+        const y = triangularShape(x, x0, A);
+        sum += y * Math.sin(n * Math.PI * x / STRING_LENGTH);
+      }
+
+      return (2 / STRING_LENGTH) * sum * dx;
+    }
+
+    function getModalCoefficients(){
+      const coeffs = [];
+      for(let n = 1; n <= MAX_MODES; n++){
+        coeffs.push(modalCoefficient(n, state.excitation.x0, state.excitation.amp));
+      }
+      return coeffs;
+    }
+
+    /*
+      Amortecimento modal:
+      - slider global controla intensidade geral;
+      - modos baixos decaem mais devagar;
+      - modos altos decaem mais rápido.
+    */
+    function modalDampingAlpha(modeNumber){
+      const globalDamping = parseFloat(damping.value);
+
+      if (globalDamping <= 0) return 0;
+
+      const modalFactor =
+        1 + Math.pow((modeNumber - 1) / (MAX_MODES - 1), 1.35) * 2.4;
+
+      return globalDamping * modalFactor;
+    }
+
+    /*
+      Envelope de amortecimento contínuo.
+      Este é o único fator de desaceleração da animação.
+    */
+    function dampingEnvelope(modeNumber, elapsedTime){
+      const alpha = modalDampingAlpha(modeNumber);
+
+      if(alpha <= 0) return 1;
+
+      return Math.exp(-alpha * elapsedTime);
+    }
+
+    function averageEnvelope(elapsedTime){
+      const active = getActiveModes();
+      if(active.length === 0) return 1;
+
+      let sum = 0;
+      for(const mode of active){
+        sum += dampingEnvelope(mode.id, elapsedTime);
+      }
+      return sum / active.length;
+    }
+
+    function xToCanvas(x){
+      return CANVAS_PADDING + (x / STRING_LENGTH) * (canvas.width - 2 * CANVAS_PADDING);
+    }
+
+    function canvasToStringX(px){
+      const w = canvas.width - 2 * CANVAS_PADDING;
+      const x = ((px - CANVAS_PADDING) / w) * STRING_LENGTH;
+      return clamp(x, 0.001, STRING_LENGTH - 0.001);
+    }
+
+    async function ensureAudio(){
+      if(!audioState.context){
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioState.context = new AudioCtx();
+
+        audioState.preMasterGain = audioState.context.createGain();
+        audioState.masterGain = audioState.context.createGain();
+
+        audioState.preMasterGain.gain.value = 2.0;
+        audioState.masterGain.gain.value = parseFloat(masterVolume.value);
+
+        audioState.preMasterGain.connect(audioState.masterGain);
+        audioState.masterGain.connect(audioState.context.destination);
+
+        for(let n = 1; n <= MAX_MODES; n++){
+          const osc = audioState.context.createOscillator();
+          const gain = audioState.context.createGain();
+          const filter = audioState.context.createBiquadFilter();
+
+          filter.type = "lowpass";
+          filter.frequency.value = Math.max(1800, 5600 - n * 260);
+
+          osc.type = n === 1 ? "sine" : (n <= 3 ? "triangle" : "sawtooth");
+          osc.frequency.value = n * fundamental();
+          gain.gain.value = 0;
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioState.preMasterGain);
+          osc.start();
+
+          audioState.nodes.push({ mode: n, osc, gain, filter });
+        }
+      }
+
+      if(audioState.context.state === "suspended"){
+        await audioState.context.resume();
+      }
+    }
+
+    function updateAudioFrequencies(){
+      if(!audioState.context) return;
+
+      for(const node of audioState.nodes){
+        node.osc.frequency.setTargetAtTime(
+          node.mode * fundamental(),
+          audioState.context.currentTime,
+          0.03
+        );
+      }
+    }
+
+    function syncMasterVolume(){
+      const vol = parseFloat(masterVolume.value);
+      masterVolumeValue.textContent = `${Math.round(vol * 100)}%`;
+
+      if(audioState.context && audioState.masterGain){
+        const now = audioState.context.currentTime;
+        audioState.masterGain.gain.cancelScheduledValues(now);
+        audioState.masterGain.gain.setTargetAtTime(vol, now, 0.03);
+      }
+    }
+
+    function stopAudioMode(modeNumber){
+      if(!audioState.context) return;
+
+      const node = audioState.nodes[modeNumber - 1];
+      const now = audioState.context.currentTime;
+
+      node.gain.gain.cancelScheduledValues(now);
+      node.gain.gain.setTargetAtTime(0.0001, now, 0.035);
+    }
+
+    function playAudioMode(modeNumber){
+      if(!audioState.context) return;
+
+      const node = audioState.nodes[modeNumber - 1];
+      const coeffs = getModalCoefficients();
+      const coeff = Math.abs(coeffs[modeNumber - 1]);
+      const base = Math.min(1, coeff * 16) * (0.16 / Math.sqrt(modeNumber));
+      const now = audioState.context.currentTime;
+      const alpha = modalDampingAlpha(modeNumber);
+
+      node.gain.gain.cancelScheduledValues(now);
+      node.gain.gain.setValueAtTime(0, now);
+      node.gain.gain.linearRampToValueAtTime(base, now + 0.01);
+
+      if(alpha <= 0){
+        node.gain.gain.setTargetAtTime(base * 0.92, now + 0.02, 0.12);
+      } else {
+        const tau = Math.max(0.04, 0.9 / (1 + alpha * 1.4));
+        node.gain.gain.setTargetAtTime(0.0001, now + 0.03, tau);
+      }
+    }
+
+    async function syncAudioWithState(){
+      await ensureAudio();
+
+      for(let n = 1; n <= MAX_MODES; n++){
+        if(isModeActive(n)){
+          playAudioMode(n);
+        } else {
+          stopAudioMode(n);
+        }
+      }
+    }
+
+    function drawBackground(yMid){
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
+
+      for(let i = 0; i <= 6; i++){
+        const x = CANVAS_PADDING + i * ((canvas.width - 2 * CANVAS_PADDING) / 6);
+        ctx.beginPath();
+        ctx.moveTo(x, 20);
+        ctx.lineTo(x, canvas.height - 20);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(CANVAS_PADDING, yMid);
+      ctx.lineTo(canvas.width - CANVAS_PADDING, yMid);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#93a4bd";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(xToCanvas(0), yMid - 22);
+      ctx.lineTo(xToCanvas(0), yMid + 22);
+      ctx.moveTo(xToCanvas(STRING_LENGTH), yMid - 22);
+      ctx.lineTo(xToCanvas(STRING_LENGTH), yMid + 22);
+      ctx.stroke();
+    }
+
+    function draw(){
+      const now = performance.now();
+
+      /*
+        Tempo transcorrido desde a excitação.
+        O amortecimento é aplicado continuamente ao longo de toda a animação.
+      */
+      const elapsedTime =
+        ((now - state.excitationStartTime) / 1000) * parseFloat(slowMotion.value);
+
+      const yMid = canvas.height / 2;
+      const c = waveSpeed();
+      const coeffs = getModalCoefficients();
+
+      drawBackground(yMid);
+
+      const harmonicPts = Array.from({ length: MAX_MODES }, () => []);
+      const totalPts = [];
+      const samples = 900;
+
+      for(let i = 0; i <= samples; i++){
+        const x = (i / samples) * STRING_LENGTH;
+        let yTotal = 0;
+
+        for(let n = 1; n <= MAX_MODES; n++){
+          if(!isModeActive(n)) continue;
+
+          const fn = n * c / (2 * STRING_LENGTH);
+          const wn = 2 * Math.PI * fn;
+
+          /*
+            O damping é o único fator de desaceleração.
+            Ele atua diretamente na amplitude do modo durante toda a animação.
+          */
+          const envelope = dampingEnvelope(n, elapsedTime);
+
+          const yn =
+            coeffs[n - 1] *
+            Math.sin(n * Math.PI * x / STRING_LENGTH) *
+            Math.cos(wn * elapsedTime) *
+            envelope;
+
+          yTotal += yn;
+
+          harmonicPts[n - 1].push({
+            x: xToCanvas(x),
+            y: yMid - yn * VISUAL_SCALE_Y
+          });
+        }
+
+        totalPts.push({
+          x: xToCanvas(x),
+          y: yMid - yTotal * VISUAL_SCALE_Y
+        });
+      }
+
+      if(!state.sumViewOnly){
+        for(let n = 1; n <= MAX_MODES; n++){
+          if(!isModeActive(n)) continue;
+
+          const pts = harmonicPts[n - 1];
+          if(pts.length < 2) continue;
+
+          ctx.beginPath();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = state.modes[n - 1].color;
+          ctx.moveTo(pts[0].x, pts[0].y);
+
+          for(let i = 1; i < pts.length; i++){
+            ctx.lineTo(pts[i].x, pts[i].y);
+          }
+
+          ctx.stroke();
+        }
+      }
+
+      if(countActiveModes() > 0){
+        ctx.beginPath();
+        ctx.lineWidth = state.sumViewOnly ? 4 : 3;
+        ctx.strokeStyle = "#ffffff";
+        ctx.moveTo(totalPts[0].x, totalPts[0].y);
+
+        for(let i = 1; i < totalPts.length; i++){
+          ctx.lineTo(totalPts[i].x, totalPts[i].y);
+        }
+
+        ctx.stroke();
+      }
+
+      const px = xToCanvas(state.excitation.x0);
+      ctx.beginPath();
+      ctx.arc(px, yMid, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#5cc8ff";
+      ctx.fill();
+
+      if(state.dragging && state.dragPos){
+        ctx.beginPath();
+        ctx.strokeStyle = "#5cc8ff";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6,6]);
+        ctx.moveTo(xToCanvas(0), yMid);
+        ctx.lineTo(state.dragPos.x, state.dragPos.y);
+        ctx.lineTo(xToCanvas(STRING_LENGTH), yMid);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.beginPath();
+        ctx.arc(state.dragPos.x, state.dragPos.y, 7, 0, Math.PI * 2);
+        ctx.fillStyle = "#7ef29a";
+        ctx.fill();
+      }
+
+      envOut.textContent = fmtBR(averageEnvelope(elapsedTime), 3);
+
+      requestAnimationFrame(draw);
+    }
+
+    function buildLegend(){
+      legend.innerHTML = "";
+
+      const active = getActiveModes();
+
+      if(active.length === 0){
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.textContent = "Nenhum modo ativo";
+        legend.appendChild(item);
+        return;
+      }
+
+      if(state.sumViewOnly){
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `
+          <span class="dot" style="background:#ffffff"></span>
+          <span>Soma dos modos ativos: ${active.map(m => m.id + "º").join(", ")}</span>
+        `;
+        legend.appendChild(item);
+        return;
+      }
+
+      for(const mode of active){
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `
+          <span class="dot" style="background:${mode.color}"></span>
+          <span>${mode.id}º modo (${fmtBR(mode.id * fundamental(), 1)} Hz)</span>
+        `;
+        legend.appendChild(item);
+      }
+
+      const totalItem = document.createElement("div");
+      totalItem.className = "legend-item";
+      totalItem.innerHTML = `
+        <span class="dot" style="background:#ffffff"></span>
+        <span>Soma resultante</span>
+      `;
+      legend.appendChild(totalItem);
+    }
+
+    function buildModeButtons(){
+      modeButtonsRow.innerHTML = "";
+
+      for(const mode of state.modes){
+        const btn = document.createElement("button");
+        btn.className = "mode-btn" + (mode.active ? " active" : "");
+        btn.style.borderColor = mode.color;
+        btn.style.background = mode.active ? mode.color + "33" : "";
+
+        btn.innerHTML = `
+          <span class="mode-label">
+            <span class="mode-dot" style="background:${mode.color}"></span>
+            <span>${mode.id}º modo</span>
+          </span>
+        `;
+
+        btn.addEventListener("click", async () => {
+          setModeActive(mode.id, !mode.active);
+          state.excitationStartTime = performance.now();
+          await syncAudioWithState();
+          updateUI();
+        });
+
+        modeButtonsRow.appendChild(btn);
+      }
+    }
+
+    function updateUI(){
+      tensionValue.textContent = `${fmtBR(parseFloat(tension.value), 0)} N`;
+      densityValue.textContent = `${fmtBR(parseFloat(density.value), 5)} kg/m`;
+      pluckValue.textContent = `${fmtBR(parseFloat(pluckPosition.value) * 100, 1)} cm`;
+      slowValue.textContent = `${fmtBR(parseFloat(slowMotion.value), 3)}x`;
+      dampingValue.textContent = fmtBR(parseFloat(damping.value), 2);
+
+      speedOut.textContent = `${fmtBR(waveSpeed(), 2)} m/s`;
+      f1Out.textContent = `${fmtBR(fundamental(), 2)} Hz`;
+      pointOut.textContent = `${fmtBR(state.excitation.x0, 2)} m`;
+      activeModesOut.textContent = String(countActiveModes());
+
+      sumViewBtn.classList.toggle("active", state.sumViewOnly);
+
+      buildModeButtons();
+      buildLegend();
+      updateAudioFrequencies();
+      syncMasterVolume();
+    }
+
+    function setExcitationFromCanvas(clientX, clientY){
+      const rect = canvas.getBoundingClientRect();
+      const x = (clientX - rect.left) * (canvas.width / rect.width);
+      const y = (clientY - rect.top) * (canvas.height / rect.height);
+      const yMid = canvas.height / 2;
+
+      let stringX = canvasToStringX(x);
+      stringX = clamp(stringX, 0.02, 0.30);
+
+      const ampPx = clamp(yMid - y, -100, 100);
+      const ampMeters = ampPx / 3200;
+
+      state.excitation.x0 = stringX;
+      state.excitation.amp = Math.max(0.005, Math.abs(ampMeters));
+      pluckPosition.value = stringX;
+
+      state.dragPos = {
+        x: xToCanvas(stringX),
+        y: yMid - ampMeters * 3200
+      };
+
+      updateUI();
+    }
+
+    canvas.addEventListener("mousedown", (e) => {
+      state.dragging = true;
+      setExcitationFromCanvas(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      if(!state.dragging) return;
+      setExcitationFromCanvas(e.clientX, e.clientY);
+    });
+
+    window.addEventListener("mouseup", async () => {
+      if(state.dragging){
+        state.dragging = false;
+        state.dragPos = null;
+        state.excitationStartTime = performance.now();
+        await syncAudioWithState();
+      }
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      state.dragging = true;
+      const t = e.touches[0];
+      setExcitationFromCanvas(t.clientX, t.clientY);
+    }, { passive:false });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if(!state.dragging) return;
+      const t = e.touches[0];
+      setExcitationFromCanvas(t.clientX, t.clientY);
+    }, { passive:false });
+
+    window.addEventListener("touchend", async () => {
+      if(state.dragging){
+        state.dragging = false;
+        state.dragPos = null;
+        state.excitationStartTime = performance.now();
+        await syncAudioWithState();
+      }
+    });
+
+    tension.addEventListener("input", updateUI);
+    density.addEventListener("input", updateUI);
+
+    pluckPosition.addEventListener("input", () => {
+      state.excitation.x0 = parseFloat(pluckPosition.value);
+      updateUI();
+    });
+
+    slowMotion.addEventListener("input", updateUI);
+
+    damping.addEventListener("input", async () => {
+      state.excitationStartTime = performance.now();
+      await syncAudioWithState();
+      updateUI();
+    });
+
+    masterVolume.addEventListener("input", async () => {
+      await ensureAudio();
+      syncMasterVolume();
+    });
+
+    allModesBtn.addEventListener("click", async () => {
+      for(let n = 1; n <= MAX_MODES; n++){
+        setModeActive(n, true);
+      }
+
+      state.excitationStartTime = performance.now();
+      await syncAudioWithState();
+      updateUI();
+    });
+
+    clearModesBtn.addEventListener("click", async () => {
+      for(let n = 1; n <= MAX_MODES; n++){
+        setModeActive(n, false);
+      }
+
+      await syncAudioWithState();
+      updateUI();
+    });
+
+    sumViewBtn.addEventListener("click", () => {
+      state.sumViewOnly = !state.sumViewOnly;
+      updateUI();
+    });
+
+    pluckBtn.addEventListener("click", async () => {
+      state.excitation.x0 = parseFloat(pluckPosition.value);
+      state.excitation.amp = 0.03;
+      state.excitationStartTime = performance.now();
+      await syncAudioWithState();
+      updateUI();
+    });
+
+    resetBtn.addEventListener("click", async () => {
+      tension.value = 80;
+      density.value = 0.0012;
+      pluckPosition.value = 0.20;
+      slowMotion.value = 1;
+      damping.value = 0;
+      masterVolume.value = 0;
+
+      state.excitation = { x0: 0.20, amp: 0.03 };
+      state.dragging = false;
+      state.dragPos = null;
+      state.excitationStartTime = performance.now();
+      state.sumViewOnly = false;
+
+      for(let n = 1; n <= MAX_MODES; n++){
+        setModeActive(n, false);
+      }
+
+      await ensureAudio();
+      for(let n = 1; n <= MAX_MODES; n++){
+        stopAudioMode(n);
+      }
+
+      updateUI();
+    });
+
+    updateUI();
+    draw();
+  </script>
+</body>
+</html>

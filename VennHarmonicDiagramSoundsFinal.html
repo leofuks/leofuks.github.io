@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Venn Harmonic Diagram — Outer Ring + Precise Regions + Smooth Audio</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background:#000; color:#e8e8e8; min-height:100vh; padding:10px; overflow-x:hidden; }
+  .container { max-width:1400px; margin:0 auto; }
+  h1 { text-align:center; margin-bottom:2px; background:linear-gradient(90deg,#f00,#ff8800,#ff0,#0f0,#0ff,#80f); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-size:clamp(1.2rem,2.4vw,1.8rem); }
+  .author-credit { text-align:center; font-size:0.85rem; color:#9fc5e8; letter-spacing:0.08em; margin-bottom:10px; opacity:0.85; font-style:italic; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; background:rgba(255,255,255,0.05); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .control-group { display:flex; flex-direction:column; gap:5px; }
+  label { font-size:0.8rem; font-weight:600; color:#9fc5e8; display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; }
+  .value-badge { background:rgba(79,172,254,0.2); padding:2px 8px; border-radius:10px; color:#4facfe; font-weight:700; font-size:0.8rem; }
+  .memo-badge { background:rgba(255,200,0,0.15); padding:2px 7px; border-radius:10px; color:#ffd166; font-weight:600; font-size:0.72rem; }
+  input[type="range"] { width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; outline:none; -webkit-appearance:none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; background:linear-gradient(135deg,#4facfe,#00f2fe); border-radius:50%; cursor:pointer; box-shadow:0 0 8px rgba(79,172,254,0.6); }
+  input[type="range"]::-moz-range-thumb { width:16px; height:16px; background:linear-gradient(135deg,#4facfe,#00f2fe); border-radius:50%; cursor:pointer; border:none; }
+  select { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#e8e8e8; padding:6px 10px; border-radius:6px; font-size:0.85rem; cursor:pointer; }
+  .freq-buttons { display:flex; gap:5px; margin-top:3px; }
+  .freq-buttons button { flex:1; background:rgba(79,172,254,0.15); border:1px solid rgba(79,172,254,0.4); color:#e8e8e8; padding:5px 8px; border-radius:5px; cursor:pointer; font-size:1rem; font-weight:700; user-select:none; transition:background 0.1s; }
+  .freq-buttons button:hover { background:rgba(79,172,254,0.3); }
+  .clear-btn { background:rgba(255,80,80,0.15); border:1px solid rgba(255,80,80,0.4); color:#ffb3b3; padding:6px 12px; border-radius:5px; cursor:pointer; font-weight:700; font-size:0.8rem; margin-top:3px; transition:background 0.15s; }
+  .clear-btn:hover { background:rgba(255,80,80,0.3); }
+  .diagram-wrap { background:#000; border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:6px; position:relative; }
+  #vennSvg { width:100%; display:block; cursor:crosshair; }
+  .status-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:6px 10px; background:rgba(0,0,0,0.5); border-radius:6px; margin-top:6px; font-size:0.82rem; min-height:36px; }
+  .status-indicator { width:10px; height:10px; border-radius:50%; background:#555; transition:all 0.2s; }
+  .status-indicator.active { background:#00f2fe; box-shadow:0 0 10px #00f2fe; animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.3); } }
+  .harmonic-chip { background:linear-gradient(135deg,#4facfe,#00f2fe); color:#0a0a0a; padding:2px 9px; border-radius:11px; font-weight:700; font-size:0.78rem; }
+  .harmonic-chip.locked { background:linear-gradient(135deg,#ffd166,#ff9f1c); color:#111; }
+  .harmonic-chip.ring { background:linear-gradient(135deg,#a0e7e5,#b4f8c8); color:#0a0a0a; }
+  .label-text { font-weight:800; pointer-events:auto; text-anchor:middle; fill:#fff; text-shadow:0 0 4px rgba(0,0,0,0.8); cursor:pointer; transition:fill 120ms ease-out, text-shadow 120ms ease-out; user-select:none; }
+  .label-text.active { fill:#000; text-shadow:0 0 8px rgba(255,255,255,0.95); }
+  .label-text.locked { fill:#000; text-shadow:0 0 10px rgba(255,255,0,0.9); }
+  .info { font-size:0.75rem; color:#888; margin-top:5px; text-align:center; line-height:1.4; }
+  .info kbd { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:3px; padding:1px 5px; font-family:monospace; font-size:0.74rem; }
+  .footer-credit { position:fixed; bottom:4px; right:8px; font-size:0.7rem; color:rgba(255,255,255,0.45); pointer-events:none; z-index:50; font-style:italic; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎵 Venn Harmonic Diagram</h1>
+  <p class="author-credit">developed by Leonardo Fuks</p>
+
+  <div class="controls">
+    <div class="control-group">
+      <label>Harmonics <span class="value-badge" id="harmCountVal">5</span></label>
+      <input type="range" id="harmCount" min="1" max="32" value="5" />
+    </div>
+    <div class="control-group">
+      <label>Fundamental
+        <span class="value-badge" id="freqVal">55.00 Hz</span>
+        <span class="memo-badge" id="memoVal" title="Memorized value">↺ —</span>
+      </label>
+      <input type="range" id="freq" min="30" max="1000" value="55" step="0.01" />
+      <div class="freq-buttons">
+        <button id="freqMinus" title="Hold to decrease (1 octave / 3 s)">−</button>
+        <button id="freqReset" title="Restore memorized">↺</button>
+        <button id="freqPlus"  title="Hold to increase (1 octave / 3 s)">+</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <label>Wave Type</label>
+      <select id="waveType">
+        <option value="sine">Sinusoidal</option>
+        <option value="sawtooth">Sawtooth</option>
+        <option value="square">Square</option>
+        <option value="triangle">Triangular</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Diagram Size <span class="value-badge" id="scaleVal">90%</span></label>
+      <input type="range" id="scale" min="40" max="100" value="90" />
+      <label>Volume <span class="value-badge" id="volVal">40%</span></label>
+      <input type="range" id="volume" min="0" max="100" value="40" />
+      <button class="clear-btn" id="clearBtn" title="Stop all & reset (Space)">⏹ Stop All (Space)</button>
+    </div>
+  </div>
+
+  <div class="diagram-wrap">
+    <svg id="vennSvg" viewBox="0 0 800 800" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="status-bar">
+      <div class="status-indicator" id="statusInd"></div>
+      <span id="statusText">Hover regions or outer white ring · Click numbers to lock</span>
+      <div id="activeHarmonics" style="display:flex; gap:5px; flex-wrap:wrap; margin-left:auto;"></div>
+    </div>
+    <div class="info">
+      <b>Hover</b> inner regions or the <b>outer white ring</b> sectors · <b>Click</b> numbers to lock ·
+      <kbd>Space</kbd> stops all · <kbd>+</kbd>/<kbd>S</kbd> octave up · <kbd>−</kbd>/<kbd>A</kbd> octave down
+    </div>
+  </div>
+</div>
+<footer class="footer-credit">developed by Leonardo Fuks</footer>
+
+<script>
+(() => {
+  /* ================= DOM ================= */
+  const svg = document.getElementById('vennSvg');
+  const harmCountEl = document.getElementById('harmCount');
+  const harmCountVal = document.getElementById('harmCountVal');
+  const freqEl = document.getElementById('freq');
+  const freqVal = document.getElementById('freqVal');
+  const memoVal = document.getElementById('memoVal');
+  const waveTypeEl = document.getElementById('waveType');
+  const volumeEl = document.getElementById('volume');
+  const volVal = document.getElementById('volVal');
+  const scaleEl = document.getElementById('scale');
+  const scaleVal = document.getElementById('scaleVal');
+  const statusInd = document.getElementById('statusInd');
+  const statusText = document.getElementById('statusText');
+  const activeHarmonicsEl = document.getElementById('activeHarmonics');
+  const clearBtn = document.getElementById('clearBtn');
+  const diagramWrap = document.querySelector('.diagram-wrap');
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  /* ================== AUDIO ================== */
+  let audioCtx = null, masterGain = null;
+  const activeOscillators = new Map();
+  const FADE_IN  = 0.035;
+  const FADE_OUT = 0.060;
+
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = volumeEl.value / 100 * 0.5;
+      masterGain.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function updateVolume() {
+    if (masterGain) {
+      const t = audioCtx.currentTime;
+      masterGain.gain.cancelScheduledValues(t);
+      masterGain.gain.linearRampToValueAtTime(volumeEl.value/100*0.5, t+0.03);
+    }
+  }
+  function startHarmonic(n) {
+    if (activeOscillators.has(n)) return;
+    initAudio();
+    const f = parseFloat(freqEl.value);
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = waveTypeEl.value;
+    osc.frequency.value = f * n;
+    const t = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    osc.connect(g); g.connect(masterGain);
+    osc.start();
+    activeOscillators.set(n, { osc, gain: g, stopping:false });
+  }
+  function stopHarmonic(n) {
+    const e = activeOscillators.get(n);
+    if (!e || e.stopping) return;
+    e.stopping = true;
+    const t = audioCtx.currentTime;
+    const cur = Math.max(0.0001, e.gain.gain.value);
+    e.gain.gain.cancelScheduledValues(t);
+    e.gain.gain.setValueAtTime(cur, t);
+    e.gain.gain.exponentialRampToValueAtTime(0.0001, t + FADE_OUT);
+    e.gain.gain.linearRampToValueAtTime(0, t + FADE_OUT + 0.005);
+    try { e.osc.stop(t + FADE_OUT + 0.02); } catch(_) {}
+    activeOscillators.delete(n);
+  }
+  function stopAllAudio() {
+    for (const n of Array.from(activeOscillators.keys())) stopHarmonic(n);
+  }
+  function rebalance(totalSet) {
+    if (!audioCtx) return;
+    const count = totalSet.size;
+    if (count === 0) return;
+    const t = audioCtx.currentTime;
+    for (const [n, e] of activeOscillators) {
+      if (e.stopping) continue;
+      const target = (1/Math.sqrt(n)) / Math.max(1, Math.sqrt(count));
+      e.gain.gain.cancelScheduledValues(t);
+      const cur = Math.max(0.0001, e.gain.gain.value);
+      e.gain.gain.setValueAtTime(cur, t);
+      e.gain.gain.linearRampToValueAtTime(target, t + FADE_IN);
+    }
+  }
+  function updateLiveOscillators() {
+    if (!audioCtx) return;
+    const f = parseFloat(freqEl.value);
+    const t = audioCtx.currentTime;
+    for (const [n, e] of activeOscillators) {
+      e.osc.type = waveTypeEl.value;
+      e.osc.frequency.cancelScheduledValues(t);
+      e.osc.frequency.setTargetAtTime(f * n, t, 0.01);
+    }
+  }
+  function syncAudioToState() {
+    const total = new Set([...lockedSet, ...hoverSet, ...ringHoverSet]);
+    for (const n of Array.from(activeOscillators.keys())) {
+      if (!total.has(n)) stopHarmonic(n);
+    }
+    for (const n of total) {
+      if (!activeOscillators.has(n)) startHarmonic(n);
+    }
+    rebalance(total);
+    updateUI();
+    updateLabelStates();
+  }
+
+  /* ================== STATE ================== */
+  const lockedSet     = new Set();
+  const hoverSet      = new Set();
+  const ringHoverSet  = new Set();
+
+  /* ============== Frequency memo / glide ============== */
+  const freqCtrl = {
+    memorized: null,
+    adjusting: null,
+    lastTs: 0,
+    RATE: 1/3, // 1 octave per 3 seconds
+    MIN: 30,
+    MAX: 1000
+  };
+  function updateMemoBadge() {
+    memoVal.textContent = freqCtrl.memorized !== null
+      ? '↺ ' + freqCtrl.memorized.toFixed(2) + ' Hz' : '↺ —';
+  }
+  function restoreMemorized() {
+    if (freqCtrl.memorized !== null) {
+      freqEl.value = freqCtrl.memorized.toFixed(2);
+      freqEl.dispatchEvent(new Event('input'));
+    }
+  }
+  let freqAnimationId = null;
+  function beginAdjustFrequency(direction) {
+    if (freqCtrl.adjusting === direction) return;
+    if (freqAnimationId !== null) cancelAnimationFrame(freqAnimationId);
+    if (freqCtrl.memorized === null) {
+      freqCtrl.memorized = parseFloat(freqEl.value);
+      updateMemoBadge();
+    }
+    freqCtrl.adjusting = direction;
+    freqCtrl.lastTs = performance.now();
+    const step = (ts) => {
+      const dt = (ts - freqCtrl.lastTs) / 1000;
+      freqCtrl.lastTs = ts;
+      const s = direction === '+' ? 1 : -1;
+      const factor = Math.pow(2, s * freqCtrl.RATE * dt);
+      let newFreq = parseFloat(freqEl.value) * factor;
+      newFreq = Math.max(freqCtrl.MIN, Math.min(freqCtrl.MAX, newFreq));
+      freqEl.value = newFreq.toFixed(2);
+      freqEl.dispatchEvent(new Event('input'));
+      freqAnimationId = requestAnimationFrame(step);
+    };
+    freqAnimationId = requestAnimationFrame(step);
+  }
+  function endAdjustFrequency() {
+    if (freqAnimationId !== null) cancelAnimationFrame(freqAnimationId);
+    freqAnimationId = null;
+    freqCtrl.adjusting = null;
+  }
+  function isPlusKey(e) { return e.key === '+' || e.key === '=' || e.code === 'NumpadAdd'; }
+  function isMinusKey(e) { return e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract'; }
+
+  /* ================== GEOMETRY ================== */
+  let circles = [];
+  const SVG_SIZE = 800;
+  const CENTER = SVG_SIZE/2;
+  let outerR = 0, innerR = 0;
+  let diagramScale = 1;
+
+  function generateCircles(count) {
+    circles = [];
+    const MAX_TOTAL = 380 * diagramScale;
+    const ringRatio = 1.10;
+
+    if (count === 1) {
+      const r = MAX_TOTAL / ringRatio;
+      circles.push({ cx: CENTER, cy: CENTER, r, n: 1 });
+      innerR = r;
+    } else if (count === 2) {
+      const targetInner = MAX_TOTAL / ringRatio;
+      const r = targetInner / 1.5;
+      const off = r * 0.5;
+      circles.push({ cx: CENTER - off, cy: CENTER, r, n: 1 });
+      circles.push({ cx: CENTER + off, cy: CENTER, r, n: 2 });
+      innerR = r + off;
+    } else {
+      const targetInner = MAX_TOTAL / ringRatio;
+      const kFactor = Math.min(0.85, 0.35 + count * 0.04);
+      const baseR = targetInner / (1 + kFactor);
+      const ringR = baseR * kFactor;
+      for (let i = 0; i < count; i++) {
+        const a = -Math.PI/2 + (2*Math.PI*i)/count;
+        circles.push({
+          cx: CENTER + ringR * Math.cos(a),
+          cy: CENTER + ringR * Math.sin(a),
+          r: baseR,
+          n: i+1
+        });
+      }
+      innerR = ringR + baseR;
+    }
+    outerR = innerR * ringRatio;
+  }
+
+  function hueFor(i, total) {
+    if (total <= 1) return 200;
+    return (i / (total-1)) * 280;
+  }
+
+  /* ================== RENDER ================== */
+  function renderDiagram() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    defs.id = 'venn-defs';
+    svg.appendChild(defs);
+
+    appendRect(svg, 0, 0, 800, 800, '#000');
+    appendCircle(svg, CENTER, CENTER, outerR, '#ffffff');
+
+    circles.forEach((c,i) => {
+      const hue = hueFor(i, circles.length);
+      const el = document.createElementNS(SVG_NS,'circle');
+      el.setAttribute('cx', c.cx);
+      el.setAttribute('cy', c.cy);
+      el.setAttribute('r', c.r);
+      el.setAttribute('fill', `hsl(${hue},85%,55%)`);
+      el.setAttribute('fill-opacity', '0.35');
+      el.setAttribute('stroke', `hsl(${hue},85%,42%)`);
+      el.setAttribute('stroke-width', '2');
+      el.setAttribute('stroke-opacity', '0.7');
+      el.setAttribute('pointer-events', 'none');
+      svg.appendChild(el);
+    });
+
+    const lockedGroup = document.createElementNS(SVG_NS, 'g');
+    lockedGroup.id = 'locked-area';
+    lockedGroup.setAttribute('pointer-events', 'none');
+    svg.appendChild(lockedGroup);
+
+    const cCount = circles.length;
+    if (cCount > 1) {
+      const ringGuides = document.createElementNS(SVG_NS, 'g');
+      ringGuides.setAttribute('pointer-events', 'none');
+      for (let i=0; i < cCount; i++) {
+        const a = -Math.PI/2 + (2*Math.PI*i)/cCount - Math.PI/cCount;
+        const x1 = CENTER + innerR * Math.cos(a);
+        const y1 = CENTER + innerR * Math.sin(a);
+        const x2 = CENTER + outerR * Math.cos(a);
+        const y2 = CENTER + outerR * Math.sin(a);
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', 'rgba(0,0,0,0.25)');
+        line.setAttribute('stroke-width', '1');
+        ringGuides.appendChild(line);
+      }
+      svg.appendChild(ringGuides);
+    }
+
+    const ringGroup = document.createElementNS(SVG_NS, 'g');
+    ringGroup.id = 'ring-sectors';
+    if (cCount === 1) {
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', fullRingPath(innerR, outerR));
+      path.setAttribute('fill', 'transparent');
+      path.setAttribute('data-n', 1);
+      path.setAttribute('data-ring', '1');
+      path.classList.add('ring-sector');
+      path.style.cursor = 'pointer';
+      ringGroup.appendChild(path);
+    } else {
+      const half = Math.PI / cCount;
+      for (let i = 0; i < cCount; i++) {
+        const n = i + 1;
+        const aCenter = -Math.PI/2 + (2*Math.PI*i)/cCount;
+        const aStart = aCenter - half;
+        const aEnd   = aCenter + half;
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', ringSectorPath(aStart, aEnd, innerR, outerR));
+        path.setAttribute('fill', 'transparent');
+        path.setAttribute('data-n', n);
+        path.setAttribute('data-ring', '1');
+        path.classList.add('ring-sector');
+        path.style.cursor = 'pointer';
+        ringGroup.appendChild(path);
+      }
+    }
+    svg.appendChild(ringGroup);
+
+    circles.forEach(c => {
+      const hit = document.createElementNS(SVG_NS,'circle');
+      hit.setAttribute('cx', c.cx);
+      hit.setAttribute('cy', c.cy);
+      hit.setAttribute('r', c.r);
+      hit.setAttribute('fill', 'transparent');
+      hit.setAttribute('data-n', c.n);
+      hit.classList.add('hit-circle');
+      hit.style.cursor = 'pointer';
+      svg.appendChild(hit);
+    });
+
+    circles.forEach(c => {
+      const dx = c.cx - CENTER, dy = c.cy - CENTER;
+      const dist = Math.hypot(dx, dy) || 1;
+      let lx, ly;
+      if (circles.length === 1) { lx = c.cx; ly = c.cy - c.r * 0.7; }
+      else {
+        const off = c.r * 0.78;
+        lx = c.cx + (dx/dist) * off;
+        ly = c.cy + (dy/dist) * off;
+      }
+      const fs = Math.max(12, Math.min(34, 220 / Math.sqrt(circles.length)));
+      const txt = document.createElementNS(SVG_NS,'text');
+      txt.setAttribute('id', `label-${c.n}`);
+      txt.setAttribute('class', 'label-text');
+      txt.setAttribute('x', lx);
+      txt.setAttribute('y', ly);
+      txt.setAttribute('font-size', fs);
+      txt.setAttribute('dy', '0.35em');
+      txt.setAttribute('data-n', c.n);
+      txt.textContent = c.n;
+      svg.appendChild(txt);
+    });
+
+    const wm = document.createElementNS(SVG_NS,'text');
+    wm.setAttribute('x', 790); wm.setAttribute('y', 790);
+    wm.setAttribute('text-anchor','end');
+    wm.setAttribute('font-size', 11);
+    wm.setAttribute('fill','rgba(255,255,255,0.55)');
+    wm.setAttribute('font-style','italic');
+    wm.textContent = 'developed by Leonardo Fuks';
+    svg.appendChild(wm);
+
+    updateLockedRegions();
+    updateLabelStates();
+  }
+
+  function appendRect(parent, x,y,w,h,fill) {
+    const r = document.createElementNS(SVG_NS, 'rect');
+    r.setAttribute('x', x); r.setAttribute('y', y);
+    r.setAttribute('width', w); r.setAttribute('height', h);
+    r.setAttribute('fill', fill);
+    parent.appendChild(r);
+    return r;
+  }
+  function appendCircle(parent, cx, cy, r, fill) {
+    const c = document.createElementNS(SVG_NS,'circle');
+    c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
+    c.setAttribute('fill', fill);
+    parent.appendChild(c);
+    return c;
+  }
+
+  function ringSectorPath(aStart, aEnd, rIn, rOut) {
+    const x1o = CENTER + rOut * Math.cos(aStart);
+    const y1o = CENTER + rOut * Math.sin(aStart);
+    const x2o = CENTER + rOut * Math.cos(aEnd);
+    const y2o = CENTER + rOut * Math.sin(aEnd);
+    const x2i = CENTER + rIn  * Math.cos(aEnd);
+    const y2i = CENTER + rIn  * Math.sin(aEnd);
+    const x1i = CENTER + rIn  * Math.cos(aStart);
+    const y1i = CENTER + rIn  * Math.sin(aStart);
+    const largeArc = (aEnd - aStart) > Math.PI ? 1 : 0;
+    return `M ${x1o} ${y1o}
+            A ${rOut} ${rOut} 0 ${largeArc} 1 ${x2o} ${y2o}
+            L ${x2i} ${y2i}
+            A ${rIn} ${rIn}  0 ${largeArc} 0 ${x1i} ${y1i}
+            Z`;
+  }
+  function fullRingPath(rIn, rOut) {
+    return `M ${CENTER+rOut} ${CENTER}
+            A ${rOut} ${rOut} 0 1 1 ${CENTER-rOut} ${CENTER}
+            A ${rOut} ${rOut} 0 1 1 ${CENTER+rOut} ${CENTER}
+            Z
+            M ${CENTER+rIn} ${CENTER}
+            A ${rIn} ${rIn} 0 1 0 ${CENTER-rIn} ${CENTER}
+            A ${rIn} ${rIn} 0 1 0 ${CENTER+rIn} ${CENTER}
+            Z`;
+  }
+
+  function updateLockedRegions() {
+    const defs = document.getElementById('venn-defs');
+    const group = document.getElementById('locked-area');
+    if (!defs || !group) return;
+    while (group.firstChild) group.removeChild(group.firstChild);
+    const oldMask = defs.querySelector('#locked-mask');
+    if (oldMask) defs.removeChild(oldMask);
+    if (lockedSet.size === 0) return;
+
+    [...lockedSet].forEach(n => {
+      const c = circles.find(x => x.n === n);
+      if (!c) return;
+      const ring = document.createElementNS(SVG_NS, 'circle');
+      ring.setAttribute('cx', c.cx);
+      ring.setAttribute('cy', c.cy);
+      ring.setAttribute('r', c.r);
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', '#ffd166');
+      ring.setAttribute('stroke-width', '4');
+      ring.setAttribute('stroke-opacity', '0.9');
+      group.appendChild(ring);
+    });
+  }
+
+  /* ============ Pointer / hover detection ============ */
+  function svgCoords(evt) {
+    const pt = svg.createSVGPoint();
+    let clientX, clientY;
+    if (evt.touches && evt.touches[0]) {
+      clientX = evt.touches[0].clientX;
+      clientY = evt.touches[0].clientY;
+    } else {
+      clientX = evt.clientX;
+      clientY = evt.clientY;
+    }
+    pt.x = clientX; pt.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x:0, y:0 };
+    const p = pt.matrixTransform(ctm.inverse());
+    return { x: p.x, y: p.y };
+  }
+
+  function harmonicsAt(x, y) {
+    const set = new Set();
+    for (const c of circles) {
+      const dx = x - c.cx, dy = y - c.cy;
+      if (dx*dx + dy*dy <= c.r*c.r) set.add(c.n);
+    }
+    return set;
+  }
+
+  function ringSectorAt(x, y) {
+    const dx = x - CENTER, dy = y - CENTER;
+    const dist = Math.hypot(dx, dy);
+    if (dist < innerR || dist > outerR) return null;
+    const N = circles.length;
+    if (N === 1) return 1;
+    let angle = Math.atan2(dy, dx);
+    let a = angle + Math.PI/2;
+    if (a < 0) a += 2*Math.PI;
+    if (a >= 2*Math.PI) a -= 2*Math.PI;
+    const sectorSize = (2*Math.PI) / N;
+    let idx = Math.floor((a + sectorSize/2) / sectorSize) % N;
+    return idx + 1;
+  }
+
+  let lastHoverKey = '';
+  function handlePointer(evt) {
+    const { x, y } = svgCoords(evt);
+    const innerSet = harmonicsAt(x, y);
+    const ringN = ringSectorAt(x, y);
+    const key = 'i:' + Array.from(innerSet).sort((a,b)=>a-b).join(',') + '|r:' + (ringN ?? '');
+    if (key === lastHoverKey) return;
+    lastHoverKey = key;
+    hoverSet.clear();
+    for (const n of innerSet) hoverSet.add(n);
+    ringHoverSet.clear();
+    if (ringN !== null && ringN !== undefined) ringHoverSet.add(ringN);
+    if (innerSet.size > 0 || ringN) initAudio();
+    syncAudioToState();
+  }
+  function handleLeave() {
+    if (hoverSet.size === 0 && ringHoverSet.size === 0) return;
+    hoverSet.clear();
+    ringHoverSet.clear();
+    lastHoverKey = '';
+    syncAudioToState();
+  }
+
+  svg.addEventListener('mousemove', handlePointer);
+  svg.addEventListener('mouseleave', handleLeave);
+  svg.addEventListener('touchmove', e => { e.preventDefault(); handlePointer(e); }, { passive:false });
+  svg.addEventListener('touchend', handleLeave);
+
+  /* ============ Click / lock handling ============ */
+  let mouseDown = false;
+  const dragLockNSet = new Set();
+  function targetHarmonic(target) {
+    if (!target) return null;
+    const dn = target.getAttribute && target.getAttribute('data-n');
+    if (dn) return parseInt(dn, 10);
+    return null;
+  }
+  function toggleLock(n) {
+    if (!n || dragLockNSet.has(n)) return;
+    dragLockNSet.add(n);
+    initAudio();
+    if (lockedSet.has(n)) lockedSet.delete(n);
+    else lockedSet.add(n);
+    updateLockedRegions();
+    syncAudioToState();
+  }
+  svg.addEventListener('mousedown', (e) => {
+    mouseDown = true; dragLockNSet.clear();
+    toggleLock(targetHarmonic(e.target));
+  });
+  svg.addEventListener('mousemove', (e) => {
+    if (!mouseDown) return;
+    const n = targetHarmonic(e.target);
+    if (n) toggleLock(n);
+  });
+  window.addEventListener('mouseup', () => { mouseDown = false; dragLockNSet.clear(); });
+  svg.addEventListener('touchstart', (e) => {
+    if (!e.touches[0]) return;
+    const el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+    toggleLock(targetHarmonic(el));
+  }, { passive:true });
+
+  /* ============ UI Updates ============ */
+  function updateUI() {
+    const total = new Set([...lockedSet, ...hoverSet, ...ringHoverSet]);
+    statusInd.classList.toggle('active', total.size > 0);
+    activeHarmonicsEl.innerHTML = '';
+    const sorted = [...total].sort((a,b)=>a-b);
+    sorted.forEach(n => {
+      const chip = document.createElement('span');
+      chip.className = 'harmonic-chip';
+      if (lockedSet.has(n)) chip.classList.add('locked');
+      else if (ringHoverSet.has(n) && !hoverSet.has(n)) chip.classList.add('ring');
+      const f = parseFloat(freqEl.value) * n;
+      chip.textContent = `H${n} · ${f.toFixed(1)}Hz`;
+      activeHarmonicsEl.appendChild(chip);
+    });
+    if (total.size === 0) {
+      statusText.textContent = 'Hover regions or outer white ring · Click numbers to lock';
+    } else {
+      statusText.textContent = `Playing ${total.size} harmonic${total.size>1?'s':''}`;
+    }
+  }
+  function updateLabelStates() {
+    circles.forEach(c => {
+      const el = document.getElementById('label-'+c.n);
+      if (!el) return;
+      el.classList.remove('active','locked');
+      if (lockedSet.has(c.n)) el.classList.add('locked');
+      else if (hoverSet.has(c.n) || ringHoverSet.has(c.n)) el.classList.add('active');
+    });
+  }
+
+  /* ============ Scaling to fit screen ============ */
+  function fitSvgToScreen() {
+    const reserved = 230;
+    const availH = window.innerHeight - reserved;
+    const availW = diagramWrap.clientWidth - 16;
+    const size = Math.max(280, Math.min(availW, availH));
+    svg.style.height = size + 'px';
+    svg.style.maxWidth = size + 'px';
+    svg.style.margin = '0 auto';
+  }
+
+  /* ============================================================
+   * ====== KEYBOARD HANDLING + OCTAVE GLIDE (MODIFIED) ========
+   * ============================================================
+   *
+   * This section restores the existing "+/-" octave-glide behavior
+   * and EXTENDS it so the same continuous octave shift is also
+   * triggered by the 'S' (octave UP) and 'A' (octave DOWN) keys.
+   *
+   * --- Timing model (handled by beginAdjustFrequency above) -------
+   *   freqCtrl.RATE = 1/3  -> 1 octave per 3 seconds
+   *
+   * Inside the rAF loop:
+   *     factor  = 2^( sign * RATE * dt )
+   *     newFreq = currentFreq * factor
+   *
+   * dt is the real elapsed time between two animation frames, so
+   * the ramp is exact even if the browser drops frames. Multiplying
+   * by 2^(rate*dt) yields a *musically linear* glide (linear in
+   * octaves, exponential in Hz). After exactly 3 s of holding the
+   * key, the value has been multiplied (or divided) by 2 = ±1 octave.
+   *
+   * --- Accepted key sources --------------------------------------
+   *   INCREASE (octave UP):
+   *     - '+'              (regular keyboard, shifted '=')
+   *     - '='              (same physical key, unshifted)
+   *     - NumpadAdd        (Num Lock '+' key)
+   *     - 'S' or 's'       (NEW alias for octave up)
+   *
+   *   DECREASE (octave DOWN):
+   *     - '-'              (regular keyboard)
+   *     - '_'              (shifted '-')
+   *     - NumpadSubtract   (Num Lock '-' key)
+   *     - 'A' or 'a'       (NEW alias for octave down)
+   *
+   * --- Why we check `e.repeat` -----------------------------------
+   * When the OS auto-repeats a held key, it fires multiple 'keydown'
+   * events. Without filtering, each one would call beginAdjustFrequency
+   * again and reset the rAF loop -> visible stutter. We guard with
+   * `e.repeat` AND with the `keyDir` latch so a single hold yields
+   * ONE continuous, smooth ramp.
+   * --------------------------------------------------------------- */
+
+  // Clear-all helper (unchanged behavior)
+  function clearAll() {
+    lockedSet.clear(); hoverSet.clear(); ringHoverSet.clear();
+    lastHoverKey = '';
+    stopAllAudio();
+    updateLockedRegions();
+    syncAudioToState();
+  }
+  clearBtn.addEventListener('click', clearAll);
+
+  // --- NEW: alias predicates for the S/A keys ---------------------
+  // Using e.code ('KeyS' / 'KeyA') makes detection independent of the
+  // active keyboard layout (ABNT2, QWERTY, AZERTY, etc.), while e.key
+  // fallback covers edge cases.
+  function isOctaveUpAliasKey(e)   { return e.code === 'KeyS' || e.key === 'S' || e.key === 's'; }
+  function isOctaveDownAliasKey(e) { return e.code === 'KeyA' || e.key === 'A' || e.key === 'a'; }
+
+  // Combined predicates: original "+/-" handlers PLUS the new aliases.
+  // These wrap the pre-existing isPlusKey / isMinusKey so the original
+  // behavior is preserved 100% and only EXTENDED.
+  function isIncreaseKey(e) { return isPlusKey(e)  || isOctaveUpAliasKey(e);   }
+  function isDecreaseKey(e) { return isMinusKey(e) || isOctaveDownAliasKey(e); }
+
+  // `keyDir` is the single source of truth for "is a glide currently
+  // owned by the keyboard?". It prevents OS auto-repeat or a second
+  // key (e.g. pressing 'S' while '+' is held) from restarting the rAF.
+  let keyDir = null;
+
+  document.addEventListener('keydown', (e) => {
+    // Ignore keys typed into form fields so the user can still edit values.
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Drop OS auto-repeat events: we drive the ramp ourselves via rAF.
+    if (e.repeat) {
+      if (isIncreaseKey(e) || isDecreaseKey(e) || e.code === 'Space') e.preventDefault();
+      return;
+    }
+
+    // Space = panic stop (unchanged behavior)
+    if (e.code === 'Space') { e.preventDefault(); clearAll(); return; }
+
+    // Octave UP — handles '+', '=', NumpadAdd, AND 'S' (new alias)
+    if (isIncreaseKey(e)) {
+      e.preventDefault();
+      if (keyDir !== '+') {           // latch: only (re)start if direction changed
+        keyDir = '+';
+        beginAdjustFrequency('+');    // existing rAF-driven exponential glide
+      }
+      return;
+    }
+
+    // Octave DOWN — handles '-', '_', NumpadSubtract, AND 'A' (new alias)
+    if (isDecreaseKey(e)) {
+      e.preventDefault();
+      if (keyDir !== '-') {
+        keyDir = '-';
+        beginAdjustFrequency('-');
+      }
+      return;
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    // Only stop the glide when the *currently active* direction is released.
+    // This lets the user roll fingers: e.g. press 'S', then '+', release 'S'
+    // -> glide keeps going because '+' is still down. We stop when the key
+    // released matches the active direction family.
+    if (keyDir === '+' && isIncreaseKey(e)) {
+      keyDir = null;
+      endAdjustFrequency();
+    } else if (keyDir === '-' && isDecreaseKey(e)) {
+      keyDir = null;
+      endAdjustFrequency();
+    }
+  });
+
+  // Safety net: if the window loses focus mid-glide (Alt-Tab, modal, etc.)
+  // we must release the ramp, otherwise the rAF loop would keep modifying
+  // the frequency invisibly.
+  window.addEventListener('blur', () => {
+    keyDir = null;
+    endAdjustFrequency();
+  });
+
+  /* ====== END OF MODIFIED KEYBOARD SECTION ======================== */
+
+  /* ============ Frequency buttons ============ */
+  document.getElementById('freqPlus').addEventListener('mousedown', () => beginAdjustFrequency('+'));
+  document.getElementById('freqMinus').addEventListener('mousedown', () => beginAdjustFrequency('-'));
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => {
+    document.getElementById('freqPlus').addEventListener(ev, endAdjustFrequency);
+    document.getElementById('freqMinus').addEventListener(ev, endAdjustFrequency);
+  });
+  document.getElementById('freqReset').addEventListener('click', restoreMemorized);
+
+  /* ============ Control bindings ============ */
+  harmCountEl.addEventListener('input', () => {
+    const c = parseInt(harmCountEl.value);
+    harmCountVal.textContent = c;
+    lockedSet.clear(); hoverSet.clear(); ringHoverSet.clear(); lastHoverKey = '';
+    stopAllAudio();
+    generateCircles(c);
+    renderDiagram();
+    updateUI();
+  });
+  freqEl.addEventListener('input', () => {
+    const v = parseFloat(freqEl.value);
+    freqVal.textContent = v.toFixed(2) + ' Hz';
+    updateLiveOscillators();
+    updateUI();
+  });
+  waveTypeEl.addEventListener('change', updateLiveOscillators);
+  volumeEl.addEventListener('input', () => {
+    volVal.textContent = volumeEl.value + '%';
+    updateVolume();
+  });
+  scaleEl.addEventListener('input', () => {
+    diagramScale = parseInt(scaleEl.value) / 100;
+    scaleVal.textContent = scaleEl.value + '%';
+    generateCircles(parseInt(harmCountEl.value));
+    renderDiagram();
+  });
+
+  window.addEventListener('resize', fitSvgToScreen);
+
+  /* ============ Init ============ */
+  diagramScale = parseInt(scaleEl.value) / 100;
+  generateCircles(parseInt(harmCountEl.value));
+  renderDiagram();
+  updateMemoBadge();
+  updateUI();
+  fitSvgToScreen();
+})();
+</script>
+</body>
+</html>

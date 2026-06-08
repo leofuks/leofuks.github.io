@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Restauração de Partituras v7.4 — Leonardo Fuks</title>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --panel2:#11161f; --line:#30363d;
+    --text:#e6edf3; --muted:#9aa4b2; --primary:#2f81f7; --success:#238636;
+    --danger:#da3633; --preserve:#22c55e; --accent:#8b5cf6;
+  }
+  *{box-sizing:border-box}
+  html,body{
+    margin:0; min-height:100vh;
+    font-family:'Segoe UI',Inter,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+  }
+  ::-webkit-scrollbar{width:14px;height:14px}
+  ::-webkit-scrollbar-track{background:#0b1220;border-radius:7px}
+  ::-webkit-scrollbar-thumb{background:#4a5468;border-radius:7px;border:2px solid #0b1220}
+  ::-webkit-scrollbar-thumb:hover{background:#6c7a89}
+
+  .app{display:grid;grid-template-columns:380px 1fr;min-height:100vh}
+  .sidebar{
+    background:var(--panel);border-right:1px solid var(--line);
+    overflow-y:auto;padding:12px;max-height:100vh;position:sticky;top:0;
+  }
+  .main{display:flex;flex-direction:column;min-width:0;min-height:100vh}
+  .topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px;border-bottom:1px solid var(--line);
+    background:rgba(22,27,34,.9);gap:10px;flex-wrap:wrap;
+  }
+  .brand h1{margin:0;font-size:16px}
+  .brand p{margin:2px 0 0;color:var(--muted);font-size:11px}
+  .author-credit{
+    background:linear-gradient(90deg,#5b44c9,#2f81f7);
+    color:#fff;padding:3px 10px;border-radius:999px;
+    font-size:11px;font-weight:600;letter-spacing:.3px;
+  }
+  .badge{background:#202734;border:1px solid #2b3442;border-radius:999px;padding:4px 9px;font-size:11px}
+  .badge.ok{background:#1a3d2a;border-color:#2d5a40;color:#7ee2a8}
+  .badge.err{background:#3d1a1a;border-color:#5a2d2d;color:#f08585}
+  .badge.remove{background:#3d1a1a;color:#f08585}
+  .badge.preserve{background:#0f3d1a;color:#7ee2a8}
+
+  /* === MELHORIA 2: miniaturas com painel mais largo (240px) === */
+  .workspace{flex:1;display:grid;grid-template-columns:1fr 240px;min-height:0}
+  .viewer-wrap{display:flex;flex-direction:column;min-height:0;min-width:0}
+  .viewer-header{
+    padding:8px 14px;border-bottom:1px solid var(--line);
+    background:#141922;font-size:12px;
+    display:flex;align-items:center;gap:10px;justify-content:space-between;
+  }
+
+  /* === MELHORIA 1: Dropdown de escala === */
+  .zoom-control{display:flex;align-items:center;gap:6px}
+  .zoom-control label{font-size:11px;color:var(--muted)}
+  .zoom-control select{
+    background:#11161f;color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;
+  }
+
+  /* Barra horizontal */
+  .h-scroll-bar{
+    background:#141922;border-bottom:1px solid var(--line);
+    padding:6px 10px;display:flex;align-items:center;gap:8px;
+  }
+  .h-scroll-track{
+    flex:1;height:14px;background:#0b1220;border:1px solid var(--line);
+    border-radius:7px;position:relative;cursor:pointer;overflow:hidden;
+  }
+  .h-scroll-thumb{
+    position:absolute;top:1px;bottom:1px;left:0;
+    background:linear-gradient(180deg,#4a5468,#3a4458);
+    border-radius:6px;cursor:grab;min-width:30px;
+  }
+  .h-scroll-thumb:hover{background:linear-gradient(180deg,#6c7a89,#4a5468)}
+  .h-scroll-thumb.dragging{cursor:grabbing;background:linear-gradient(180deg,#2f81f7,#1f62c4)}
+  .h-scroll-label{font-size:10px;color:var(--muted);min-width:80px;text-align:right;font-family:monospace}
+  .h-scroll-btn{
+    width:24px;height:22px;border-radius:5px;background:#222b38;
+    color:var(--text);border:none;cursor:pointer;font-size:11px;
+  }
+  .h-scroll-btn:hover{background:#293446}
+  .h-scroll-btn:disabled{opacity:.4;cursor:not-allowed}
+
+  .viewer-scroller{flex:1;overflow:auto;background:#0b1220;min-height:400px}
+  .canvas-stage{position:relative;display:inline-block;transform-origin:top left;margin:16px}
+  canvas{display:block;background:#fff;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+  #overlayCanvas{position:absolute;top:0;left:0;background:transparent;cursor:default;pointer-events:none}
+  #overlayCanvas.active{pointer-events:auto;cursor:crosshair}
+
+  /* === MELHORIA 2: Miniaturas SEM distorção === */
+  .thumb-panel{
+    border-left:1px solid var(--line);background:#0f141c;
+    display:flex;flex-direction:column;min-height:0;
+  }
+  .thumb-header{padding:8px 12px;border-bottom:1px solid var(--line);font-size:12px;background:#141922}
+  .thumb-list{
+    flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;
+    gap:12px;min-height:0;
+  }
+  .thumb-item{
+    border:1px solid var(--line);border-radius:6px;cursor:pointer;
+    overflow:hidden;background:#fff;position:relative;width:100%;
+    display:flex;flex-direction:column;
+  }
+  .thumb-item.active{border-color:var(--primary);box-shadow:inset 0 0 0 2px var(--primary)}
+  .thumb-item.has-marks::after,.thumb-item.has-preserve::after{
+    content:'●';position:absolute;top:4px;right:6px;font-size:16px;text-shadow:0 0 3px #000;
+  }
+  .thumb-item.has-marks::after{color:var(--danger)}
+  .thumb-item.has-preserve::after{color:var(--preserve)}
+  /* MELHORIA 2: miniaturas usam aspect-ratio real, sem squashing */
+  .thumb-canvas-wrap{
+    width:100%;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .thumb-item canvas{
+    width:100%;
+    height:auto;
+    max-width:100%;
+    display:block;
+    object-fit:contain;
+    background:#fff;
+    border-radius:0;
+    box-shadow:none;
+  }
+  .thumb-cap{
+    padding:5px 7px;font-size:10px;color:var(--muted);
+    border-top:1px solid var(--line);text-align:center;background:#0d1219;
+  }
+
+  .panel{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px}
+  .panel h2{margin:0 0 8px;font-size:13px;color:var(--primary)}
+  .muted{color:var(--muted);font-size:11px;margin:4px 0}
+  .hint{background:#1a2030;border-left:3px solid var(--primary);padding:6px 8px;margin-top:6px;font-size:11px;border-radius:4px;line-height:1.4}
+  .hint b{color:var(--text)}
+  .hint.global{border-left-color:var(--accent);background:#1f1a30}
+  .hint.stems{border-left-color:var(--success);background:#0f2a1a}
+  .hint.author{
+    border-left-color:#ffd966;background:#2a2515;
+    text-align:center;font-weight:600;color:#ffd966;
+  }
+  .legend{display:flex;gap:10px;margin-top:6px;font-size:11px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:4px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:2px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .stat{background:#1a2030;border-radius:6px;padding:6px;text-align:center}
+  .stat .val{font-size:18px;font-weight:bold;color:var(--primary)}
+  .stat .lbl{font-size:10px;color:var(--muted)}
+  kbd{background:#1a2030;border:1px solid var(--line);border-radius:3px;padding:1px 4px;font-size:10px;font-family:monospace}
+  button, .file-label{
+    width:100%;border:none;padding:8px 10px;border-radius:7px;
+    background:#222b38;color:var(--text);cursor:pointer;font-size:12px;
+    font-family:inherit;transition:.15s;
+  }
+  button:hover:not(:disabled),.file-label:hover{background:#293446}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:#1f62c4}
+  button.success{background:#1f6f3d}
+  button.danger{background:#a52a2a}
+  button.accent{background:#5b44c9}
+  .file-label{display:block;text-align:center}
+  input[type="file"]{display:none}
+  .row{display:flex;gap:5px;margin-top:6px}
+  .row button{flex:1}
+  .field{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+  .field label{font-size:11px;color:var(--muted)}
+  input[type="number"],input[type="range"],select{
+    width:100%;padding:6px 8px;border-radius:6px;background:#11161f;
+    color:var(--text);border:1px solid var(--line);font-family:inherit;font-size:12px;
+  }
+  .mode-toggle,.tool-toggle{
+    display:grid;grid-template-columns:1fr 1fr;gap:0;border-radius:7px;
+    overflow:hidden;border:1px solid var(--line);margin-top:4px;
+  }
+  .mode-toggle button,.tool-toggle button{border-radius:0;background:#1a2030}
+  .mode-toggle button.active-remove{background:var(--danger);font-weight:bold}
+  .mode-toggle button.active-preserve{background:var(--preserve);font-weight:bold;color:#000}
+  .tool-toggle button.active{background:var(--primary);font-weight:bold}
+  #logConsole{
+    background:#000;color:#0f0;padding:8px;font-family:Consolas,monospace;
+    font-size:10px;border-radius:6px;max-height:130px;overflow-y:auto;
+    white-space:pre-wrap;line-height:1.4;
+  }
+  .log-info{color:#7ee2a8}.log-warn{color:#ffd966}.log-err{color:#ff6b6b}.log-step{color:#4dabf7;font-weight:bold}
+  .progress-wrap{display:none;background:#11161f;border:1px solid var(--line);border-radius:6px;padding:8px;margin-top:6px}
+  .progress-wrap.show{display:block}
+  .progress-bar{width:100%;height:6px;background:#1a2030;border-radius:3px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,#2f81f7,#8b5cf6);width:0;transition:width .2s}
+  .progress-text{font-size:10px;color:var(--muted);margin-top:4px}
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .modal h3{margin:0 0 10px;color:var(--danger)}
+  .footer-credit{
+    padding:8px 14px;border-top:1px solid var(--line);
+    background:#0a0e16;font-size:11px;color:var(--muted);
+    text-align:center;
+  }
+  .footer-credit b{color:#ffd966}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <!-- ===== Crédito de autoria ===== -->
+    <div class="hint author">
+      🎼 Software developed by <b>Leonardo Fuks</b>
+    </div>
+
+    <div class="panel">
+      <h2>1. Abrir arquivo</h2>
+      <p class="muted">PDF ou imagem (PNG/JPG/WEBP).</p>
+      <label class="file-label primary" for="fileInput">📂 Selecionar arquivo</label>
+      <input id="fileInput" type="file" accept=".pdf,image/png,image/jpeg,image/webp"/>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-text" id="progressText">Aguardando...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>2. Modo de seleção <span style="color:var(--accent);font-size:10px">(GLOBAL)</span></h2>
+      <div class="mode-toggle">
+        <button id="modeRemoveBtn" class="active-remove">🗑️ Remover</button>
+        <button id="modePreserveBtn">🛡️ Preservar</button>
+      </div>
+      <div class="hint global" id="modeHint">
+        <b>Modo REMOVER (global):</b> em todo o documento, tudo é mantido — exceto as áreas marcadas de vermelho, que serão apagadas das páginas onde foram pintadas.
+      </div>
+      <div class="legend">
+        <span><i style="background:#da3633"></i>Remover</span>
+        <span><i style="background:#22c55e"></i>Preservar</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>3. Ferramenta de seleção</h2>
+      <div class="tool-toggle">
+        <button id="toolRectBtn" class="active">▭ Retângulo</button>
+        <button id="toolFreeBtn">✏️ Pincel livre</button>
+      </div>
+      <button id="toggleMarkBtn" class="primary" style="margin-top:6px" disabled>🖱️ Ativar marcação</button>
+      <div class="field" id="brushField" style="display:none">
+        <label>Tamanho do pincel: <span id="brushSizeLbl">20</span>px</label>
+        <input id="brushSize" type="range" min="4" max="80" value="20"/>
+        <label style="margin-top:6px">
+          <input type="checkbox" id="closedAreaChk" checked>
+          Detectar área fechada (laço) e preencher
+        </label>
+      </div>
+      <div class="row">
+        <button id="undoMarkBtn" disabled>↶ Desfazer</button>
+        <button id="clearMarksBtn" class="danger" disabled>🗑️ Página</button>
+      </div>
+      <button id="clearAllMarksBtn" class="danger" style="margin-top:5px" disabled>🗑️ Limpar TODOS</button>
+    </div>
+
+    <div class="panel">
+      <h2>4. Opções de remoção</h2>
+      <div class="field">
+        <label>
+          <input type="checkbox" id="inpaintStaffChk" checked>
+          <b>Reconstruir pentagrama atravessado</b> 🎯
+        </label>
+      </div>
+      <div class="field">
+        <label>
+          <input type="checkbox" id="preserveStemsChk" checked>
+          🎵 Preservar hastes das notas (stems)
+        </label>
+      </div>
+      <div class="hint stems">
+        <b>🎯 Pincel + Pentagrama:</b> quando ambos estão ativos, o pincel livre detecta as 5 linhas adjacentes e <b>recola</b> um pentagrama com espessura e espaçamento idênticos no vazio. As hastes <b>nunca</b> são tocadas.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>5. Gerar resultado</h2>
+      <div class="hint global">
+        <b>Processamento GLOBAL:</b><br/>
+        • Marcas <b style="color:#22c55e">verdes</b> → só páginas com preservar são mantidas.<br/>
+        • Marcas <b style="color:#f08585">vermelhas</b> → áreas apagadas.
+      </div>
+      <div class="field">
+        <label>Espaçamento entre blocos (px)</label>
+        <input id="spacingInput" type="number" value="20" min="0" max="120"/>
+      </div>
+      <div class="field">
+        <label>Margem topo/base (px)</label>
+        <input id="marginInput" type="number" value="40" min="0" max="200"/>
+      </div>
+      <div class="field">
+        <label>Sensibilidade conteúdo (0-30)</label>
+        <input id="contentThreshold" type="number" value="3" min="0" max="30"/>
+      </div>
+      <button id="processBtn" class="accent" disabled>♻️ Processar e compactar</button>
+      <button id="toggleViewBtn" disabled style="margin-top:5px">👁️ Alternar visualização</button>
+    </div>
+
+    <div class="panel">
+      <h2>6. Navegação</h2>
+      <div class="row">
+        <button id="prevBtn" disabled>◀</button>
+        <button id="nextBtn" disabled>▶</button>
+      </div>
+      <p class="muted" style="margin-top:6px">
+        Use o seletor de <b>escala</b> no topo do visualizador para ajustar o zoom (25% a 100%).<br/>
+        <kbd>M</kbd> marcar · <kbd>R</kbd>/<kbd>P</kbd> modo · <kbd>1</kbd>/<kbd>2</kbd> ferramenta<br/>
+        <kbd>←</kbd> <kbd>→</kbd> páginas · <kbd>F</kbd> alternar · <kbd>Ctrl+Z</kbd> desfazer
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>7. Exportar</h2>
+      <button id="exportPdfBtn" class="success" disabled>💾 Exportar PDF</button>
+      <button id="exportPngBtn" style="margin-top:5px" disabled>🖼️ PNG página atual</button>
+    </div>
+
+    <div class="panel">
+      <h2>📊 Status</h2>
+      <div class="stats">
+        <div class="stat"><div class="val" id="stPages">0</div><div class="lbl">Páginas</div></div>
+        <div class="stat"><div class="val" id="stCurrent">0</div><div class="lbl">Atual</div></div>
+        <div class="stat"><div class="val" id="stMarks">0</div><div class="lbl">Marcas página</div></div>
+        <div class="stat"><div class="val" id="stTotal">0</div><div class="lbl">Total global</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>📋 Log</h2>
+      <div id="logConsole">Aguardando...</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="brand">
+        <h1>🎼 Restauração de Partituras v7.4</h1>
+        <p>Escalas fixas · Miniaturas proporcionais · Pentagrama colado preservando hastes</p>
+      </div>
+      <span class="author-credit">Software developed by Leonardo Fuks</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <span class="badge" id="libBadge">⏳ libs...</span>
+        <span class="badge" id="fileBadge">Sem arquivo</span>
+        <span class="badge" id="pageBadge">— / —</span>
+        <span class="badge remove" id="modeBadge">Modo: Remover</span>
+        <span class="badge" id="toolBadge">Retângulo</span>
+        <span class="badge" id="viewBadge">Visão: Original</span>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <section class="viewer-wrap">
+        <div class="viewer-header">
+          <div>
+            <strong id="viewerTitle">Visualizador</strong>
+            <span class="muted" id="viewerHint"> — carregue um arquivo</span>
+          </div>
+          <!-- === MELHORIA 1: Seletor de escala === -->
+          <div class="zoom-control">
+            <label for="zoomSelect">🔍 Escala:</label>
+            <select id="zoomSelect" disabled>
+              <option value="0.25">25%</option>
+              <option value="0.33">33%</option>
+              <option value="0.50">50%</option>
+              <option value="0.66">66%</option>
+              <option value="0.75">75%</option>
+              <option value="1.00" selected>100%</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="h-scroll-bar" id="hScrollBar">
+          <button class="h-scroll-btn" id="hScrollLeft" title="Rolar à esquerda">◀</button>
+          <div class="h-scroll-track" id="hScrollTrack">
+            <div class="h-scroll-thumb" id="hScrollThumb" style="width:100%"></div>
+          </div>
+          <button class="h-scroll-btn" id="hScrollRight" title="Rolar à direita">▶</button>
+          <span class="h-scroll-label" id="hScrollLabel">0 / 0</span>
+        </div>
+
+        <div class="viewer-scroller" id="scroller">
+          <div class="canvas-stage" id="stage">
+            <canvas id="baseCanvas" width="800" height="1000"></canvas>
+            <canvas id="overlayCanvas" width="800" height="1000"></canvas>
+          </div>
+        </div>
+
+        <div class="footer-credit">
+          🎼 <b>Software developed by Leonardo Fuks</b> · v7.4 · 2026
+        </div>
+      </section>
+      <aside class="thumb-panel">
+        <div class="thumb-header">📑 Miniaturas (proporcionais)</div>
+        <div class="thumb-list" id="thumbList"></div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<div class="modal-bg" id="errorModal">
+  <div class="modal">
+    <h3 id="modalTitle">❌ Erro</h3>
+    <div id="modalBody"></div>
+    <button onclick="document.getElementById('errorModal').classList.remove('show')" style="margin-top:14px">Fechar</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ====================================================
+// ESTADO GLOBAL
+// ====================================================
+const state = {
+  fileName:'', sourceType:null, pdfDoc:null, imageElement:null,
+  pageCount:0, currentPage:1, renderScale:2.0, zoom:1.0,
+  isMarkMode:false, selectionMode:'remove', tool:'rect',
+  brushSize:20, inpaintStaff:true, preserveStems:true, detectClosedArea:true,
+  marksByPage:{}, originalCache:new Map(), processedCache:new Map(),
+  finalPages:[], showFinalView:false, processed:false
+};
+
+// ====================================================
+// LOGGER
+// ====================================================
+const Logger = (() => {
+  const el = document.getElementById('logConsole');
+  function w(m,c=''){
+    const t=new Date().toLocaleTimeString();
+    const l=document.createElement('div');
+    l.className=c; l.textContent=`[${t}] ${m}`;
+    el.appendChild(l); el.scrollTop=el.scrollHeight;
+  }
+  return {
+    info:m=>w('• '+m,'log-info'),
+    warn:m=>w('⚠ '+m,'log-warn'),
+    error:m=>w('✗ '+m,'log-err'),
+    step:m=>w('▶ '+m,'log-step')
+  };
+})();
+
+// ====================================================
+// UI HELPERS
+// ====================================================
+const UI = {
+  showError(t, r){
+    document.getElementById('modalTitle').textContent=t;
+    const arr = Array.isArray(r)?r:[r];
+    document.getElementById('modalBody').innerHTML='<p>Possíveis causas:</p><ul>'+arr.map(x=>`<li>${x}</li>`).join('')+'</ul>';
+    document.getElementById('errorModal').classList.add('show');
+  },
+  setProgress(p, t){
+    const w=document.getElementById('progressWrap');
+    w.classList.add('show');
+    document.getElementById('progressFill').style.width=p+'%';
+    document.getElementById('progressText').textContent=t;
+    if(p>=100) setTimeout(()=>w.classList.remove('show'),1500);
+  },
+  setLibBadge(t,ok){ const b=document.getElementById('libBadge'); b.textContent=t; b.className='badge '+(ok?'ok':'err') },
+  setFileBadge(t){ document.getElementById('fileBadge').textContent=t },
+  setViewBadge(t){ document.getElementById('viewBadge').textContent='Visão: '+t }
+};
+
+// ====================================================
+// VALIDATOR / LIB / LOADER
+// ====================================================
+const Validator = {
+  async validate(f){
+    const reasons=[];
+    if(!f) return {ok:false, reasons:['Nenhum arquivo']};
+    const ext=f.name.toLowerCase().split('.').pop();
+    if(f.size===0) reasons.push('Arquivo vazio');
+    if(f.size>500*1024*1024) reasons.push('>500MB');
+    const isPdf=f.type==='application/pdf'||ext==='pdf';
+    const isImg=/^image\//.test(f.type)||['png','jpg','jpeg','webp'].includes(ext);
+    if(!isPdf && !isImg) reasons.push('Tipo não suportado');
+    if(isPdf && f.size>0){
+      try{
+        const buf=await f.slice(0,8).arrayBuffer();
+        const h=String.fromCharCode(...new Uint8Array(buf).slice(0,5));
+        if(h!=='%PDF-') reasons.push('Assinatura %PDF- ausente');
+      }catch(e){ reasons.push('Falha leitura cabeçalho'); }
+    }
+    if(reasons.length){ Logger.error('Falhou: '+reasons.join(' | ')); return {ok:false, reasons}; }
+    Logger.info('✓ Arquivo válido');
+    return {ok:true, type:isPdf?'pdf':'image', reasons:[]};
+  }
+};
+
+const LibCheck = {
+  verify(){
+    const m=[];
+    if(typeof pdfjsLib==='undefined') m.push('PDF.js');
+    if(typeof window.jspdf==='undefined') m.push('jsPDF');
+    if(typeof JSZip==='undefined') m.push('JSZip');
+    if(m.length){
+      UI.setLibBadge('❌ Erro',false);
+      UI.showError('Bibliotecas faltando', [`Faltam: ${m.join(', ')}`]);
+      return false;
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    Logger.info(`PDF.js v${pdfjsLib.version} carregado`);
+    UI.setLibBadge('✅ Libs OK',true);
+    return true;
+  }
+};
+
+const Loader = {
+  async loadPDF(f){
+    try{
+      UI.setProgress(10,'Lendo PDF...');
+      const buf=await f.arrayBuffer();
+      UI.setProgress(40,'Parseando PDF...');
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      state.pdfDoc=doc; state.pageCount=doc.numPages; state.sourceType='pdf';
+      UI.setProgress(100,`PDF: ${doc.numPages} páginas`);
+      return true;
+    }catch(e){ UI.showError('Erro PDF',[e.message]); return false; }
+  },
+  async loadImage(f){
+    try{
+      const url=URL.createObjectURL(f);
+      const img=new Image();
+      await new Promise((res,rej)=>{img.onload=res; img.onerror=rej; img.src=url;});
+      state.imageElement=img; state.pageCount=1; state.sourceType='image';
+      UI.setProgress(100,'Imagem carregada');
+      return true;
+    }catch(e){ UI.showError('Erro imagem',[e.message]); return false; }
+  }
+};
+
+// ====================================================
+// GLOBAL SCOPE
+// ====================================================
+const GlobalScope = {
+  hasAnyPreserveMark(){
+    for(const p in state.marksByPage){
+      if((state.marksByPage[p]||[]).some(m=>m.mode==='preserve')) return true;
+    }
+    return false;
+  },
+  pageHasPreserveMark(p){ return (state.marksByPage[p]||[]).some(m=>m.mode==='preserve'); },
+  shouldIncludePage(p){
+    if(this.hasAnyPreserveMark()) return this.pageHasPreserveMark(p);
+    return true;
+  }
+};
+
+// ====================================================
+// RENDERER
+// ====================================================
+const Renderer = {
+  baseCanvas:null, overlayCanvas:null, baseCtx:null, overlayCtx:null,
+  init(){
+    this.baseCanvas = document.getElementById('baseCanvas');
+    this.overlayCanvas = document.getElementById('overlayCanvas');
+    this.baseCtx = this.baseCanvas.getContext('2d',{willReadFrequently:true});
+    this.overlayCtx = this.overlayCanvas.getContext('2d');
+  },
+  async getPageImageData(p){
+    if(state.originalCache.has(p)) return state.originalCache.get(p);
+    const canvas=document.createElement('canvas');
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    if(state.sourceType==='pdf'){
+      const page=await state.pdfDoc.getPage(p);
+      const viewport=page.getViewport({scale: state.renderScale});
+      canvas.width=viewport.width; canvas.height=viewport.height;
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({canvasContext: ctx, viewport}).promise;
+    } else {
+      const img=state.imageElement;
+      canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0);
+    }
+    const data=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const res={canvas, imageData:data, width:canvas.width, height:canvas.height};
+    state.originalCache.set(p,res);
+    return res;
+  },
+  async renderPage(p){
+    const viewerHint=document.getElementById('viewerHint');
+    const viewerTitle=document.getElementById('viewerTitle');
+    if(state.showFinalView && state.finalPages.length){
+      const fp=state.finalPages[p-1];
+      this.baseCanvas.width=fp.width; this.baseCanvas.height=fp.height;
+      this.overlayCanvas.width=fp.width; this.overlayCanvas.height=fp.height;
+      this.baseCtx.putImageData(fp.imageData,0,0);
+      this.overlayCtx.clearRect(0,0,fp.width,fp.height);
+      viewerTitle.textContent=`Página final ${p}/${state.finalPages.length}`;
+      viewerHint.textContent=' — visualização compactada';
+      UI.setViewBadge('Final compactada');
+    } else {
+      const pg=await this.getPageImageData(p);
+      this.baseCanvas.width=pg.width; this.baseCanvas.height=pg.height;
+      this.overlayCanvas.width=pg.width; this.overlayCanvas.height=pg.height;
+      this.baseCtx.putImageData(pg.imageData,0,0);
+      this.drawOverlay();
+      viewerTitle.textContent=`Página ${p}/${state.pageCount}`;
+      viewerHint.textContent= state.isMarkMode?' — Modo MARCAÇÃO ativo':' — clique em "Ativar marcação"';
+      UI.setViewBadge('Original');
+    }
+    App.updateUI();
+    setTimeout(()=>HScrollBar.update(), 30);
+  },
+  drawOverlay(){
+    const ctx=this.overlayCtx;
+    ctx.clearRect(0,0,this.overlayCanvas.width,this.overlayCanvas.height);
+    const marks=state.marksByPage[state.currentPage]||[];
+    for(const m of marks){
+      const fill = m.mode==='remove' ? 'rgba(218,54,51,0.4)' : 'rgba(34,197,94,0.4)';
+      const stroke = m.mode==='remove' ? 'rgba(218,54,51,0.85)' : 'rgba(34,197,94,0.85)';
+      ctx.fillStyle=fill; ctx.strokeStyle=stroke;
+      this.drawMark(ctx,m);
+    }
+    if(Marker.tempRect){
+      const r=Marker.tempRect;
+      const col=state.selectionMode==='remove'?'rgba(218,54,51,0.4)':'rgba(34,197,94,0.4)';
+      const stroke=state.selectionMode==='remove'?'#da3633':'#22c55e';
+      ctx.fillStyle=col; ctx.strokeStyle=stroke; ctx.lineWidth=2;
+      ctx.setLineDash([4,4]);
+      ctx.fillRect(r.x,r.y,r.w,r.h);
+      ctx.strokeRect(r.x,r.y,r.w,r.h);
+      ctx.setLineDash([]);
+    }
+    if(Marker.tempStroke && Marker.tempStroke.points.length>1){
+      const col=state.selectionMode==='remove'?'rgba(218,54,51,0.5)':'rgba(34,197,94,0.5)';
+      ctx.strokeStyle=col; ctx.lineWidth=Marker.tempStroke.size;
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.beginPath();
+      const pts=Marker.tempStroke.points;
+      ctx.moveTo(pts[0].x,pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+      ctx.stroke();
+    }
+  },
+  drawMark(ctx,m){
+    if(m.type==='rect'){
+      ctx.fillRect(m.x,m.y,m.w,m.h);
+    } else if(m.type==='free'){
+      if(m.closed && m.points.length>2){
+        ctx.beginPath();
+        ctx.moveTo(m.points[0].x, m.points[0].y);
+        for(let i=1;i<m.points.length;i++) ctx.lineTo(m.points[i].x, m.points[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.save(); ctx.lineWidth=2; ctx.stroke(); ctx.restore();
+      } else {
+        ctx.lineCap='round'; ctx.lineJoin='round';
+        ctx.lineWidth=m.size||20;
+        ctx.beginPath();
+        ctx.moveTo(m.points[0].x,m.points[0].y);
+        for(let i=1;i<m.points.length;i++) ctx.lineTo(m.points[i].x,m.points[i].y);
+        ctx.stroke();
+      }
+    }
+  }
+};
+
+// ====================================================
+// HSCROLL
+// ====================================================
+const HScrollBar = {
+  track:null, thumb:null, label:null, leftBtn:null, rightBtn:null,
+  scroller:null, dragging:false, dragStartX:0, dragStartScroll:0,
+  init(){
+    this.track=document.getElementById('hScrollTrack');
+    this.thumb=document.getElementById('hScrollThumb');
+    this.label=document.getElementById('hScrollLabel');
+    this.leftBtn=document.getElementById('hScrollLeft');
+    this.rightBtn=document.getElementById('hScrollRight');
+    this.scroller=document.getElementById('scroller');
+    this.scroller.addEventListener('scroll', ()=>{ if(!this.dragging) this.update(); });
+    this.track.addEventListener('mousedown', e=>{
+      if(e.target===this.thumb) return;
+      const rect=this.track.getBoundingClientRect();
+      const clickX=e.clientX-rect.left;
+      const thumbW=this.thumb.offsetWidth;
+      const targetLeft=Math.max(0, Math.min(rect.width-thumbW, clickX-thumbW/2));
+      const ratio=targetLeft/Math.max(1, rect.width-thumbW);
+      this.applyRatio(ratio);
+    });
+    this.thumb.addEventListener('mousedown', e=>{
+      e.preventDefault();
+      this.dragging=true;
+      this.dragStartX=e.clientX;
+      this.dragStartScroll=this.scroller.scrollLeft;
+      this.thumb.classList.add('dragging');
+    });
+    window.addEventListener('mousemove', e=>{
+      if(!this.dragging) return;
+      const trackRect=this.track.getBoundingClientRect();
+      const thumbW=this.thumb.offsetWidth;
+      const trackW=trackRect.width-thumbW;
+      const maxScroll=this.scroller.scrollWidth-this.scroller.clientWidth;
+      if(trackW<=0||maxScroll<=0) return;
+      const dx=e.clientX-this.dragStartX;
+      const scrollDelta=(dx/trackW)*maxScroll;
+      this.scroller.scrollLeft=Math.max(0, Math.min(maxScroll, this.dragStartScroll+scrollDelta));
+      this.update();
+    });
+    window.addEventListener('mouseup', ()=>{
+      if(this.dragging){ this.dragging=false; this.thumb.classList.remove('dragging'); }
+    });
+    this.leftBtn.addEventListener('click', ()=>this.scroller.scrollBy({left:-150,behavior:'smooth'}));
+    this.rightBtn.addEventListener('click', ()=>this.scroller.scrollBy({left:150,behavior:'smooth'}));
+    this.update();
+  },
+  applyRatio(ratio){
+    const maxScroll=this.scroller.scrollWidth-this.scroller.clientWidth;
+    if(maxScroll<=0) return;
+    this.scroller.scrollLeft=ratio*maxScroll;
+    this.update();
+  },
+  update(){
+    const sw=this.scroller.scrollWidth;
+    const cw=this.scroller.clientWidth;
+    const sl=this.scroller.scrollLeft;
+    const trackW=this.track.clientWidth;
+    if(sw<=cw){
+      this.thumb.style.width='100%'; this.thumb.style.left='0px';
+      this.label.textContent='— / —';
+      this.leftBtn.disabled=true; this.rightBtn.disabled=true;
+      return;
+    }
+    const ratio=cw/sw;
+    const thumbW=Math.max(30, trackW*ratio);
+    const maxThumbLeft=trackW-thumbW;
+    const maxScroll=sw-cw;
+    const thumbLeft=(sl/maxScroll)*maxThumbLeft;
+    this.thumb.style.width=thumbW+'px';
+    this.thumb.style.left=thumbLeft+'px';
+    this.label.textContent=`${Math.round(sl)} / ${Math.round(maxScroll)}`;
+    this.leftBtn.disabled=sl<=0;
+    this.rightBtn.disabled=sl>=maxScroll-1;
+  }
+};
+
+// ====================================================
+// MARKER (igual v7.3)
+// ====================================================
+const Marker = {
+  drawing:false, startX:0, startY:0, tempRect:null, tempStroke:null,
+  init(){
+    const c=Renderer.overlayCanvas;
+    c.addEventListener('mousedown', e=>this.onDown(e));
+    c.addEventListener('mousemove', e=>this.onMove(e));
+    window.addEventListener('mouseup', ()=>this.onUp());
+    c.addEventListener('touchstart', e=>{e.preventDefault();this.onDown(e.touches[0]);},{passive:false});
+    c.addEventListener('touchmove', e=>{e.preventDefault();this.onMove(e.touches[0]);},{passive:false});
+    c.addEventListener('touchend', e=>{e.preventDefault();this.onUp();},{passive:false});
+  },
+  getPos(e){
+    const r=Renderer.overlayCanvas.getBoundingClientRect();
+    const sx=Renderer.overlayCanvas.width/r.width;
+    const sy=Renderer.overlayCanvas.height/r.height;
+    return { x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy };
+  },
+  onDown(e){
+    if(!state.isMarkMode || state.showFinalView) return;
+    const p=this.getPos(e);
+    this.drawing=true;
+    this.startX=p.x; this.startY=p.y;
+    if(state.tool==='rect') this.tempRect={x:p.x,y:p.y,w:0,h:0};
+    else this.tempStroke={points:[{x:p.x,y:p.y}], size:state.brushSize};
+  },
+  onMove(e){
+    if(!this.drawing) return;
+    const p=this.getPos(e);
+    if(state.tool==='rect' && this.tempRect){
+      this.tempRect.x=Math.min(this.startX,p.x);
+      this.tempRect.y=Math.min(this.startY,p.y);
+      this.tempRect.w=Math.abs(p.x-this.startX);
+      this.tempRect.h=Math.abs(p.y-this.startY);
+    } else if(state.tool==='free' && this.tempStroke){
+      this.tempStroke.points.push({x:p.x,y:p.y});
+    }
+    Renderer.drawOverlay();
+  },
+  onUp(){
+    if(!this.drawing) return;
+    this.drawing=false;
+    if(!state.marksByPage[state.currentPage]) state.marksByPage[state.currentPage]=[];
+    if(state.tool==='rect' && this.tempRect){
+      if(this.tempRect.w>3 && this.tempRect.h>3){
+        state.marksByPage[state.currentPage].push({
+          type:'rect', mode:state.selectionMode,
+          x:this.tempRect.x, y:this.tempRect.y,
+          w:this.tempRect.w, h:this.tempRect.h
+        });
+      }
+      this.tempRect=null;
+    } else if(state.tool==='free' && this.tempStroke){
+      if(this.tempStroke.points.length>1){
+        const pts=this.tempStroke.points;
+        const first=pts[0], last=pts[pts.length-1];
+        const closeDist=Math.hypot(last.x-first.x, last.y-first.y);
+        let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        for(const pt of pts){
+          if(pt.x<minX) minX=pt.x; if(pt.x>maxX) maxX=pt.x;
+          if(pt.y<minY) minY=pt.y; if(pt.y>maxY) maxY=pt.y;
+        }
+        const bboxDiag=Math.hypot(maxX-minX, maxY-minY);
+        const isClosed=state.detectClosedArea && pts.length>8 && bboxDiag>30
+                    && (closeDist<Math.max(40, bboxDiag*0.25));
+        if(isClosed){
+          const closedPts=pts.slice();
+          if(closeDist>0.5) closedPts.push({x:first.x,y:first.y});
+          state.marksByPage[state.currentPage].push({
+            type:'free', mode:state.selectionMode,
+            points:closedPts, size:this.tempStroke.size, closed:true
+          });
+        } else {
+          state.marksByPage[state.currentPage].push({
+            type:'free', mode:state.selectionMode,
+            points:pts, size:this.tempStroke.size, closed:false
+          });
+        }
+      }
+      this.tempStroke=null;
+    }
+    state.processedCache.clear();
+    Renderer.drawOverlay();
+    App.updateUI();
+    Thumbs.updateMarkIndicators();
+  },
+  undoLast(){
+    const marks=state.marksByPage[state.currentPage];
+    if(marks && marks.length){
+      marks.pop();
+      state.processedCache.clear();
+      Renderer.drawOverlay();
+      App.updateUI(); Thumbs.updateMarkIndicators();
+    }
+  },
+  clearPage(){
+    delete state.marksByPage[state.currentPage];
+    state.processedCache.clear();
+    Renderer.drawOverlay();
+    App.updateUI(); Thumbs.updateMarkIndicators();
+  },
+  clearAll(){
+    state.marksByPage={};
+    state.processedCache.clear();
+    Renderer.drawOverlay();
+    App.updateUI(); Thumbs.updateMarkIndicators();
+  }
+};
+
+// ====================================================
+// PROCESSOR — MELHORIA 3 (pentagrama "colado" + stems protegidos)
+// ====================================================
+const Processor = {
+  buildMaskForPage(p,w,h){
+    const marks=state.marksByPage[p]||[];
+    const globalHasPreserve=GlobalScope.hasAnyPreserveMark();
+    const pageHasPreserve=GlobalScope.pageHasPreserveMark(p);
+    if(!globalHasPreserve && !marks.length) return {removeMask:null, hasMarks:false};
+    const removeMask=new Uint8Array(w*h);
+    const mc=document.createElement('canvas');
+    mc.width=w; mc.height=h;
+    const mctx=mc.getContext('2d',{willReadFrequently:true});
+    if(globalHasPreserve){
+      if(pageHasPreserve){
+        mctx.fillStyle='#000'; mctx.fillRect(0,0,w,h);
+        mctx.fillStyle='#fff'; mctx.strokeStyle='#fff';
+        for(const m of marks){ if(m.mode==='preserve') this.drawMaskShape(mctx,m); }
+        mctx.fillStyle='#000'; mctx.strokeStyle='#000';
+        for(const m of marks){ if(m.mode==='remove') this.drawMaskShape(mctx,m); }
+      } else {
+        return {removeMask:null, hasMarks:false, dropPage:true};
+      }
+    } else {
+      mctx.fillStyle='#fff'; mctx.fillRect(0,0,w,h);
+      mctx.fillStyle='#000'; mctx.strokeStyle='#000';
+      for(const m of marks){ if(m.mode==='remove') this.drawMaskShape(mctx,m); }
+    }
+    const data=mctx.getImageData(0,0,w,h).data;
+    for(let i=0,j=0;i<data.length;i+=4,j++){
+      removeMask[j]=data[i]<128?1:0;
+    }
+    return {removeMask, hasMarks:true};
+  },
+  drawMaskShape(ctx,m){
+    if(m.type==='rect'){
+      ctx.fillRect(m.x,m.y,m.w,m.h);
+    } else if(m.type==='free'){
+      if(m.closed && m.points.length>2){
+        ctx.beginPath();
+        ctx.moveTo(m.points[0].x, m.points[0].y);
+        for(let i=1;i<m.points.length;i++) ctx.lineTo(m.points[i].x, m.points[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.save();
+        ctx.lineCap='round'; ctx.lineJoin='round';
+        ctx.lineWidth=m.size||20;
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.lineCap='round'; ctx.lineJoin='round';
+        ctx.lineWidth=m.size||20;
+        ctx.beginPath();
+        ctx.moveTo(m.points[0].x,m.points[0].y);
+        for(let i=1;i<m.points.length;i++) ctx.lineTo(m.points[i].x,m.points[i].y);
+        ctx.stroke();
+      }
+    }
+  },
+
+  /**
+   * MELHORIA 3: Para cada área removida (uma "região conectada" da máscara),
+   * detecta as 5 linhas do pentagrama horizontal adjacente (esquerda + direita),
+   * mede ESPESSURA e ESPAÇAMENTO exatos e gera um pentagrama "colado"
+   * apenas dentro daquela região, evitando completamente as colunas das hastes.
+   */
+  async processPage(p){
+    if(state.processedCache.has(p)) return state.processedCache.get(p);
+    const pg=await Renderer.getPageImageData(p);
+    const w=pg.width, h=pg.height;
+    const original=pg.imageData.data;
+    const out=new Uint8ClampedArray(original);
+    const {removeMask, hasMarks, dropPage}=this.buildMaskForPage(p,w,h);
+
+    if(dropPage){
+      const res={canvas:null, imageData:null, width:w, height:h, dropPage:true};
+      state.processedCache.set(p,res);
+      return res;
+    }
+
+    if(hasMarks && removeMask){
+      // ===== Passo 1: Detectar hastes ANTES de apagar =====
+      // (proteção total contra qualquer escrita posterior)
+      let stemColumns = new Uint8Array(w); // marca colunas que contêm haste protegida
+      let stemInfo = null;
+      if(state.inpaintStaff && state.preserveStems){
+        stemInfo = this.detectStems(original, removeMask, w, h);
+        for(const s of stemInfo.stems){
+          for(let x=s.xStart; x<=s.xEnd; x++) stemColumns[x]=1;
+        }
+      }
+
+      // ===== Passo 2: Encontrar regiões conectadas da máscara =====
+      const regions = state.inpaintStaff
+        ? this.findMaskRegions(removeMask, w, h)
+        : [];
+
+      // ===== Passo 3: Para cada região, amostrar pentagrama local =====
+      const regionStaffPatterns = [];
+      if(state.inpaintStaff){
+        for(const region of regions){
+          const pattern = this.sampleStaffPattern(original, removeMask, w, h, region);
+          if(pattern) regionStaffPatterns.push({region, pattern});
+        }
+      }
+
+      // ===== Passo 4: Apagar pixels da máscara =====
+      let removedCount=0;
+      for(let i=0;i<removeMask.length;i++){
+        if(removeMask[i]===1){
+          const k=i*4;
+          out[k]=255; out[k+1]=255; out[k+2]=255; out[k+3]=255;
+          removedCount++;
+        }
+      }
+      Logger.info(`Página ${p}: ${removedCount} pixels removidos`);
+
+      // ===== Passo 5: "Colar" pentagrama em cada região =====
+      // Pinta as 5 linhas com espessura/espaçamento idênticos,
+      // PULANDO completamente as colunas das hastes
+      if(regionStaffPatterns.length){
+        let glued=0;
+        for(const {region, pattern} of regionStaffPatterns){
+          glued += this.glueStaffPattern(out, removeMask, w, h, region, pattern, stemColumns);
+        }
+        Logger.info(`Pentagrama COLADO: ${regionStaffPatterns.length} região(ões), ${glued} pixels (espessura ${regionStaffPatterns[0].pattern.thickness}px, espaçamento ${regionStaffPatterns[0].pattern.spacing.toFixed(1)}px)`);
+      }
+
+      // ===== Passo 6: Restaurar hastes (intactas, sem alteração) =====
+      if(stemInfo && stemInfo.stems.length){
+        this.restoreStems(out, removeMask, w, h, stemInfo);
+        Logger.info(`Hastes RESTAURADAS intactas: ${stemInfo.stems.length} (zero modificação)`);
+      }
+    }
+
+    const imgData=new ImageData(out,w,h);
+    const c=document.createElement('canvas');
+    c.width=w; c.height=h;
+    c.getContext('2d').putImageData(imgData,0,0);
+    const res={canvas:c, imageData:imgData, width:w, height:h, dropPage:false};
+    state.processedCache.set(p,res);
+    return res;
+  },
+
+  // ============================================================
+  // Encontra regiões conectadas (4-vizinhança) da máscara
+  // Retorna [{minX, maxX, minY, maxY, pixels}]
+  // ============================================================
+  findMaskRegions(removeMask, w, h){
+    const visited = new Uint8Array(w*h);
+    const regions = [];
+    const stack = [];
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const idx=y*w+x;
+        if(removeMask[idx]!==1 || visited[idx]) continue;
+        // BFS
+        stack.length=0;
+        stack.push(idx);
+        visited[idx]=1;
+        let minX=x, maxX=x, minY=y, maxY=y, count=0;
+        while(stack.length){
+          const cur=stack.pop();
+          const cy=Math.floor(cur/w), cx=cur-cy*w;
+          if(cx<minX) minX=cx; if(cx>maxX) maxX=cx;
+          if(cy<minY) minY=cy; if(cy>maxY) maxY=cy;
+          count++;
+          // 4-vizinhos
+          if(cx+1<w){ const n=cur+1; if(!visited[n] && removeMask[n]===1){ visited[n]=1; stack.push(n); } }
+          if(cx-1>=0){ const n=cur-1; if(!visited[n] && removeMask[n]===1){ visited[n]=1; stack.push(n); } }
+          if(cy+1<h){ const n=cur+w; if(!visited[n] && removeMask[n]===1){ visited[n]=1; stack.push(n); } }
+          if(cy-1>=0){ const n=cur-w; if(!visited[n] && removeMask[n]===1){ visited[n]=1; stack.push(n); } }
+        }
+        if(count >= 30){
+          regions.push({minX, maxX, minY, maxY, count});
+        }
+      }
+    }
+    return regions;
+  },
+
+  // ============================================================
+  // Amostra o pentagrama LOCAL a partir de faixas FORA da máscara
+  // imediatamente à esquerda e à direita da região. Retorna:
+  // { lines:[{yCenter, thickness}, ...], spacing, thickness }
+  // ============================================================
+  sampleStaffPattern(data, removeMask, w, h, region){
+    const isDark=(i)=>{
+      const k=i*4;
+      return data[k]<110 && data[k+1]<110 && data[k+2]<110;
+    };
+    const yTop = Math.max(0, region.minY-5);
+    const yBot = Math.min(h-1, region.maxY+5);
+    const stripeW = 40; // largura de amostragem em cada lado
+    const xLeftEnd = Math.max(0, region.minX-2);
+    const xLeftStart = Math.max(0, xLeftEnd - stripeW);
+    const xRightStart = Math.min(w-1, region.maxX+2);
+    const xRightEnd = Math.min(w-1, xRightStart + stripeW);
+
+    // Histograma por linha y: pixels escuros nas duas faixas
+    const rowDark = new Float32Array(h);
+    const rowTotal = new Float32Array(h);
+    for(let y=yTop; y<=yBot; y++){
+      let dark=0, total=0;
+      for(let x=xLeftStart; x<xLeftEnd; x++){
+        const i=y*w+x;
+        if(removeMask[i]===1) continue;
+        total++;
+        if(isDark(i)) dark++;
+      }
+      for(let x=xRightStart; x<=xRightEnd; x++){
+        const i=y*w+x;
+        if(removeMask[i]===1) continue;
+        total++;
+        if(isDark(i)) dark++;
+      }
+      rowDark[y]=dark;
+      rowTotal[y]=total;
+    }
+
+    // Detecta linhas (rows com alta proporção de pixels escuros)
+    const isLineRow = new Uint8Array(h);
+    for(let y=yTop; y<=yBot; y++){
+      if(rowTotal[y] < 10) continue;
+      if(rowDark[y]/rowTotal[y] > 0.5) isLineRow[y]=1;
+    }
+    // Agrupa runs (cada run = uma linha do pentagrama, com sua espessura real)
+    const lines=[];
+    let y=yTop;
+    while(y<=yBot){
+      if(isLineRow[y]){
+        let y0=y;
+        while(y<=yBot && isLineRow[y]) y++;
+        const y1=y-1;
+        const thickness=y1-y0+1;
+        if(thickness>=1 && thickness<=6){
+          lines.push({yStart:y0, yEnd:y1, yCenter:(y0+y1)/2, thickness});
+        }
+      } else y++;
+    }
+    if(lines.length < 2) return null;
+
+    // Calcula espaçamento mediano entre centros
+    const spacings=[];
+    for(let i=1;i<lines.length;i++){
+      spacings.push(lines[i].yCenter - lines[i-1].yCenter);
+    }
+    spacings.sort((a,b)=>a-b);
+    const medianSpacing = spacings[Math.floor(spacings.length/2)];
+
+    // Calcula espessura mediana
+    const thicknesses = lines.map(l=>l.thickness).sort((a,b)=>a-b);
+    const medianThickness = thicknesses[Math.floor(thicknesses.length/2)];
+
+    // Se já temos as 5 linhas próximas, usa-as direto.
+    // Caso contrário, reconstrói as 5 a partir de uma linha de referência + espaçamento.
+    let finalLines = lines;
+    if(lines.length > 5){
+      // Pega as 5 com espaçamento mais regular
+      let best=null, bestVar=Infinity;
+      for(let i=0;i<=lines.length-5;i++){
+        const sub=lines.slice(i,i+5);
+        const gaps=[];
+        for(let j=1;j<5;j++) gaps.push(sub[j].yCenter-sub[j-1].yCenter);
+        const mean=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+        const v=gaps.reduce((a,b)=>a+(b-mean)**2,0)/gaps.length;
+        if(v<bestVar){ bestVar=v; best=sub; }
+      }
+      if(best) finalLines = best;
+    } else if(lines.length < 5 && medianSpacing > 0){
+      // Extrapola até 5 linhas usando o espaçamento mediano
+      const ref = lines[Math.floor(lines.length/2)];
+      finalLines = [];
+      for(let k=-2;k<=2;k++){
+        const yc = ref.yCenter + k*medianSpacing;
+        finalLines.push({
+          yCenter: yc,
+          yStart: Math.round(yc - medianThickness/2),
+          yEnd:   Math.round(yc - medianThickness/2) + medianThickness - 1,
+          thickness: medianThickness
+        });
+      }
+    }
+
+    return {
+      lines: finalLines,
+      spacing: medianSpacing,
+      thickness: medianThickness
+    };
+  },
+
+  // ============================================================
+  // "Cola" o pentagrama dentro da região da máscara.
+  // Para cada linha do pattern, pinta uma faixa horizontal preta
+  // com a espessura exata, MAS PULA as colunas marcadas em stemColumns
+  // (zero contato com hastes).
+  // ============================================================
+  glueStaffPattern(out, removeMask, w, h, region, pattern, stemColumns){
+    let painted=0;
+    const xMin = region.minX;
+    const xMax = region.maxX;
+    for(const line of pattern.lines){
+      const yStart = Math.max(0, Math.round(line.yCenter - pattern.thickness/2));
+      const yEnd   = Math.min(h-1, yStart + pattern.thickness - 1);
+      for(let y=yStart; y<=yEnd; y++){
+        for(let x=xMin; x<=xMax; x++){
+          // Só pinta DENTRO da máscara
+          const i=y*w+x;
+          if(removeMask[i]!==1) continue;
+          // PROTEÇÃO ABSOLUTA: nunca tocar colunas de haste
+          if(stemColumns[x]===1) continue;
+          const k=i*4;
+          out[k]=0; out[k+1]=0; out[k+2]=0; out[k+3]=255;
+          painted++;
+        }
+      }
+    }
+    return painted;
+  },
+
+  // ============================================================
+  // Detecção de hastes (igual v7.3, sem alteração)
+  // ============================================================
+  detectStems(data, removeMask, w, h){
+    const isDark=(i)=>{
+      const k=i*4;
+      return data[k]<110 && data[k+1]<110 && data[k+2]<110;
+    };
+    const darkOutside=new Uint8Array(w*h);
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const i=y*w+x;
+        if(removeMask[i]===0 && isDark(i)) darkOutside[i]=1;
+      }
+    }
+    const MIN_STEM_LEN = Math.max(15, Math.round(h*0.015));
+    const MAX_THICK = 4;
+    const stems=[];
+    const used=new Uint8Array(w);
+
+    for(let x=0;x<w;x++){
+      if(used[x]) continue;
+      let bestLen=0, bestY0=-1, bestY1=-1;
+      let y=0;
+      while(y<h){
+        if(darkOutside[y*w+x]){
+          let y0=y;
+          while(y<h && darkOutside[y*w+x]) y++;
+          const y1=y-1;
+          const len=y1-y0+1;
+          if(len>bestLen){ bestLen=len; bestY0=y0; bestY1=y1; }
+        } else y++;
+      }
+      if(bestLen<MIN_STEM_LEN) continue;
+
+      let xEnd=x;
+      for(let xx=x+1; xx<Math.min(w,x+MAX_THICK+2); xx++){
+        let overlap=0;
+        for(let yy=bestY0; yy<=bestY1; yy++){
+          if(darkOutside[yy*w+xx]) overlap++;
+        }
+        if(overlap > bestLen*0.7) xEnd=xx; else break;
+      }
+      const thickness=xEnd-x+1;
+      if(thickness>MAX_THICK) continue;
+      for(let xx=x; xx<=xEnd; xx++) used[xx]=1;
+
+      // Verifica se toca a máscara em alguma extremidade
+      const xMid=Math.floor((x+xEnd)/2);
+      let touchesMask=false;
+      for(let yy=Math.max(0,bestY0-3); yy>=Math.max(0,bestY0-60); yy--){
+        if(removeMask[yy*w+xMid]===1){ touchesMask=true; break; }
+      }
+      if(!touchesMask){
+        for(let yy=Math.min(h-1,bestY1+3); yy<=Math.min(h-1,bestY1+60); yy++){
+          if(removeMask[yy*w+xMid]===1){ touchesMask=true; break; }
+        }
+      }
+      if(!touchesMask) continue;
+
+      // Estende dentro da máscara
+      let extendTop=bestY0, extendBottom=bestY1;
+      let yy=bestY0-1;
+      while(yy>=0 && removeMask[yy*w+xMid]===1){ extendTop=yy; yy--; }
+      yy=bestY1+1;
+      while(yy<h && removeMask[yy*w+xMid]===1){ extendBottom=yy; yy++; }
+
+      stems.push({xStart:x, xEnd, thickness, yTop:extendTop, yBottom:extendBottom});
+    }
+    return {stems};
+  },
+
+  restoreStems(out, removeMask, w, h, stemInfo){
+    for(const s of stemInfo.stems){
+      for(let x=s.xStart; x<=s.xEnd; x++){
+        for(let y=s.yTop; y<=s.yBottom; y++){
+          if(y<0||y>=h||x<0||x>=w) continue;
+          const i=y*w+x;
+          if(removeMask[i]!==1) continue;
+          const k=i*4;
+          out[k]=0; out[k+1]=0; out[k+2]=0; out[k+3]=255;
+        }
+      }
+    }
+  }
+};
+
+// ====================================================
+// COMPACTOR (resumido)
+// ====================================================
+const Compactor = {
+  async buildLayout(){
+    if(!state.pageCount){ UI.showError('Sem arquivo','Carregue um arquivo'); return; }
+    Logger.step('Iniciando compactação...');
+    UI.setProgress(5,'Processando...');
+    const spacing=parseInt(document.getElementById('spacingInput').value)||20;
+    const margin=parseInt(document.getElementById('marginInput').value)||40;
+    const threshold=parseInt(document.getElementById('contentThreshold').value)||3;
+
+    const blocks=[];
+    let maxW=0;
+    for(let p=1;p<=state.pageCount;p++){
+      UI.setProgress(5+(p/state.pageCount)*50, `Página ${p}/${state.pageCount}...`);
+      if(!GlobalScope.shouldIncludePage(p)) continue;
+      const proc=await Processor.processPage(p);
+      if(proc.dropPage||!proc.canvas) continue;
+      const pageBlocks=this.findContentBlocks(proc, threshold);
+      if(proc.width>maxW) maxW=proc.width;
+      for(const b of pageBlocks) blocks.push(b);
+    }
+    if(!blocks.length){ UI.showError('Sem conteúdo',['Nenhum bloco detectado.']); return; }
+
+    UI.setProgress(60,'Montando páginas finais...');
+    const pageW=maxW;
+    const pageH=Math.round(pageW*1.4142);
+    const usableH=pageH-margin*2;
+    const finalPages=[];
+    let currentH=0, currentBlocks=[];
+    for(const b of blocks){
+      const need=currentBlocks.length===0?b.height:(currentH+spacing+b.height);
+      if(need>usableH && currentBlocks.length){
+        finalPages.push(this.composePage(currentBlocks,pageW,pageH,margin,spacing));
+        currentBlocks=[b]; currentH=b.height;
+      } else { currentBlocks.push(b); currentH=need; }
+    }
+    if(currentBlocks.length) finalPages.push(this.composePage(currentBlocks,pageW,pageH,margin,spacing));
+    state.finalPages=finalPages;
+    state.processed=true;
+    state.showFinalView=true;
+    state.currentPage=1;
+    document.getElementById('toggleViewBtn').disabled=false;
+    UI.setProgress(100,`✅ ${finalPages.length} página(s)`);
+    await Renderer.renderPage(1);
+    await Thumbs.build();
+  },
+  findContentBlocks(proc, threshold){
+    const {imageData,width,height}=proc;
+    const data=imageData.data;
+    const rowDark=new Uint32Array(height);
+    for(let y=0;y<height;y++){
+      let cnt=0;
+      for(let x=0;x<width;x++){
+        const k=(y*width+x)*4;
+        if(data[k]<200&&data[k+1]<200&&data[k+2]<200) cnt++;
+      }
+      rowDark[y]=cnt;
+    }
+    const blocks=[];
+    let inBlock=false, startY=0, gap=0; const gapTol=8;
+    for(let y=0;y<height;y++){
+      if(rowDark[y]>threshold){
+        if(!inBlock){ inBlock=true; startY=y; }
+        gap=0;
+      } else if(inBlock){
+        gap++;
+        if(gap>gapTol){
+          const endY=y-gap;
+          if(endY-startY>5) blocks.push(this.extractBlock(proc,startY,endY));
+          inBlock=false; gap=0;
+        }
+      }
+    }
+    if(inBlock){
+      const endY=height-1;
+      if(endY-startY>5) blocks.push(this.extractBlock(proc,startY,endY));
+    }
+    return blocks;
+  },
+  extractBlock(proc,y0,y1){
+    const h=y1-y0+1,w=proc.width;
+    const c=document.createElement('canvas');
+    c.width=w; c.height=h;
+    c.getContext('2d').drawImage(proc.canvas,0,y0,w,h,0,0,w,h);
+    return {canvas:c,width:w,height:h};
+  },
+  composePage(blocks,pageW,pageH,margin,spacing){
+    const c=document.createElement('canvas');
+    c.width=pageW; c.height=pageH;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,pageW,pageH);
+    let y=margin;
+    for(const b of blocks){
+      const x=Math.floor((pageW-b.width)/2);
+      ctx.drawImage(b.canvas,x,y);
+      y+=b.height+spacing;
+    }
+    return {canvas:c, imageData:ctx.getImageData(0,0,pageW,pageH), width:pageW, height:pageH};
+  }
+};
+
+// ====================================================
+// EXPORTER
+// ====================================================
+const Exporter = {
+  async exportPDF(){
+    const pages=state.showFinalView&&state.finalPages.length?state.finalPages:null;
+    let sources;
+    if(pages) sources=pages.map(p=>p.canvas);
+    else {
+      sources=[];
+      for(let p=1;p<=state.pageCount;p++){
+        if(!GlobalScope.shouldIncludePage(p)) continue;
+        const proc=await Processor.processPage(p);
+        if(proc.dropPage||!proc.canvas) continue;
+        sources.push(proc.canvas);
+      }
+    }
+    if(!sources.length){ UI.showError('Sem páginas','Nada para exportar'); return; }
+    const {jsPDF}=window.jspdf;
+    const first=sources[0];
+    const orientation=first.width>first.height?'l':'p';
+    const pdf=new jsPDF({orientation,unit:'pt',format:[first.width,first.height]});
+    for(let i=0;i<sources.length;i++){
+      const c=sources[i];
+      if(i>0) pdf.addPage([c.width,c.height], c.width>c.height?'l':'p');
+      pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,c.width,c.height);
+    }
+    const baseName=state.fileName.replace(/\.[^.]+$/,'')||'partitura';
+    pdf.save(`${baseName}_LeonardoFuks.pdf`);
+  },
+  async exportPNG(){
+    let canvas;
+    if(state.showFinalView&&state.finalPages.length){
+      canvas=state.finalPages[state.currentPage-1].canvas;
+    } else {
+      const proc=await Processor.processPage(state.currentPage);
+      if(proc.dropPage||!proc.canvas){ UI.showError('Página descartada','Adicione marcação.'); return; }
+      canvas=proc.canvas;
+    }
+    const a=document.createElement('a');
+    const baseName=state.fileName.replace(/\.[^.]+$/,'')||'partitura';
+    a.download=`${baseName}_pag${state.currentPage}_LeonardoFuks.png`;
+    a.href=canvas.toDataURL('image/png');
+    a.click();
+  }
+};
+
+// ====================================================
+// THUMBS — MELHORIA 2: aspect-ratio preservado sem squashing
+// ====================================================
+const Thumbs = {
+  async build(){
+    const list=document.getElementById('thumbList');
+    list.innerHTML='';
+    const total=state.showFinalView?state.finalPages.length:state.pageCount;
+    // Largura útil do painel (240px - 20px de padding)
+    const TARGET_W=210;
+
+    for(let p=1;p<=total;p++){
+      const item=document.createElement('div');
+      item.className='thumb-item';
+      item.dataset.page=p;
+
+      let src;
+      if(state.showFinalView) src=state.finalPages[p-1].canvas;
+      else src=(await Renderer.getPageImageData(p)).canvas;
+
+      // === MELHORIA 2: dimensões EXATAS do aspect-ratio real ===
+      const aspectRatio = src.height / src.width;
+      const tw = TARGET_W;
+      const th = Math.round(tw * aspectRatio);
+
+      const wrap=document.createElement('div');
+      wrap.className='thumb-canvas-wrap';
+
+      const c=document.createElement('canvas');
+      c.width=tw; c.height=th;
+      const cctx=c.getContext('2d');
+      cctx.imageSmoothingEnabled=true;
+      cctx.imageSmoothingQuality='high';
+      cctx.fillStyle='#fff';
+      cctx.fillRect(0,0,tw,th);
+      // Desenha mantendo proporção total (sem squashing)
+      cctx.drawImage(src, 0,0, src.width, src.height, 0,0, tw, th);
+
+      wrap.appendChild(c);
+      item.appendChild(wrap);
+
+      const cap=document.createElement('div');
+      cap.className='thumb-cap';
+      cap.textContent=`Página ${p}`;
+      item.appendChild(cap);
+
+      item.addEventListener('click', ()=>App.goPage(p));
+      list.appendChild(item);
+    }
+    this.updateActive();
+    this.updateMarkIndicators();
+  },
+  updateActive(){
+    document.querySelectorAll('.thumb-item').forEach(it=>{
+      it.classList.toggle('active', parseInt(it.dataset.page)===state.currentPage);
+    });
+  },
+  updateMarkIndicators(){
+    if(state.showFinalView) return;
+    document.querySelectorAll('.thumb-item').forEach(it=>{
+      const p=parseInt(it.dataset.page);
+      const marks=state.marksByPage[p]||[];
+      const hasPreserve=marks.some(m=>m.mode==='preserve');
+      const hasRemove=marks.some(m=>m.mode==='remove');
+      it.classList.toggle('has-preserve', hasPreserve);
+      it.classList.toggle('has-marks', !hasPreserve && hasRemove);
+    });
+  }
+};
+
+// ====================================================
+// APP
+// ====================================================
+const App = {
+  init(){
+    Renderer.init();
+    Marker.init();
+    if(!LibCheck.verify()) return;
+    HScrollBar.init();
+    window.addEventListener('resize', ()=>HScrollBar.update());
+    this.bindEvents();
+    this.updateUI();
+    Logger.info('🎼 Software developed by Leonardo Fuks · v7.4 pronto');
+  },
+  bindEvents(){
+    document.getElementById('fileInput').addEventListener('change', e=>this.onFile(e));
+    document.getElementById('toggleMarkBtn').addEventListener('click', ()=>this.toggleMarkMode());
+    document.getElementById('undoMarkBtn').addEventListener('click', ()=>Marker.undoLast());
+    document.getElementById('clearMarksBtn').addEventListener('click', ()=>Marker.clearPage());
+    document.getElementById('clearAllMarksBtn').addEventListener('click', ()=>Marker.clearAll());
+    document.getElementById('processBtn').addEventListener('click', ()=>Compactor.buildLayout());
+    document.getElementById('toggleViewBtn').addEventListener('click', ()=>this.toggleFinalView());
+    document.getElementById('prevBtn').addEventListener('click', ()=>this.goPage(state.currentPage-1));
+    document.getElementById('nextBtn').addEventListener('click', ()=>this.goPage(state.currentPage+1));
+    document.getElementById('exportPdfBtn').addEventListener('click', ()=>Exporter.exportPDF());
+    document.getElementById('exportPngBtn').addEventListener('click', ()=>Exporter.exportPNG());
+    document.getElementById('modeRemoveBtn').addEventListener('click', ()=>this.setSelectionMode('remove'));
+    document.getElementById('modePreserveBtn').addEventListener('click', ()=>this.setSelectionMode('preserve'));
+    document.getElementById('toolRectBtn').addEventListener('click', ()=>this.setTool('rect'));
+    document.getElementById('toolFreeBtn').addEventListener('click', ()=>this.setTool('free'));
+    document.getElementById('brushSize').addEventListener('input', e=>{
+      state.brushSize=parseInt(e.target.value);
+      document.getElementById('brushSizeLbl').textContent=state.brushSize;
+    });
+    document.getElementById('closedAreaChk').addEventListener('change', e=>{ state.detectClosedArea=e.target.checked; });
+    document.getElementById('inpaintStaffChk').addEventListener('change', e=>{
+      state.inpaintStaff=e.target.checked;
+      state.processedCache.clear();
+      Logger.info('Reconstrução pentagrama: '+(state.inpaintStaff?'ON':'OFF'));
+    });
+    document.getElementById('preserveStemsChk').addEventListener('change', e=>{
+      state.preserveStems=e.target.checked;
+      state.processedCache.clear();
+      Logger.info('Preservar hastes: '+(state.preserveStems?'ON':'OFF'));
+    });
+
+    // === MELHORIA 1: Seletor de escala ===
+    document.getElementById('zoomSelect').addEventListener('change', e=>{
+      this.setZoom(parseFloat(e.target.value));
+    });
+
+    document.addEventListener('keydown', e=>this.onKey(e));
+  },
+  async onFile(e){
+    const file=e.target.files[0]; if(!file) return;
+    const v=await Validator.validate(file);
+    if(!v.ok){ UI.showError('Arquivo inválido',v.reasons); return; }
+    state.fileName=file.name;
+    state.pageCount=0; state.currentPage=1;
+    state.showFinalView=false; state.processed=false;
+    state.originalCache.clear(); state.processedCache.clear();
+    state.marksByPage={}; state.finalPages=[];
+    document.getElementById('toggleViewBtn').disabled=true;
+    const ok=(v.type==='pdf')?await Loader.loadPDF(file):await Loader.loadImage(file);
+    if(!ok) return;
+    UI.setFileBadge(file.name);
+    this.enableControls();
+    await this.goPage(1);
+    await Thumbs.build();
+  },
+  enableControls(){
+    const ids=['toggleMarkBtn','undoMarkBtn','clearMarksBtn','clearAllMarksBtn','processBtn',
+               'prevBtn','nextBtn','exportPdfBtn','exportPngBtn','zoomSelect'];
+    ids.forEach(id=>{ const b=document.getElementById(id); if(b) b.disabled=false; });
+  },
+  toggleMarkMode(){
+    state.isMarkMode=!state.isMarkMode;
+    const btn=document.getElementById('toggleMarkBtn');
+    btn.textContent=(state.isMarkMode?'🛑 Desativar':'🖱️ Ativar')+' marcação';
+    btn.className=state.isMarkMode?'danger':'primary';
+    document.getElementById('viewerHint').textContent=state.isMarkMode?' — Modo MARCAÇÃO ativo':' — clique em "Ativar marcação"';
+    Renderer.overlayCanvas.classList.toggle('active', state.isMarkMode);
+  },
+  setSelectionMode(mode){
+    state.selectionMode=mode;
+    document.getElementById('modeRemoveBtn').classList.toggle('active-remove', mode==='remove');
+    document.getElementById('modePreserveBtn').classList.toggle('active-preserve', mode==='preserve');
+    const badge=document.getElementById('modeBadge');
+    badge.textContent='Modo: '+(mode==='remove'?'Remover':'Preservar');
+    badge.className='badge '+(mode==='remove'?'remove':'preserve');
+    const hint=document.getElementById('modeHint');
+    hint.innerHTML = mode==='remove'
+      ? '<b>Modo REMOVER (global):</b> tudo é mantido — exceto áreas marcadas de vermelho.'
+      : '<b>Modo PRESERVAR (global):</b> apenas páginas com marcas verdes são mantidas.';
+  },
+  setTool(tool){
+    state.tool=tool;
+    document.getElementById('toolRectBtn').classList.toggle('active', tool==='rect');
+    document.getElementById('toolFreeBtn').classList.toggle('active', tool==='free');
+    document.getElementById('brushField').style.display=tool==='free'?'flex':'none';
+    document.getElementById('toolBadge').textContent=tool==='rect'?'Retângulo':'Pincel livre';
+  },
+  async goPage(p){
+    if(p<1) p=1;
+    const total=state.showFinalView?state.finalPages.length:state.pageCount;
+    if(p>total) p=total;
+    state.currentPage=p;
+    await Renderer.renderPage(p);
+    Thumbs.updateActive();
+    this.updateUI();
+  },
+  // === MELHORIA 1: Aplica escala fixa ===
+  setZoom(z){
+    state.zoom=z;
+    document.getElementById('stage').style.transform=`scale(${z})`;
+    // Ajusta o select para refletir o valor (snap aos valores válidos)
+    const sel=document.getElementById('zoomSelect');
+    const validValues=[0.25,0.33,0.50,0.66,0.75,1.00];
+    let closest=validValues[0], minDiff=Math.abs(z-closest);
+    for(const v of validValues){
+      const d=Math.abs(z-v);
+      if(d<minDiff){ minDiff=d; closest=v; }
+    }
+    sel.value=closest.toFixed(2);
+    setTimeout(()=>HScrollBar.update(), 50);
+    Logger.info(`Escala: ${Math.round(z*100)}%`);
+  },
+  toggleFinalView(){
+    if(!state.finalPages.length) return;
+    state.showFinalView=!state.showFinalView;
+    state.currentPage=1;
+    Renderer.renderPage(1).then(()=>Thumbs.build());
+  },
+  onKey(e){
+    if(e.target.tagName==='INPUT'&&e.target.type!=='checkbox') return;
+    if(e.target.tagName==='SELECT') return;
+    if(e.key==='m'||e.key==='M') this.toggleMarkMode();
+    else if(e.key==='r'||e.key==='R') this.setSelectionMode('remove');
+    else if(e.key==='p'||e.key==='P') this.setSelectionMode('preserve');
+    else if(e.key==='1') this.setTool('rect');
+    else if(e.key==='2') this.setTool('free');
+    else if(e.key==='ArrowLeft') this.goPage(state.currentPage-1);
+    else if(e.key==='ArrowRight') this.goPage(state.currentPage+1);
+    else if(e.key==='f'||e.key==='F') this.toggleFinalView();
+    else if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z')) Marker.undoLast();
+  },
+  updateUI(){
+    const total=state.showFinalView?state.finalPages.length:state.pageCount;
+    document.getElementById('pageBadge').textContent=`${state.currentPage} / ${total||'—'}`;
+    document.getElementById('stPages').textContent=total;
+    document.getElementById('stCurrent').textContent=state.currentPage;
+    const pageMarks=state.marksByPage[state.currentPage]||[];
+    document.getElementById('stMarks').textContent=pageMarks.length;
+    let totalMarks=0;
+    for(const k in state.marksByPage) totalMarks+=state.marksByPage[k].length;
+    document.getElementById('stTotal').textContent=totalMarks;
+  }
+};
+
+window.addEventListener('DOMContentLoaded', ()=>App.init());
+</script>
+</body>
+</html>

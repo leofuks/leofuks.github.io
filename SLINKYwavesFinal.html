@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Slinky Wave Demo — by Leonardo Fuks</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: linear-gradient(#1a1a2e, #0f0f1a);
+    font-family: Arial, sans-serif;
+    color: #eee;
+    user-select: none;
+  }
+  canvas { display: block; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  .toolbar {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(0,0,0,0.45);
+    padding: 8px 12px;
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    z-index: 10;
+  }
+  #toolbar  { top: 12px; }
+  #toolbar2 { top: 78px; }
+
+  .toolbar button {
+    background: #2a2a40; color: #eee;
+    border: 1px solid #444;
+    padding: 9px 16px; border-radius: 6px;
+    cursor: pointer; font-size: 16px; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .toolbar button:hover { background: #3a3a55; border-color: #777; }
+  .toolbar button.active {
+    background: #ffcc66; color: #222; border-color: #ffcc66;
+    box-shadow: 0 0 12px rgba(255,204,102,0.5);
+  }
+  .toolbar button.demo { background: #2a4055; border-color: #557; }
+  .toolbar button.demo.active {
+    background: #66ccff; color: #112; border-color: #66ccff;
+    box-shadow: 0 0 12px rgba(102,204,255,0.5);
+  }
+  .toolbar button.stop { background: #552a2a; border-color: #844; }
+  .toolbar button.stop:hover { background: #884040; }
+
+  .toolbar button.mode { background: #2e3d2e; border-color: #5a7a5a; }
+  .toolbar button.mode.active {
+    background: #9be58b; color: #112; border-color: #9be58b;
+    box-shadow: 0 0 12px rgba(155,229,139,0.5);
+  }
+
+  .slider-wrap {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 10px; border-left: 1px solid #555; margin-left: 6px;
+  }
+  .slider-wrap label { font-size: 15px; color: #ccc; }
+  #tension { width: 160px; accent-color: #ffcc66; }
+
+  #lang { position: absolute; top: 12px; left: 16px; z-index: 11; }
+  #lang button {
+    background: #2a2a40; color: #eee; border: 1px solid #555;
+    padding: 7px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 14px; font-weight: 700;
+  }
+  #lang button.active { background: #ffcc66; color: #222; border-color: #ffcc66; }
+
+  #credit {
+    position: absolute; top: 12px; right: 16px;
+    font-size: 14px; color: #ccc;
+    background: rgba(0,0,0,0.4);
+    padding: 5px 12px; border-radius: 6px;
+    pointer-events: none;
+  }
+
+  #hint {
+    position: absolute; bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px; color: #88ccff;
+    pointer-events: none; text-shadow: 0 0 6px black;
+    text-align: center; max-width: 90%;
+  }
+</style>
+</head>
+<body>
+
+<div id="lang">
+  <button id="btnEN" class="active">EN</button>
+  <button id="btnPT">PT</button>
+</div>
+
+<div id="toolbar" class="toolbar">
+  <button id="btnTor" class="active" data-en="Torsional"     data-pt="Torcional">Torsional</button>
+  <button id="btnTrn"                data-en="Transversal"   data-pt="Transversal">Transversal</button>
+  <button id="btnLon"                data-en="Longitudinal"  data-pt="Longitudinal">Longitudinal</button>
+  <button id="btnDemoTor" class="demo" data-en="Demo Tor" data-pt="Demo Torc.">Demo Tor</button>
+  <button id="btnDemoTrn" class="demo" data-en="Demo Trn" data-pt="Demo Trans.">Demo Trn</button>
+  <button id="btnDemoLon" class="demo" data-en="Demo Lon" data-pt="Demo Long.">Demo Lon</button>
+  <button id="btnStop" class="stop"   data-en="Stop"     data-pt="Parar">Stop</button>
+  <div class="slider-wrap">
+    <label for="tension" data-en="Tension" data-pt="Tensão">Tension</label>
+    <input id="tension" type="range" min="0" max="100" value="0">
+  </div>
+</div>
+
+<div id="toolbar2" class="toolbar">
+  <span style="color:#aaa; font-size:14px; padding-right:6px;"
+        data-en="Standing wave mode:" data-pt="Modo de onda estacionária:">Standing wave mode:</span>
+  <button class="mode" data-mode="1">1</button>
+  <button class="mode" data-mode="2">2</button>
+  <button class="mode" data-mode="3">3</button>
+  <button class="mode" data-mode="4">4</button>
+  <button class="mode" data-mode="5">5</button>
+  <button class="mode" data-mode="6">6</button>
+</div>
+
+<div id="credit">Developed by Leonardo Fuks</div>
+
+<div id="hint"
+     data-en="Mode buttons (1–6): a 3-second onset excitation drives the left end at f_n, then settles into the pure standing wave. Tap the info table to hide/show it."
+     data-pt="Botões de modo (1–6): excitação inicial de 3 s na extremidade esquerda em f_n, depois estabiliza na onda estacionária pura. Toque na tabela para ocultar/mostrar.">
+  Mode buttons (1–6): a 3-second onset excitation drives the left end at f_n, then settles into the pure standing wave. Tap the info table to hide/show it.
+</div>
+
+<canvas id="cv"></canvas>
+
+<script>
+/* ============================================================
+   Slinky Wave Demo — Developed by Leonardo Fuks
+   With kinematic mode-shape simulator + onset excitation phase
+   ============================================================ */
+
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W, H;
+function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+addEventListener('resize', resize);
+resize();
+
+const N = 160;
+
+const BASE_C2_TOR = 0.25;
+const BASE_C2_TRN = 0.22;
+const BASE_C2_LON = 0.40;
+let C2_TOR = BASE_C2_TOR;
+let C2_TRN = BASE_C2_TRN;
+let C2_LON = BASE_C2_LON;
+
+const DAMP = 0.0018;
+
+const TOR_MAX = Math.PI / 2;
+const TRN_MAX = 1.0;
+const LON_MAX = 1.5;
+
+const theta = new Float32Array(N), omega = new Float32Array(N);
+const yDis  = new Float32Array(N), yVel  = new Float32Array(N);
+const uDis  = new Float32Array(N), uVel  = new Float32Array(N);
+
+let activeType = 'tor';
+
+let demoMode = null;
+let demoModeNum = 1;
+let demoStage = 'A';
+let demoTime = 0;
+let demoPhysT = 0;
+const STAGE_A_DURATION = 3.5;
+const STAGE_B_DURATION = 7.0;
+const DEMO_MAX_MODE = 5;
+const STEPS_PER_SEC = 60 * 3;
+
+// --- KINEMATIC standing-wave mode (1..6) ---
+let standingMode = null;
+let standingTime = 0;
+
+// Onset excitation duration (seconds) — increased to 3 seconds
+const ONSET_DURATION = 3.0;
+
+// Fundamental frequencies (Hz)
+const F1 = { tor: 0.55, trn: 0.45, lon: 0.50 };
+
+let tensionFactor = 1.0;
+let coilDensity = 1.0;
+const BASE_VISIBLE_COILS = 90;
+
+let dragging = false;
+let dragX0 = 0, dragY0 = 0;
+let dragLastTargetTheta = 0;
+let dragLastTargetY = 0;
+let dragLastTargetU = 0;
+
+let lang = 'en';
+
+// --- Info panel toggle (tap to hide/show) ---
+let showInfoPanel = true;
+// Stored bounds of the panel, used for hit-testing taps
+let infoPanelRect = { x: 0, y: 0, w: 0, h: 0, visible: false };
+
+// ============================================================
+// PHYSICS (used only when no kinematic mode is active)
+// ============================================================
+function softClamp(q, v, limit){
+  for (let i = 0; i < N; i++){
+    if (q[i] > limit){
+      q[i] = limit;
+      if (v[i] > 0) v[i] = -v[i] * 0.3;
+    } else if (q[i] < -limit){
+      q[i] = -limit;
+      if (v[i] < 0) v[i] = -v[i] * 0.3;
+    }
+  }
+}
+
+function stageASignal(localTSec){
+  const phase = (localTSec / STAGE_A_DURATION) * Math.PI * 2 * 1.5;
+  return Math.tanh(3.0 * Math.sin(phase));
+}
+
+function stageBSignal(stepCount, wN){
+  const ramp = Math.min(1, stepCount / (1.5 * STEPS_PER_SEC));
+  return ramp * Math.sin(wN * stepCount);
+}
+
+function physicsStep(){
+  let demoDrivesLeft = false;
+
+  if (demoMode){
+    const n = demoModeNum;
+    const Llen = N - 1;
+    const c = Math.sqrt(
+      demoMode === 'tor' ? C2_TOR :
+      demoMode === 'trn' ? C2_TRN : C2_LON
+    );
+    const kN = (2*n - 1) * Math.PI / (2*Llen);
+    const wN = c * kN;
+
+    if (demoStage === 'A'){
+      const sigNorm = stageASignal(demoTime);
+      const targetTheta = sigNorm * (TOR_MAX * 0.85);
+      const targetY     = sigNorm * (TRN_MAX * 0.85);
+      const targetU     = sigNorm * (LON_MAX * 0.85);
+
+      const k = 0.10, d = 0.45;
+      if (demoMode === 'tor'){
+        omega[0] += k * (targetTheta - theta[0]) - d * omega[0];
+      } else if (demoMode === 'trn'){
+        yVel[0]  += k * (targetY - yDis[0])    - d * yVel[0];
+      } else {
+        uVel[0]  += k * (targetU - uDis[0])    - d * uVel[0];
+      }
+      demoDrivesLeft = true;
+    } else {
+      const baseAmp = (
+        demoMode === 'tor' ? 0.014 :
+        demoMode === 'trn' ? 0.022 :
+                             0.030
+      );
+      const sig = baseAmp * stageBSignal(demoPhysT, wN);
+      if (demoMode === 'tor') omega[0] += sig;
+      if (demoMode === 'trn') yVel[0]  += sig;
+      if (demoMode === 'lon') uVel[0]  += sig;
+      demoPhysT++;
+    }
+  }
+
+  if (dragging){
+    const k = 0.22, d = 0.55;
+    if (activeType === 'tor'){
+      omega[0] += k * (dragLastTargetTheta - theta[0]) - d * omega[0];
+    } else if (activeType === 'trn'){
+      yVel[0]  += k * (dragLastTargetY - yDis[0])      - d * yVel[0];
+    } else if (activeType === 'lon'){
+      uVel[0]  += k * (dragLastTargetU - uDis[0])      - d * uVel[0];
+    }
+  }
+
+  const torDriven = (dragging && activeType === 'tor')
+                  || (demoDrivesLeft && demoMode === 'tor');
+  const trnDriven = (dragging && activeType === 'trn')
+                  || (demoDrivesLeft && demoMode === 'trn');
+  const lonDriven = (dragging && activeType === 'lon')
+                  || (demoDrivesLeft && demoMode === 'lon');
+
+  for (let i = 1; i < N - 1; i++){
+    omega[i] += C2_TOR*(theta[i-1] - 2*theta[i] + theta[i+1]) - DAMP*omega[i];
+  }
+  if (!torDriven){
+    omega[0] += C2_TOR*(theta[1] - theta[0]) - DAMP*omega[0];
+  }
+  theta[N-1] = 0; omega[N-1] = 0;
+  for (let i = 0; i < N - 1; i++) theta[i] += omega[i];
+
+  for (let i = 1; i < N - 1; i++){
+    yVel[i] += C2_TRN*(yDis[i-1] - 2*yDis[i] + yDis[i+1]) - DAMP*yVel[i];
+  }
+  if (!trnDriven){
+    yVel[0] += C2_TRN*(yDis[1] - yDis[0]) - DAMP*yVel[0];
+  }
+  yDis[N-1] = 0; yVel[N-1] = 0;
+  for (let i = 0; i < N - 1; i++) yDis[i] += yVel[i];
+
+  for (let i = 1; i < N - 1; i++){
+    uVel[i] += C2_LON*(uDis[i-1] - 2*uDis[i] + uDis[i+1]) - DAMP*uVel[i];
+  }
+  if (!lonDriven){
+    uVel[0] += C2_LON*(uDis[1] - uDis[0]) - DAMP*uVel[0];
+  }
+  uDis[N-1] = 0; uVel[N-1] = 0;
+  for (let i = 0; i < N - 1; i++) uDis[i] += uVel[i];
+
+  softClamp(theta, omega, TOR_MAX);
+  softClamp(yDis,  yVel,  TRN_MAX);
+  softClamp(uDis,  uVel,  LON_MAX);
+}
+
+// ============================================================
+// KINEMATIC MODE SHAPE GENERATOR  (with onset excitation)
+// ============================================================
+function modeShape(s, n){
+  return Math.sin(n * Math.PI * s);
+}
+
+function smoothstep(t){
+  t = Math.max(0, Math.min(1, t));
+  return t * t * (3 - 2 * t);
+}
+
+function applyKinematicMode(){
+  const speed = Math.sqrt(tensionFactor);
+  const f1    = F1[activeType] * speed;
+  const fn    = standingMode * f1;
+  const omegaN = 2 * Math.PI * fn;
+
+  const A_TOR = TOR_MAX * 0.85;
+  const A_TRN = TRN_MAX * 0.85;
+  const A_LON = LON_MAX * 0.85;
+  const A = activeType === 'tor' ? A_TOR
+          : activeType === 'trn' ? A_TRN : A_LON;
+
+  const tau = Math.min(1, standingTime / ONSET_DURATION);
+  const beta = smoothstep(tau);
+  const alphaOnset = 1 - beta;
+  const alphaIn = smoothstep(tau);
+  const phase = omegaN * standingTime;
+
+  theta.fill(0); omega.fill(0);
+  yDis.fill(0);  yVel.fill(0);
+  uDis.fill(0);  uVel.fill(0);
+
+  const lambda = 0.35;
+
+  for (let i = 0; i < N; i++){
+    const s = i / (N - 1);
+    const expProfile = Math.exp(-s / lambda);
+    const onsetPart    = alphaOnset * alphaIn * expProfile * Math.sin(phase);
+    const standingPart = beta * modeShape(s, standingMode) * Math.cos(phase);
+    const val = A * (onsetPart + standingPart);
+
+    if (activeType === 'tor'){
+      theta[i] = val;
+    } else if (activeType === 'trn'){
+      yDis[i]  = val;
+    } else {
+      uDis[i]  = val;
+    }
+  }
+}
+
+// ============================================================
+// DRAWING
+// ============================================================
+function layout(){
+  return {
+    leftX:   W * 0.13,
+    rightX:  W * 0.88,
+    centerY: H * 0.58,
+    ringR:   Math.min(40, H * 0.075),
+    ringW:   Math.min(15, H * 0.026),
+  };
+}
+
+const PALETTE = [
+  '#ff3b3b','#ffd23b','#3bff7a','#3bd0ff',
+  '#7a3bff','#ff3bd0','#ffffff','#222222',
+  '#ff8c3b','#3bffd0','#d0ff3b','#3b6dff'
+];
+
+function shade(hex, f){
+  const r = parseInt(hex.slice(1,3),16),
+        g = parseInt(hex.slice(3,5),16),
+        b = parseInt(hex.slice(5,7),16);
+  return `rgb(${r*f|0},${g*f|0},${b*f|0})`;
+}
+
+function drawRing(cx, cy, R, w, ang){
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w, R, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(40,40,55,0.92)';
+  ctx.fill();
+
+  const N_STRIPES = Math.max(4, Math.round(12 * coilDensity));
+  const steps = 56;
+  for (let s = 0; s < steps; s++){
+    const phi1 = (s/steps) * Math.PI*2;
+    const phi2 = ((s+1)/steps) * Math.PI*2;
+    const sx1 = w*Math.sin(phi1), sy1 = R*Math.cos(phi1);
+    const sx2 = w*Math.sin(phi2), sy2 = R*Math.cos(phi2);
+
+    const rotated = phi1 + ang;
+    const norm = ((rotated % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+    const bin  = Math.floor(norm / (Math.PI*2) * N_STRIPES);
+    const col  = PALETTE[bin % PALETTE.length];
+    const front = Math.sin(phi1) > 0 ? 1 : 0.55;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(sx1, sy1);
+    ctx.lineTo(sx2, sy2);
+    ctx.closePath();
+    ctx.fillStyle = shade(col, front);
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w, R, 0, 0, Math.PI*2);
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.ellipse(0, -R*0.5, w*0.6, R*0.18, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.09)';
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHand(x, y, R, ang){
+  ctx.save();
+  ctx.translate(x - R*1.6, y);
+  ctx.rotate(ang * 0.6);
+  ctx.fillStyle = '#e0b48a';
+  ctx.strokeStyle = '#7a5a3a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-90, -26, 90, 52, 14);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 32, 34, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(10, -26, 12, 18, 0.4, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function tr(en, pt){ return lang === 'pt' ? pt : en; }
+
+function drawNodeMarkers(L, visibleN){
+  if (!standingMode) return;
+  const tau = Math.min(1, standingTime / ONSET_DURATION);
+  const fade = smoothstep(tau);
+  if (fade < 0.05) return;
+
+  const baseSpacing = (L.rightX - L.leftX) / (visibleN - 1);
+  const n = standingMode;
+
+  ctx.globalAlpha = fade;
+  for (let k = 0; k <= n; k++){
+    const s = k / n;
+    const j = Math.round(s * (visibleN - 1));
+    const x = L.leftX + j * baseSpacing;
+    const y = L.centerY;
+    ctx.beginPath();
+    ctx.arc(x, y + L.ringR + 18, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#ff6b6b';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  for (let k = 0; k < n; k++){
+    const s = (k + 0.5) / n;
+    const j = Math.round(s * (visibleN - 1));
+    const x = L.leftX + j * baseSpacing;
+    const y = L.centerY;
+    ctx.beginPath();
+    ctx.arc(x, y + L.ringR + 18, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#9be58b';
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD(){
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '16px monospace';
+  const typeName = activeType === 'tor' ? tr('Torsional','Torcional')
+                 : activeType === 'trn' ? tr('Transversal','Transversal')
+                 : tr('Longitudinal','Longitudinal');
+  ctx.fillText(
+    `${tr('Active','Ativa')}: ${typeName}   |   ${tr('Tension','Tensão')}: ${tensionFactor.toFixed(2)}×`,
+    14, H - 60
+  );
+
+  if (demoMode){
+    ctx.fillStyle = '#66ccff';
+    const stageLabel = demoStage === 'A'
+      ? tr('TRANSIENT (extreme)','TRANSIENTE (extremo)')
+      : tr('RESONANT (standing wave)','RESSONANTE (onda estacionária)');
+    ctx.fillText(
+      `DEMO ${demoMode.toUpperCase()} — ${tr('mode','modo')} n=${demoModeNum} — ${stageLabel}`,
+      14, H - 38
+    );
+  } else if (standingMode){
+    const speed = Math.sqrt(tensionFactor);
+    const f1 = F1[activeType] * speed;
+    const fn = standingMode * f1;
+    const nNodes = standingMode + 1;
+    const nAnti  = standingMode;
+    const inOnset = standingTime < ONSET_DURATION;
+
+    ctx.fillStyle = inOnset ? '#ffaa66' : '#9be58b';
+    const phaseLabel = inOnset
+      ? tr(`ONSET EXCITATION  (${(ONSET_DURATION - standingTime).toFixed(1)} s left)`,
+           `EXCITAÇÃO INICIAL  (${(ONSET_DURATION - standingTime).toFixed(1)} s restantes)`)
+      : tr('STANDING WAVE — established','ONDA ESTACIONÁRIA — estabelecida');
+    ctx.fillText(
+      `${phaseLabel} — ${tr('mode','modo')} n=${standingMode}` +
+      `  |  ${tr('nodes','nós')}=${nNodes}, ${tr('antinodes','ventres')}=${nAnti}`,
+      14, H - 38
+    );
+
+    ctx.fillStyle = '#ffe066';
+    ctx.fillText(
+      `f₁ = ${f1.toFixed(3)} Hz   →   f${standingMode} = ${standingMode}·f₁ = ${fn.toFixed(3)} Hz`,
+      14, H - 16
+    );
+  }
+}
+
+function draw(){
+  ctx.clearRect(0, 0, W, H);
+  const L = layout();
+
+  const grd = ctx.createLinearGradient(0, L.centerY + L.ringR + 10, 0, H);
+  grd.addColorStop(0, 'rgba(60,40,20,0.6)');
+  grd.addColorStop(1, 'rgba(20,10,5,0.0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, L.centerY + L.ringR + 10, W, H);
+
+  ctx.fillStyle = '#444';
+  ctx.fillRect(L.rightX + L.ringR*0.6, L.centerY - L.ringR*2.2, 22, L.ringR*4.4);
+  ctx.fillStyle = '#222';
+  for (let y = L.centerY - L.ringR*2; y < L.centerY + L.ringR*2; y += 8){
+    ctx.fillRect(L.rightX + L.ringR*0.6, y, 22, 2);
+  }
+
+  const visibleN = Math.max(15, Math.round(BASE_VISIBLE_COILS / tensionFactor));
+  const baseSpacing = (L.rightX - L.leftX) / (visibleN - 1);
+  const uScale = baseSpacing * 5.0;
+  const yScale = 4 * L.ringR;
+
+  const drawn = [];
+  for (let j = 0; j < visibleN; j++){
+    const i = Math.round(j * (N - 1) / (visibleN - 1));
+    const x = L.leftX + j*baseSpacing + uDis[i]*uScale;
+    const y = L.centerY + yDis[i]*yScale;
+    drawn.push({ i, x, y });
+  }
+
+  if (standingMode){
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(L.leftX, L.centerY);
+    ctx.lineTo(L.rightX, L.centerY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.strokeStyle = 'rgba(180,180,200,0.3)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let j = 0; j < drawn.length - 1; j++){
+    ctx.moveTo(drawn[j].x, drawn[j].y);
+    ctx.lineTo(drawn[j+1].x, drawn[j+1].y);
+  }
+  ctx.stroke();
+
+  for (let j = drawn.length - 1; j >= 0; j--){
+    const d = drawn[j];
+    drawRing(d.x, d.y, L.ringR, L.ringW, theta[d.i]);
+  }
+
+  drawHand(drawn[0].x, drawn[0].y, L.ringR, theta[0]);
+
+  drawNodeMarkers(L, visibleN);
+  drawHUD();
+
+  // Reset stored panel rect each frame
+  infoPanelRect.visible = false;
+
+  if (standingMode){
+    if (showInfoPanel){
+      drawModePanel();
+    } else {
+      drawShowPanelHint();
+    }
+  }
+}
+
+function drawModePanel(){
+  const speed = Math.sqrt(tensionFactor);
+  const f1 = F1[activeType] * speed;
+  const x = 16, y = 60;
+  const w = 290, h = 210;
+
+  // Save bounds for hit-testing
+  infoPanelRect = { x, y, w, h, visible: true };
+
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.strokeStyle = 'rgba(155,229,139,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = '#9be58b';
+  ctx.font = 'bold 15px monospace';
+  ctx.fillText(tr('Mode frequencies','Frequências dos modos'), x + 12, y + 22);
+
+  // Small "tap to hide" hint in the corner
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.font = '10px monospace';
+  const hideTxt = tr('tap to hide ✕','toque para ocultar ✕');
+  const txtW = ctx.measureText(hideTxt).width;
+  ctx.fillText(hideTxt, x + w - txtW - 10, y + 16);
+
+  ctx.font = '13px monospace';
+  ctx.fillStyle = '#eee';
+  ctx.fillText(`f₁ = ${f1.toFixed(3)} Hz`, x + 12, y + 42);
+
+  for (let n = 1; n <= 6; n++){
+    const fn = n * f1;
+    const isActive = (n === standingMode);
+    ctx.fillStyle = isActive ? '#ffe066' : '#bbb';
+    ctx.font = isActive ? 'bold 13px monospace' : '13px monospace';
+    ctx.fillText(
+      `n=${n}: f${n} = ${n}·f₁ = ${fn.toFixed(3)} Hz`,
+      x + 12, y + 62 + (n-1) * 18
+    );
+  }
+
+  // Onset progress bar
+  const tau = Math.min(1, standingTime / ONSET_DURATION);
+  const beta = smoothstep(tau);
+  const barX = x + 12, barY = y + h - 22, barW = w - 24, barH = 10;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(barX, barY, barW, barH);
+  ctx.fillStyle = (tau < 1) ? '#ffaa66' : '#9be58b';
+  ctx.fillRect(barX, barY, barW * beta, barH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.strokeRect(barX, barY, barW, barH);
+
+  ctx.fillStyle = '#ccc';
+  ctx.font = '11px monospace';
+  ctx.fillText(
+    tau < 1 ? tr('Onset → Standing','Excitação → Estacionária')
+            : tr('Standing wave established','Onda estacionária estabelecida'),
+    barX, barY - 4
+  );
+}
+
+// Small "show table" reminder when the panel is hidden — also tappable
+function drawShowPanelHint(){
+  const x = 16, y = 60;
+  const w = 200, h = 32;
+  infoPanelRect = { x, y, w, h, visible: true };
+
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.strokeStyle = 'rgba(155,229,139,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = '#9be58b';
+  ctx.font = '12px monospace';
+  ctx.fillText(tr('▸ tap to show data table','▸ toque para mostrar tabela'), x + 10, y + 21);
+}
+
+// ============================================================
+// INPUT
+// ============================================================
+function getXY(ev){
+  if (ev.touches && ev.touches.length){
+    return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+  }
+  if (ev.changedTouches && ev.changedTouches.length){
+    return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
+  }
+  return { x: ev.clientX, y: ev.clientY };
+}
+
+function pointInRect(px, py, r){
+  return r.visible && px >= r.x && px <= r.x + r.w
+                   && py >= r.y && py <= r.y + r.h;
+}
+
+// Track if a press was consumed by the panel toggle, so we don't also start a drag
+let pressConsumedByPanel = false;
+
+function startDrag(ev){
+  const {x, y} = getXY(ev);
+
+  // ✱ NEW: tap on the info panel (or its "show" hint) toggles visibility
+  if (standingMode && pointInRect(x, y, infoPanelRect)){
+    showInfoPanel = !showInfoPanel;
+    pressConsumedByPanel = true;
+    ev.preventDefault();
+    return;
+  }
+  pressConsumedByPanel = false;
+
+  ev.preventDefault();
+  dragging = true;
+  dragX0 = x; dragY0 = y;
+  dragLastTargetTheta = 0;
+  dragLastTargetY = 0;
+  dragLastTargetU = 0;
+  if (standingMode) setStandingMode(null);
+}
+
+function moveDrag(ev){
+  if (!dragging) return;
+  const {x, y} = getXY(ev);
+  const dx = x - dragX0;
+  const dy = y - dragY0;
+  const L = layout();
+
+  if (activeType === 'tor'){
+    const sens = 3.0 / L.ringR;
+    dragLastTargetTheta = Math.max(-TOR_MAX*0.95, Math.min(TOR_MAX*0.95, -dy * sens));
+  } else if (activeType === 'trn'){
+    const sens = 1.6 / (4 * L.ringR);
+    dragLastTargetY = Math.max(-0.95, Math.min(0.95, dy * sens));
+  } else if (activeType === 'lon'){
+    const baseSpacing = (L.rightX - L.leftX) / (N - 1);
+    const sens = 1 / (baseSpacing * 6);
+    dragLastTargetU = Math.max(-1.4, Math.min(1.4, dx * sens));
+  }
+}
+
+function endDrag(){
+  dragging = false;
+  dragLastTargetTheta = 0;
+  dragLastTargetY = 0;
+  dragLastTargetU = 0;
+  pressConsumedByPanel = false;
+}
+
+cv.addEventListener('mousedown', startDrag);
+addEventListener('mousemove', moveDrag);
+addEventListener('mouseup', endDrag);
+cv.addEventListener('touchstart', startDrag, {passive:false});
+addEventListener('touchmove', moveDrag, {passive:false});
+addEventListener('touchend', endDrag);
+
+// ============================================================
+// CONTROLS
+// ============================================================
+function clearAllFields(){
+  theta.fill(0); omega.fill(0);
+  yDis.fill(0);  yVel.fill(0);
+  uDis.fill(0);  uVel.fill(0);
+}
+
+function stopAll(){
+  clearAllFields();
+  setDemo(null);
+  setStandingMode(null);
+}
+
+const btnTor      = document.getElementById('btnTor');
+const btnTrn      = document.getElementById('btnTrn');
+const btnLon      = document.getElementById('btnLon');
+const btnDemoTor  = document.getElementById('btnDemoTor');
+const btnDemoTrn  = document.getElementById('btnDemoTrn');
+const btnDemoLon  = document.getElementById('btnDemoLon');
+const btnStop     = document.getElementById('btnStop');
+const sliderTen   = document.getElementById('tension');
+const modeButtons = document.querySelectorAll('button.mode');
+const btnEN       = document.getElementById('btnEN');
+const btnPT       = document.getElementById('btnPT');
+
+function refreshButtons(){
+  btnTor.classList.toggle('active', activeType === 'tor');
+  btnTrn.classList.toggle('active', activeType === 'trn');
+  btnLon.classList.toggle('active', activeType === 'lon');
+  btnDemoTor.classList.toggle('active', demoMode === 'tor');
+  btnDemoTrn.classList.toggle('active', demoMode === 'trn');
+  btnDemoLon.classList.toggle('active', demoMode === 'lon');
+  modeButtons.forEach(b => {
+    const m = parseInt(b.dataset.mode, 10);
+    b.classList.toggle('active', standingMode === m);
+  });
+}
+
+function setActiveType(t){
+  activeType = t;
+  if (t !== 'tor'){ theta.fill(0); omega.fill(0); }
+  if (t !== 'trn'){ yDis.fill(0);  yVel.fill(0);  }
+  if (t !== 'lon'){ uDis.fill(0);  uVel.fill(0);  }
+  if (standingMode) standingTime = 0;
+  refreshButtons();
+}
+
+btnTor.onclick = () => setActiveType('tor');
+btnTrn.onclick = () => setActiveType('trn');
+btnLon.onclick = () => setActiveType('lon');
+
+function setDemo(m){
+  clearAllFields();
+  demoMode = m;
+  demoModeNum = 1;
+  demoStage = 'A';
+  demoTime = 0;
+  demoPhysT = 0;
+  if (m){
+    setStandingMode(null);
+    setActiveType(m);
+  }
+  refreshButtons();
+}
+
+function setStandingMode(n){
+  if (n === null){
+    standingMode = null;
+    standingTime = 0;
+    refreshButtons();
+    return;
+  }
+  demoMode = null;
+  clearAllFields();
+  standingMode = n;
+  standingTime = 0;
+  refreshButtons();
+}
+
+btnDemoTor.onclick = () => setDemo(demoMode === 'tor' ? null : 'tor');
+btnDemoTrn.onclick = () => setDemo(demoMode === 'trn' ? null : 'trn');
+btnDemoLon.onclick = () => setDemo(demoMode === 'lon' ? null : 'lon');
+btnStop.onclick    = stopAll;
+
+modeButtons.forEach(b => {
+  b.onclick = () => {
+    const m = parseInt(b.dataset.mode, 10);
+    setStandingMode(standingMode === m ? null : m);
+  };
+});
+
+sliderTen.addEventListener('input', () => {
+  const v = parseFloat(sliderTen.value) / 100;
+  tensionFactor = 1.0 + v * 3.0;
+  const speedScale = tensionFactor;
+  C2_TOR = BASE_C2_TOR * speedScale;
+  C2_TRN = BASE_C2_TRN * speedScale;
+  C2_LON = BASE_C2_LON * speedScale;
+  coilDensity = 1.0 / tensionFactor;
+});
+
+function applyLanguage(){
+  document.querySelectorAll('[data-en]').forEach(el => {
+    const t = lang === 'pt' ? el.dataset.pt : el.dataset.en;
+    if (t) el.textContent = t;
+  });
+  btnEN.classList.toggle('active', lang === 'en');
+  btnPT.classList.toggle('active', lang === 'pt');
+  document.documentElement.lang = lang;
+}
+btnEN.onclick = () => { lang = 'en'; applyLanguage(); };
+btnPT.onclick = () => { lang = 'pt'; applyLanguage(); };
+
+if (!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r){
+    this.beginPath();
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y,     x + w, y + h, r);
+    this.arcTo(x + w, y + h, x,     y + h, r);
+    this.arcTo(x,     y + h, x,     y,     r);
+    this.arcTo(x,     y,     x + w, y,     r);
+    this.closePath();
+    return this;
+  };
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+let lastT = performance.now();
+function loop(now){
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+
+  if (standingMode){
+    standingTime += dt;
+    applyKinematicMode();
+  } else {
+    if (demoMode){
+      demoTime += dt;
+      if (demoStage === 'A' && demoTime >= STAGE_A_DURATION){
+        demoStage = 'B'; demoTime = 0; demoPhysT = 0;
+      } else if (demoStage === 'B' && demoTime >= STAGE_B_DURATION){
+        demoStage = 'A'; demoTime = 0; demoPhysT = 0;
+        demoModeNum++;
+        if (demoModeNum > DEMO_MAX_MODE) demoModeNum = 1;
+        clearAllFields();
+      }
+    }
+    for (let k = 0; k < 3; k++) physicsStep();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

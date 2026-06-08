@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flute Intonation Lab</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ─────────────────────────────────────────────
+       DESIGN SYSTEM & RESET
+    ───────────────────────────────────────────── */
+    :root {
+      --bg:         #0d1117;
+      --surface:    #161b22;
+      --surface2:   #21262d;
+      --border:     #30363d;
+      --accent:     #58a6ff;
+      --accent2:    #3fb950;
+      --warn:       #d29922;
+      --danger:     #f85149;
+      --text:       #e6edf3;
+      --text-muted: #8b949e;
+      --radius:     10px;
+      --shadow:     0 4px 24px rgba(0,0,0,.5);
+      --font:       'Segoe UI', system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── LAYOUT ── */
+    .app-header {
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 1.2rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    .app-header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .app-header .subtitle { font-size: .8rem; color: var(--text-muted); margin-top: 2px; }
+    .header-logo { font-size: 2rem; }
+    .header-status-pill {
+      margin-left: auto;
+      padding: .3rem .8rem;
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      transition: all .3s;
+    }
+    .header-status-pill.idle    { color: var(--text-muted); }
+    .header-status-pill.running { border-color: var(--accent2); color: var(--accent2); background: rgba(63,185,80,.1); }
+    .header-status-pill.paused  { border-color: var(--warn);   color: var(--warn);   background: rgba(210,153,34,.1); }
+    .header-status-pill.done    { border-color: var(--accent);  color: var(--accent);  background: rgba(88,166,255,.1); }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      padding: 1.5rem 2rem;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    @media (max-width: 960px) {
+      .main-grid { grid-template-columns: 1fr; padding: 1rem; }
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem;
+      box-shadow: var(--shadow);
+    }
+    .card-title {
+      font-size: .85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    /* ── CALIBRATION CARD HIGHLIGHT ── */
+    .card.calibration-card {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(88,166,255,.2), var(--shadow);
+    }
+    .calibration-display {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .8rem 1rem;
+      margin-bottom: .8rem;
+    }
+    .calibration-hz-big {
+      font-size: 2.4rem;
+      font-weight: 900;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      min-width: 90px;
+    }
+    .calibration-info { flex: 1; }
+    .calibration-info .cal-label {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+    }
+    .calibration-info .cal-standard {
+      font-size: .88rem;
+      font-weight: 600;
+      margin-top: .15rem;
+    }
+    .cal-standard.baroque  { color: #c9a227; }
+    .cal-standard.chamber  { color: #a0c4ff; }
+    .cal-standard.standard { color: var(--accent2); }
+    .cal-standard.high     { color: var(--warn); }
+    .cal-standard.custom   { color: var(--text); }
+
+    .cal-presets {
+      display: flex;
+      gap: .4rem;
+      flex-wrap: wrap;
+      margin-bottom: .6rem;
+    }
+    .cal-preset-btn {
+      padding: .3rem .65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all .2s;
+      font-weight: 600;
+    }
+    .cal-preset-btn:hover { background: var(--surface); color: var(--text); }
+    .cal-preset-btn.active {
+      border-color: var(--accent);
+      background: rgba(88,166,255,.12);
+      color: var(--accent);
+    }
+
+    .cal-input-row {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-top: .4rem;
+    }
+    .cal-input-row input[type="number"] {
+      width: 90px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: .4rem .6rem;
+      font-size: .95rem;
+      font-weight: 700;
+      outline: none;
+      text-align: center;
+      transition: border-color .2s;
+    }
+    .cal-input-row input[type="number"]:focus { border-color: var(--accent); }
+    .cal-input-row label { font-size: .85rem; color: var(--text-muted); white-space: nowrap; }
+    .cal-range-hint { font-size: .75rem; color: var(--text-muted); margin-top: .3rem; }
+
+    /* ── FORM CONTROLS ── */
+    label { font-size: .85rem; color: var(--text-muted); display: block; margin-bottom: .25rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group:last-child { margin-bottom: 0; }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 4px;
+      border-radius: 2px;
+    }
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: .45rem .7rem;
+      font-size: .9rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    select:focus { border-color: var(--accent); }
+    option { background: var(--surface2); }
+    .range-row { display: flex; align-items: center; gap: .6rem; margin-top: .3rem; }
+    .range-val { min-width: 40px; text-align: right; font-size: .85rem; font-weight: 700; color: var(--accent); }
+
+    /* ── TOGGLE GROUP ── */
+    .toggle-group { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .toggle-btn {
+      flex: 1;
+      padding: .45rem .6rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: .82rem;
+      cursor: pointer;
+      transition: all .2s;
+      text-align: center;
+    }
+    .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      padding: .55rem 1.1rem; border-radius: 6px; border: 1px solid transparent;
+      font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .2s; white-space: nowrap;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: var(--accent);  color: #000; }
+    .btn-success  { background: var(--accent2); color: #000; }
+    .btn-warn     { background: var(--warn);    color: #000; }
+    .btn-danger   { background: var(--danger);  color: #fff; }
+    .btn-ghost    { background: transparent; border-color: var(--border); color: var(--text); }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.15); }
+    .btn-success:hover:not(:disabled) { filter: brightness(1.15); }
+    .btn-warn:hover:not(:disabled)    { filter: brightness(1.15); }
+    .btn-danger:hover:not(:disabled)  { filter: brightness(1.15); }
+    .btn-ghost:hover:not(:disabled)   { background: var(--surface2); }
+    .controls-row { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .8rem; }
+
+    /* ── PROGRESS ── */
+    .progress-bar-wrap { background: var(--surface2); border-radius: 999px; height: 8px; overflow: hidden; margin: .6rem 0; }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+      transition: width .4s ease;
+      width: 0%;
+    }
+
+    /* ── CURRENT NOTE ── */
+    .current-note-display {
+      text-align: center; padding: 1.2rem; background: var(--surface2);
+      border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 1rem;
+    }
+    .current-note-name {
+      font-size: 3rem; font-weight: 900; line-height: 1;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .current-note-freq { font-size: .95rem; color: var(--text-muted); margin-top: .3rem; }
+    .current-note-phase {
+      font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      margin-top: .5rem; padding: .2rem .6rem; border-radius: 999px; display: inline-block;
+    }
+    .phase-playing   { background: rgba(88,166,255,.15);  color: var(--accent); }
+    .phase-recording { background: rgba(248,81,73,.15);   color: var(--danger); }
+    .phase-analyzing { background: rgba(63,185,80,.15);   color: var(--accent2); }
+    .phase-idle      { background: var(--surface); color: var(--text-muted); }
+
+    /* ── CANVAS ── */
+    .canvas-container {
+      position: relative; background: var(--surface2); border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: hidden; margin-bottom: 1rem;
+    }
+    .canvas-label {
+      position: absolute; top: .5rem; left: .8rem; font-size: .72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted);
+      background: var(--surface2); padding: .1rem .4rem; border-radius: 4px;
+    }
+    canvas { display: block; width: 100%; }
+
+    /* ── MIC INDICATOR ── */
+    .mic-indicator { display: flex; align-items: center; gap: .5rem; font-size: .82rem; color: var(--text-muted); margin-bottom: .6rem; }
+    .mic-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); transition: background .2s; }
+    .mic-dot.active { background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+
+    /* ── CENTS METER ── */
+    .cents-meter-wrap { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem 1rem; margin-bottom: 1rem; }
+    .cents-meter-label { font-size: .75rem; color: var(--text-muted); text-align: center; margin-bottom: .4rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .cents-meter-track { position: relative; height: 28px; background: var(--surface); border-radius: 999px; border: 1px solid var(--border); overflow: hidden; }
+    .cents-meter-zones { position: absolute; inset: 0; display: flex; }
+    .zone-flat  { flex: 1; background: rgba(248,81,73,.08); }
+    .zone-ok    { width: 30%; background: rgba(63,185,80,.12); }
+    .zone-sharp { flex: 1; background: rgba(210,153,34,.08); }
+    .cents-center-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--border); transform: translateX(-50%); }
+    .cents-needle {
+      position: absolute; top: 4px; bottom: 4px; width: 4px; background: var(--accent);
+      border-radius: 2px; left: 50%; transform: translateX(-50%);
+      transition: left .08s linear, background .2s; box-shadow: 0 0 8px var(--accent);
+    }
+    .cents-value { text-align: center; font-size: .82rem; font-weight: 700; margin-top: .35rem; color: var(--accent); }
+
+    /* ── RESULTS TABLE ── */
+    .results-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    thead tr { background: var(--surface2); }
+    thead th {
+      padding: .6rem .8rem; text-align: left; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .04em; font-size: .75rem;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: .55rem .8rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .55rem;
+      border-radius: 999px; font-size: .75rem; font-weight: 700;
+    }
+    .badge-success { background: rgba(63,185,80,.15);  color: var(--accent2); }
+    .badge-warn    { background: rgba(210,153,34,.15); color: var(--warn); }
+    .badge-danger  { background: rgba(248,81,73,.15);  color: var(--danger); }
+    .badge-muted   { background: var(--surface2); color: var(--text-muted); }
+
+    /* ── SUMMARY STATS ── */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .8rem; margin-bottom: 1.2rem; }
+    .stat-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem .8rem; text-align: center; }
+    .stat-value {
+      font-size: 1.6rem; font-weight: 900;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-label { font-size: .75rem; color: var(--text-muted); margin-top: .15rem; }
+
+    /* ── TABS ── */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.2rem; }
+    .tab {
+      padding: .6rem 1.1rem; font-size: .85rem; font-weight: 600; color: var(--text-muted);
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover:not(.active) { color: var(--text); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── TOAST ── */
+    .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: .5rem; pointer-events: none; }
+    .toast {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: .7rem 1rem; font-size: .84rem; box-shadow: var(--shadow);
+      animation: slide-in .3s ease; max-width: 300px;
+    }
+    .toast.toast-success { border-color: var(--accent2); color: var(--accent2); }
+    .toast.toast-error   { border-color: var(--danger);  color: var(--danger);  }
+    .toast.toast-info    { border-color: var(--accent);  color: var(--accent);  }
+    @keyframes slide-in { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── PERMISSION OVERLAY ── */
+    .permission-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(13,17,23,.85);
+      z-index: 9000; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+    }
+    .permission-overlay.visible { display: flex; }
+    .permission-box {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 2rem 2.5rem; max-width: 400px; text-align: center; box-shadow: var(--shadow);
+    }
+    .permission-box .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .permission-box h2 { margin-bottom: .5rem; }
+    .permission-box p  { font-size: .9rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+
+    /* ── LOG ── */
+    .log-box {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: .7rem .9rem; font-family: 'Courier New', monospace; font-size: .78rem;
+      color: var(--text-muted); height: 150px; overflow-y: auto; line-height: 1.5;
+    }
+    .log-entry { padding: .05rem 0; }
+    .log-entry.info    { color: var(--accent); }
+    .log-entry.success { color: var(--accent2); }
+    .log-entry.warn    { color: var(--warn); }
+    .log-entry.error   { color: var(--danger); }
+
+    /* ── MODE BADGE ── */
+    .mode-badge {
+      display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; font-weight: 700;
+      padding: .25rem .6rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-muted);
+    }
+    .mode-badge.synth  { border-color: var(--accent);  color: var(--accent);  background: rgba(88,166,255,.08); }
+    .mode-badge.sample { border-color: var(--accent2); color: var(--accent2); background: rgba(63,185,80,.08); }
+
+    /* ── UTILITY ── */
+    .hidden  { display: none !important; }
+    .flex    { display: flex; }
+    .gap-1   { gap: .5rem; }
+    .mt-1    { margin-top: .5rem; }
+    .mt-2    { margin-top: 1rem; }
+    .small   { font-size: .8rem; color: var(--text-muted); }
+    hr.divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+    .right-col { display: flex; flex-direction: column; gap: 1.2rem; }
+    .left-col  { display: flex; flex-direction: column; gap: 1.2rem; }
+  </style>
+</head>
+<body>
+
+<!-- PERMISSION OVERLAY -->
+<div class="permission-overlay" id="permissionOverlay">
+  <div class="permission-box">
+    <div class="icon">🎙️</div>
+    <h2>Microphone Access Required</h2>
+    <p>Flute Intonation Lab needs microphone access to record and analyze your playing. Audio is processed locally and never uploaded.</p>
+    <button class="btn btn-primary" onclick="requestMicPermission()">Grant Access</button>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- APP HEADER -->
+<header class="app-header">
+  <div class="header-logo">🎶</div>
+  <div>
+    <h1>Flute Intonation Lab</h1>
+    <div class="subtitle">Historical · Acoustical · Performance Analysis</div>
+  </div>
+  <div class="header-status-pill idle" id="headerStatus">● Idle</div>
+</header>
+
+<!-- MAIN GRID -->
+<div class="main-grid">
+
+  <!-- ══════════════ LEFT COLUMN ══════════════ -->
+  <div class="left-col">
+
+    <!-- ── CALIBRATION CARD (NEW) ── -->
+    <div class="card calibration-card">
+      <div class="card-title"><span>🎼</span> Reference Pitch Calibration (A)</div>
+
+      <div class="calibration-display">
+        <div class="calibration-hz-big" id="calHzDisplay">440</div>
+        <div class="calibration-info">
+          <div class="cal-label">Current Reference</div>
+          <div class="cal-standard standard" id="calStandardLabel">A440 — Modern Standard</div>
+        </div>
+      </div>
+
+      <label style="margin-bottom:.4rem;">Quick Presets</label>
+      <div class="cal-presets">
+        <button class="cal-preset-btn" data-hz="415" onclick="applyCalPreset(415)">415 Hz<br><span style="font-weight:400;font-size:.7rem;">Baroque</span></button>
+        <button class="cal-preset-btn" data-hz="430" onclick="applyCalPreset(430)">430 Hz<br><span style="font-weight:400;font-size:.7rem;">Classical</span></button>
+        <button class="cal-preset-btn active" data-hz="440" onclick="applyCalPreset(440)">440 Hz<br><span style="font-weight:400;font-size:.7rem;">Modern</span></button>
+        <button class="cal-preset-btn" data-hz="442" onclick="applyCalPreset(442)">442 Hz<br><span style="font-weight:400;font-size:.7rem;">Orchestra</span></button>
+        <button class="cal-preset-btn" data-hz="444" onclick="applyCalPreset(444)">444 Hz<br><span style="font-weight:400;font-size:.7rem;">Chamber</span></button>
+        <button class="cal-preset-btn" data-hz="460" onclick="applyCalPreset(460)">460 Hz<br><span style="font-weight:400;font-size:.7rem;">Renaissance</span></button>
+      </div>
+
+      <label style="margin-bottom:.3rem;">Custom Value</label>
+      <div class="cal-input-row">
+        <input type="number" id="calCustomInput" min="415" max="460" step="0.1" value="440"
+               oninput="applyCalCustom(this.value)" />
+        <label style="margin:0;">Hz</label>
+        <div style="flex:1;">
+          <input type="range" id="calSlider" min="415" max="460" step="0.5" value="440"
+                 oninput="applyCalSlider(this.value)" style="margin:0;">
+        </div>
+      </div>
+      <div class="cal-range-hint">Valid range: 415 Hz (Baroque) — 460 Hz (Renaissance)</div>
+    </div>
+
+    <!-- SOUND SOURCE CARD -->
+    <div class="card">
+      <div class="card-title"><span>🔊</span> Sound Source</div>
+      <div class="form-group">
+        <label>Tone Generation Mode</label>
+        <div class="toggle-group" id="modeToggle">
+          <div class="toggle-btn active" data-mode="synth"   onclick="setMode('synth')">🎛️ Synthesizer</div>
+          <div class="toggle-btn"        data-mode="samples" onclick="setMode('samples')">📁 WAV Samples</div>
+        </div>
+      </div>
+      <div id="synthOptions">
+        <div class="form-group">
+          <label>Waveform</label>
+          <div class="toggle-group" id="waveformToggle">
+            <div class="toggle-btn active" data-wave="sine"     onclick="setWave('sine')">Sine</div>
+            <div class="toggle-btn"        data-wave="triangle" onclick="setWave('triangle')">Triangle</div>
+            <div class="toggle-btn"        data-wave="sawtooth" onclick="setWave('sawtooth')">Saw</div>
+            <div class="toggle-btn"        data-wave="square"   onclick="setWave('square')">Square</div>
+          </div>
+        </div>
+      </div>
+      <div id="sampleOptions" class="hidden">
+        <div class="form-group">
+          <label>Sample Directory Status</label>
+          <div class="flex gap-1" style="align-items:center; flex-wrap:wrap; margin-top:.3rem;">
+            <span class="mode-badge" id="sampleStatusBadge">⏳ Not verified</span>
+            <button class="btn btn-ghost" style="font-size:.78rem; padding:.3rem .7rem;" onclick="verifySamples()">Verify Samples</button>
+          </div>
+          <p class="small mt-1">Place WAV files (B3.wav, C4.wav …) in the same directory as this HTML file.</p>
+        </div>
+      </div>
+      <div style="margin-top:.5rem;">
+        <label>Reference Volume</label>
+        <div class="range-row">
+          <input type="range" id="volumeSlider" min="0" max="100" value="60" oninput="updateVolume(this.value)">
+          <span class="range-val" id="volumeVal">60%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RANGE SETTINGS -->
+    <div class="card">
+      <div class="card-title"><span>🎵</span> Note Range</div>
+      <div class="form-group">
+        <label>Lowest Note (fixed: B3)</label>
+        <select id="lowestNote" onchange="updateRange()"></select>
+      </div>
+      <div class="form-group">
+        <label>Highest Note</label>
+        <select id="highestNote" onchange="updateRange()"></select>
+        <p class="small mt-1">Adjustable range: G6 – G8</p>
+      </div>
+      <div class="form-group">
+        <label>Total notes in sequence: <strong id="totalNotesLabel" style="color:var(--accent)">—</strong></label>
+        <div class="progress-bar-wrap" style="margin-top:.4rem; height:4px;">
+          <div class="progress-bar-fill" id="rangeIndicator" style="width:100%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TIMING SETTINGS -->
+    <div class="card">
+      <div class="card-title"><span>⏱️</span> Timing</div>
+      <div class="form-group">
+        <label>Reference Tone Duration</label>
+        <div class="range-row">
+          <input type="range" id="toneDuration" min="0.5" max="2.0" step="0.1" value="1.0"
+                 oninput="document.getElementById('toneDurationVal').textContent=parseFloat(this.value).toFixed(1)+'s'">
+          <span class="range-val" id="toneDurationVal">1.0s</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Recording Duration</label>
+        <div class="range-row">
+          <input type="range" id="recDuration" min="1.0" max="4.0" step="0.1" value="2.0"
+                 oninput="document.getElementById('recDurationVal').textContent=parseFloat(this.value).toFixed(1)+'s'">
+          <span class="range-val" id="recDurationVal">2.0s</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Gap Between Notes (ms)</label>
+        <div class="range-row">
+          <input type="range" id="gapDuration" min="200" max="1500" step="100" value="400"
+                 oninput="document.getElementById('gapVal').textContent=this.value+'ms'">
+          <span class="range-val" id="gapVal">400ms</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Intonation Tolerance (cents)</label>
+        <div class="range-row">
+          <input type="range" id="toleranceCents" min="5" max="50" step="5" value="15"
+                 oninput="document.getElementById('toleranceVal').textContent=this.value+'¢'">
+          <span class="range-val" id="toleranceVal">15¢</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="card">
+      <div class="card-title"><span>🎮</span> Sequence Control</div>
+      <div class="controls-row">
+        <button class="btn btn-success" id="btnStart"  onclick="startSequence()">▶ Start</button>
+        <button class="btn btn-warn"    id="btnPause"  onclick="pauseSequence()"  disabled>⏸ Pause</button>
+        <button class="btn btn-danger"  id="btnStop"   onclick="stopSequence()"   disabled>■ Stop</button>
+        <button class="btn btn-ghost"   id="btnExport" onclick="exportResults()"  disabled>⬇ Export</button>
+      </div>
+      <hr class="divider">
+      <div class="form-group" style="margin:0">
+        <label>Progress</label>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="mainProgress"></div>
+        </div>
+        <div class="flex gap-1" style="justify-content:space-between; font-size:.78rem; color:var(--text-muted); margin-top:.3rem;">
+          <span id="progressLabel">0 / 0 notes</span>
+          <span id="progressPct">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="card">
+      <div class="card-title"><span>📋</span> System Log
+        <button class="btn btn-ghost" style="margin-left:auto; font-size:.72rem; padding:.2rem .5rem;" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ RIGHT COLUMN ══════════════ -->
+  <div class="right-col">
+
+    <!-- CURRENT NOTE STATUS -->
+    <div class="card">
+      <div class="card-title"><span>🎯</span> Current Note</div>
+      <div class="current-note-display">
+        <div class="current-note-name" id="currentNoteName">—</div>
+        <div class="current-note-freq" id="currentNoteFreq">Target: — Hz</div>
+        <div class="current-note-phase phase-idle" id="currentPhase">Idle</div>
+      </div>
+      <div class="mic-indicator">
+        <div class="mic-dot" id="micDot"></div>
+        <span id="micStatus">Microphone: inactive</span>
+        <span style="margin-left:auto; font-size:.85rem; font-weight:700;" id="detectedPitchDisplay"></span>
+      </div>
+      <div class="cents-meter-wrap">
+        <div class="cents-meter-label">Intonation Deviation</div>
+        <div class="cents-meter-track">
+          <div class="cents-meter-zones">
+            <div class="zone-flat"></div>
+            <div class="zone-ok"></div>
+            <div class="zone-sharp"></div>
+          </div>
+          <div class="cents-center-line"></div>
+          <div class="cents-needle" id="centsNeedle"></div>
+        </div>
+        <div class="cents-value" id="centsValue">— ¢</div>
+      </div>
+    </div>
+
+    <!-- LIVE VISUALIZATION -->
+    <div class="card">
+      <div class="card-title"><span>📊</span> Live Visualization</div>
+      <div class="canvas-container" style="height:100px">
+        <div class="canvas-label">Waveform</div>
+        <canvas id="waveformCanvas" height="100"></canvas>
+      </div>
+      <div class="canvas-container" style="height:100px">
+        <div class="canvas-label">Pitch Contour (current response)</div>
+        <canvas id="pitchCanvas" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- RESULTS TABS -->
+    <div class="card">
+      <div class="card-title"><span>📈</span> Results & Analysis</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('tabChart')">Pitch Map</div>
+        <div class="tab" onclick="switchTab('tabTable')">Note Table</div>
+        <div class="tab" onclick="switchTab('tabSummary')">Summary</div>
+      </div>
+
+      <div class="tab-panel active" id="tabChart">
+        <div style="position:relative; height:280px;">
+          <canvas id="pitchMapChart"></canvas>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tabTable">
+        <div class="results-table-wrap">
+          <table id="resultsTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Note</th>
+                <th>Target (Hz)</th>
+                <th>Min (Hz)</th>
+                <th>Median (Hz)</th>
+                <th>Max (Hz)</th>
+                <th>Dev (¢)</th>
+                <th>Crossed?</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:1.5rem;">No data yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tabSummary">
+        <div class="stats-grid" id="summaryStats">
+          <div class="stat-card"><div class="stat-value" id="statTotal">—</div><div class="stat-label">Total Notes</div></div>
+          <div class="stat-card"><div class="stat-value" id="statSuccess">—</div><div class="stat-label">In Tune ✓</div></div>
+          <div class="stat-card"><div class="stat-value" id="statFlat">—</div><div class="stat-label">Flat ♭</div></div>
+          <div class="stat-card"><div class="stat-value" id="statSharp">—</div><div class="stat-label">Sharp ♯</div></div>
+          <div class="stat-card"><div class="stat-value" id="statMissed">—</div><div class="stat-label">Missed</div></div>
+          <div class="stat-card"><div class="stat-value" id="statAvgDev">—</div><div class="stat-label">Avg Dev (¢)</div></div>
+          <div class="stat-card"><div class="stat-value" id="statRefA">—</div><div class="stat-label">Ref. A (Hz)</div></div>
+        </div>
+        <div style="position:relative; height:200px; margin-bottom:1rem;">
+          <canvas id="deviationChart"></canvas>
+        </div>
+        <div id="summaryInsights" style="font-size:.85rem; color:var(--text-muted); line-height:1.7;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   1. CONSTANTS & NOTE DEFINITIONS
+═══════════════════════════════════════════════════════════ */
+const NOTE_NAMES  = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const A4_MIDI     = 69;
+const MIDI_START  = 59;   // B3
+const MIDI_END_MAX= 115;  // G8
+const MIDI_END_MIN= 91;   // G6
+
+/* ─── Core frequency calculation ───
+   All frequencies are derived from the user-defined A4 reference.
+   Formula: freq = refA4 × 2^((midi − 69) / 12)
+   This shifts every note in equal temperament proportionally.         */
+function midiToFreq(midi, refA4) {
+  return refA4 * Math.pow(2, (midi - A4_MIDI) / 12);
+}
+function midiToName(midi) {
+  const oct  = Math.floor(midi / 12) - 1;
+  const name = NOTE_NAMES[midi % 12];
+  return `${name}${oct}`;
+}
+function freqToCents(f, ref) {
+  if (!f || !ref || f <= 0 || ref <= 0) return null;
+  return 1200 * Math.log2(f / ref);
+}
+function buildNoteList(loMidi, hiMidi, refA4) {
+  const list = [];
+  for (let m = loMidi; m <= hiMidi; m++) {
+    list.push({ midi: m, name: midiToName(m), freq: midiToFreq(m, refA4) });
+  }
+  return list;
+}
+
+/* ─── Format number for CSV — always decimal point, no commas ─── */
+function csvNum(val, decimals = 4) {
+  if (val === null || val === undefined || isNaN(val)) return '';
+  return Number(val).toFixed(decimals);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. APPLICATION STATE
+═══════════════════════════════════════════════════════════ */
+const State = {
+  /* ── Calibration ── */
+  referenceA4:    440.0,   // Hz — user-adjustable, drives ALL freq calculations
+
+  /* ── Sound source ── */
+  mode:           'synth',
+  waveform:       'sine',
+  volume:         0.6,
+
+  /* ── Range ── */
+  lowestMidi:     59,
+  highestMidi:    79,      // D7
+
+  /* ── Timing ── */
+  toneDuration:   1.0,
+  recDuration:    2.0,
+  gapDuration:    400,
+  toleranceCents: 15,
+
+  /* ── Runtime ── */
+  notes:          [],
+  currentIndex:   0,
+  running:        false,
+  paused:         false,
+  stopRequested:  false,
+  results:        [],
+  sampleCache:    {},
+  sampleAvail:    {},
+  micStream:      null,
+  audioCtx:       null,
+  analyserNode:   null,
+  pitchContour:   [],
+};
+
+/* ═══════════════════════════════════════════════════════════
+   3. CALIBRATION LOGIC
+═══════════════════════════════════════════════════════════ */
+const CAL_STANDARDS = [
+  { hz: 415,  label: 'A415 — Baroque Standard',    cls: 'baroque'  },
+  { hz: 430,  label: 'A430 — Classical Period',     cls: 'baroque'  },
+  { hz: 440,  label: 'A440 — Modern Standard',      cls: 'standard' },
+  { hz: 442,  label: 'A442 — Orchestra (EU)',        cls: 'chamber'  },
+  { hz: 444,  label: 'A444 — High Chamber',          cls: 'high'     },
+  { hz: 460,  label: 'A460 — Renaissance Standard', cls: 'high'     },
+];
+
+function applyCalPreset(hz) {
+  hz = parseFloat(hz);
+  State.referenceA4 = hz;
+  document.getElementById('calCustomInput').value = hz.toFixed(1);
+  document.getElementById('calSlider').value      = hz;
+  updateCalDisplay(hz);
+  updateRange();                         // recalculate note frequencies
+  log(`Reference pitch set to ${hz.toFixed(1)} Hz.`, 'info');
+}
+
+function applyCalCustom(val) {
+  let hz = parseFloat(val);
+  if (isNaN(hz)) return;
+  hz = Math.max(415, Math.min(460, hz));
+  State.referenceA4 = hz;
+  document.getElementById('calSlider').value = hz;
+  updateCalDisplay(hz);
+  updateRange();
+}
+
+function applyCalSlider(val) {
+  const hz = parseFloat(val);
+  State.referenceA4 = hz;
+  document.getElementById('calCustomInput').value = hz.toFixed(1);
+  updateCalDisplay(hz);
+  updateRange();
+}
+
+function updateCalDisplay(hz) {
+  document.getElementById('calHzDisplay').textContent = hz % 1 === 0 ? hz : hz.toFixed(1);
+
+  /* Highlight matching preset button */
+  document.querySelectorAll('.cal-preset-btn').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.hz) === hz);
+  });
+
+  /* Standard label */
+  const match = CAL_STANDARDS.find(s => Math.abs(s.hz - hz) < 0.6);
+  const lbl   = document.getElementById('calStandardLabel');
+  if (match) {
+    lbl.textContent  = match.label;
+    lbl.className    = `cal-standard ${match.cls}`;
+  } else {
+    lbl.textContent  = `Custom — ${hz.toFixed(1)} Hz`;
+    lbl.className    = 'cal-standard custom';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4. AUDIO CONTEXT — lazy init
+═══════════════════════════════════════════════════════════ */
+function getAudioCtx() {
+  if (!State.audioCtx || State.audioCtx.state === 'closed') {
+    State.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (State.audioCtx.state === 'suspended') State.audioCtx.resume();
+  return State.audioCtx;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. YIN PITCH DETECTION
+═══════════════════════════════════════════════════════════ */
+function yinPitchDetect(buffer, sampleRate, threshold = 0.15) {
+  const W    = buffer.length;
+  const half = Math.floor(W / 2);
+  const diff = new Float32Array(half);
+
+  for (let tau = 0; tau < half; tau++) {
+    let s = 0;
+    for (let i = 0; i < half; i++) {
+      const d = buffer[i] - buffer[i + tau];
+      s += d * d;
+    }
+    diff[tau] = s;
+  }
+
+  const cmnd   = new Float32Array(half);
+  cmnd[0]      = 1;
+  let runSum   = 0;
+  for (let tau = 1; tau < half; tau++) {
+    runSum   += diff[tau];
+    cmnd[tau] = diff[tau] * tau / runSum;
+  }
+
+  let tau = 2;
+  while (tau < half) {
+    if (cmnd[tau] < threshold) {
+      while (tau + 1 < half && cmnd[tau + 1] < cmnd[tau]) tau++;
+      const x0 = tau > 1 ? tau - 1 : tau;
+      const x2 = tau < half - 1 ? tau + 1 : tau;
+      if (x0 === tau)  { tau = cmnd[tau] <= cmnd[x2] ? tau : x2; break; }
+      if (x2 === tau)  { tau = cmnd[tau] <= cmnd[x0] ? tau : x0; break; }
+      const a  = cmnd[x0], b = cmnd[tau], c = cmnd[x2];
+      tau      = tau + (c - a) / (2 * (2 * b - c - a));
+      break;
+    }
+    tau++;
+  }
+  if (tau === half || isNaN(tau)) return -1;
+  return sampleRate / tau;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   6. TONE PLAYBACK
+═══════════════════════════════════════════════════════════ */
+function playSynthTone(freq, duration, waveform, volume) {
+  return new Promise(resolve => {
+    const ctx  = getAudioCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type   = waveform;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.02);
+    gain.gain.setValueAtTime(volume, ctx.currentTime + duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+    osc.onended = () => { try { gain.disconnect(); } catch(_){} resolve(); };
+  });
+}
+
+async function loadSample(noteName) {
+  if (State.sampleCache[noteName]) return State.sampleCache[noteName];
+  const ctx = getAudioCtx();
+  try {
+    const resp   = await fetch(`./${noteName}.wav`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data   = await resp.arrayBuffer();
+    const buffer = await ctx.decodeAudioData(data);
+    State.sampleCache[noteName] = buffer;
+    State.sampleAvail[noteName] = true;
+    return buffer;
+  } catch(e) {
+    State.sampleAvail[noteName] = false;
+    return null;
+  }
+}
+
+function playSampleTone(buffer, duration, volume) {
+  return new Promise(resolve => {
+    const ctx  = getAudioCtx();
+    const src  = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    src.buffer = buffer;
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.02);
+    gain.gain.setValueAtTime(volume, ctx.currentTime + duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(ctx.currentTime);
+    src.stop(ctx.currentTime + duration);
+    src.onended = () => { try { gain.disconnect(); } catch(_){} resolve(); };
+  });
+}
+
+async function playNote(noteName, freq, duration) {
+  if (State.mode === 'samples') {
+    const buf = await loadSample(noteName);
+    if (buf) { await playSampleTone(buf, duration, State.volume); return; }
+    log(`Sample ${noteName}.wav not found — using synth fallback.`, 'warn');
+  }
+  await playSynthTone(freq, duration, State.waveform, State.volume);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   7. MICROPHONE & RECORDING
+═══════════════════════════════════════════════════════════ */
+async function getMicStream() {
+  if (State.micStream && State.micStream.active) return State.micStream;
+  State.micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    video: false
+  });
+  return State.micStream;
+}
+
+function recordMic(duration) {
+  return new Promise(async (resolve, reject) => {
+    let stream;
+    try { stream = await getMicStream(); }
+    catch(e) { reject(e); return; }
+
+    const ctx        = getAudioCtx();
+    const src        = ctx.createMediaStreamSource(stream);
+    State.analyserNode = ctx.createAnalyser();
+    State.analyserNode.fftSize = 2048;
+    src.connect(State.analyserNode);
+
+    const sampleRate   = ctx.sampleRate;
+    const totalSamples = Math.ceil(sampleRate * duration);
+    const recorded     = new Float32Array(totalSamples);
+    let   offset       = 0;
+    const bufSize      = State.analyserNode.fftSize;
+    const timeBuf      = new Float32Array(bufSize);
+
+    State.pitchContour = [];
+    setMicActive(true);
+
+    const tick = () => {
+      if (State.stopRequested) { src.disconnect(); setMicActive(false); resolve(recorded.slice(0, offset)); return; }
+      State.analyserNode.getFloatTimeDomainData(timeBuf);
+      const toCopy = Math.min(bufSize, totalSamples - offset);
+      if (toCopy > 0) { recorded.set(timeBuf.slice(0, toCopy), offset); offset += toCopy; }
+      const liveFreq = yinPitchDetect(timeBuf, sampleRate);
+      if (liveFreq > 50 && liveFreq < 5000) State.pitchContour.push(liveFreq);
+      drawWaveform(timeBuf);
+      drawPitchContour();
+      updateCentsMeter(liveFreq, State.notes[State.currentIndex]?.freq);
+    };
+
+    const intervalId = setInterval(tick, Math.floor(bufSize / sampleRate * 1000));
+    setTimeout(() => {
+      clearInterval(intervalId);
+      src.disconnect();
+      setMicActive(false);
+      resolve(recorded.slice(0, offset));
+    }, duration * 1000);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   8. ANALYSIS — CROSSING-BASED CLASSIFICATION (NEW)
+   ─────────────────────────────────────────────────────────
+   Logic:
+   • Collect all valid pitch readings from the recording.
+   • Determine minFreq and maxFreq of the performance.
+   • If targetFreq falls within [minFreq, maxFreq] →
+       the player crossed through the target → STATUS = "ok"
+   • If minFreq > targetFreq (entire performance above target) →
+       STATUS = "sharp"
+   • If maxFreq < targetFreq (entire performance below target) →
+       STATUS = "flat"
+   • Median deviation (in cents) is calculated from the median
+     detected frequency for informational display.
+═══════════════════════════════════════════════════════════ */
+function analyzeRecording(audioBuffer, targetFreq, sampleRate) {
+  const chunkSize = 2048;
+  const step      = 512;
+  const freqs     = [];
+
+  for (let i = 0; i + chunkSize < audioBuffer.length; i += step) {
+    const chunk = audioBuffer.slice(i, i + chunkSize);
+    const rms   = Math.sqrt(chunk.reduce((a, v) => a + v * v, 0) / chunk.length);
+    if (rms < 0.003) continue;           // silence gate
+    const f = yinPitchDetect(chunk, sampleRate);
+    if (f > 50 && f < 5000) freqs.push(f);
+  }
+
+  if (freqs.length === 0) return null;
+
+  freqs.sort((a, b) => a - b);
+  const minFreq  = freqs[0];
+  const maxFreq  = freqs[freqs.length - 1];
+  const median   = freqs[Math.floor(freqs.length / 2)];
+  const cents    = freqToCents(median, targetFreq);
+
+  /* ── Crossing check ──────────────────────────────────────
+     The player crosses the target if the target frequency
+     falls anywhere inside the range [minFreq, maxFreq].
+     This is more robust than a cents window because it
+     respects the intentional low→high glide protocol.     */
+  let status;
+  const crossed = (minFreq <= targetFreq && targetFreq <= maxFreq);
+  if (crossed) {
+    status = 'ok';
+  } else if (minFreq > targetFreq) {
+    status = 'sharp';    // entire performance was above the target
+  } else {
+    status = 'flat';     // entire performance was below the target
+  }
+
+  return {
+    median,
+    minFreq,
+    maxFreq,
+    cents,
+    crossed,
+    status,
+    samples: freqs.length
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   9. MICROPHONE PERMISSION
+═══════════════════════════════════════════════════════════ */
+let micPermissionGranted = false;
+
+async function requestMicPermission() {
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    State.micStream      = s;
+    micPermissionGranted = true;
+    document.getElementById('permissionOverlay').classList.remove('visible');
+    log('Microphone access granted.', 'success');
+    showToast('Microphone access granted ✓', 'success');
+  } catch(e) {
+    log(`Microphone error: ${e.message}`, 'error');
+    showToast('Microphone access denied', 'error');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   10. MAIN SEQUENCE ENGINE
+═══════════════════════════════════════════════════════════ */
+async function startSequence() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showToast('getUserMedia not supported', 'error'); return;
+  }
+  if (!micPermissionGranted) {
+    document.getElementById('permissionOverlay').classList.add('visible'); return;
+  }
+  if (State.running && State.paused) {
+    State.paused = false;
+    log('Sequence resumed.', 'info');
+    setHeaderStatus('running');
+    runLoop();
+    return;
+  }
+
+  State.running       = true;
+  State.paused        = false;
+  State.stopRequested = false;
+  State.currentIndex  = 0;
+  State.results       = [];
+
+  /* Build note list using the current calibrated reference pitch */
+  State.notes = buildNoteList(State.lowestMidi, State.highestMidi, State.referenceA4);
+
+  clearResultsTable();
+  clearSummary();
+
+  document.getElementById('btnStart').disabled  = true;
+  document.getElementById('btnPause').disabled  = false;
+  document.getElementById('btnStop').disabled   = false;
+  document.getElementById('btnExport').disabled = true;
+
+  setHeaderStatus('running');
+  log(`Starting sequence with A = ${State.referenceA4.toFixed(1)} Hz`, 'info');
+  log(`Range: ${State.notes[0].name} → ${State.notes[State.notes.length-1].name} (${State.notes.length} notes)`, 'info');
+  showToast(`Sequence started — ${State.notes.length} notes`, 'info');
+
+  await runLoop();
+}
+
+async function runLoop() {
+  while (State.currentIndex < State.notes.length) {
+    if (State.stopRequested) break;
+    if (State.paused) return;
+
+    const note = State.notes[State.currentIndex];
+    updateCurrentNoteDisplay(note);
+    updateProgress();
+    log(`[${State.currentIndex + 1}/${State.notes.length}] ${note.name} — ${note.freq.toFixed(3)} Hz`, 'info');
+
+    setPhase('playing');
+    await playNote(note.name, note.freq, State.toneDuration);
+    if (State.stopRequested) break;
+
+    setPhase('recording');
+    let audioData;
+    try { audioData = await recordMic(State.recDuration); }
+    catch(e) { log(`Mic error: ${e.message}`, 'error'); showToast('Mic error — stopping', 'error'); break; }
+    if (State.stopRequested) break;
+
+    setPhase('analyzing');
+    const ctx      = getAudioCtx();
+    const analysis = analyzeRecording(audioData, note.freq, ctx.sampleRate);
+    processResult(note, analysis);
+
+    await sleep(State.gapDuration);
+    State.currentIndex++;
+  }
+  finishSequence();
+}
+
+function processResult(note, analysis) {
+  let result;
+  if (!analysis) {
+    result = { note, status: 'missed', crossed: false, cents: null, median: null, minFreq: null, maxFreq: null };
+    log(`  → No pitch detected.`, 'warn');
+  } else {
+    result = {
+      note,
+      status:   analysis.status,
+      crossed:  analysis.crossed,
+      cents:    analysis.cents,
+      median:   analysis.median,
+      minFreq:  analysis.minFreq,
+      maxFreq:  analysis.maxFreq
+    };
+    const crossedStr = analysis.crossed ? 'crossed ✓' : 'did not cross';
+    log(`  → Min:${analysis.minFreq.toFixed(2)} Median:${analysis.median.toFixed(2)} Max:${analysis.maxFreq.toFixed(2)} Hz | Dev:${analysis.cents !== null ? (analysis.cents > 0 ? '+' : '') + analysis.cents.toFixed(1) : '—'}¢ | Target ${crossedStr} | ${analysis.status.toUpperCase()}`, analysis.status === 'ok' ? 'success' : 'warn');
+  }
+  State.results.push(result);
+  appendResultRow(result, State.results.length);
+  updatePitchMapChart();
+}
+
+function finishSequence() {
+  State.running = State.paused = State.stopRequested = false;
+  setPhase('idle');
+  setHeaderStatus(State.results.length > 0 ? 'done' : 'idle');
+  updateProgress();
+  buildSummary();
+  document.getElementById('btnStart').disabled  = false;
+  document.getElementById('btnStart').textContent = '▶ Start';
+  document.getElementById('btnPause').disabled  = true;
+  document.getElementById('btnStop').disabled   = true;
+  document.getElementById('btnExport').disabled = false;
+  log('Sequence complete.', 'success');
+  showToast('Sequence complete! See Summary tab.', 'success');
+}
+
+function pauseSequence() {
+  if (!State.running) return;
+  State.paused = true;
+  setHeaderStatus('paused');
+  document.getElementById('btnStart').disabled    = false;
+  document.getElementById('btnStart').textContent = '▶ Resume';
+  log('Paused.', 'warn');
+  showToast('Paused', 'info');
+}
+
+function stopSequence() {
+  State.stopRequested = true;
+  State.paused        = false;
+  setHeaderStatus('idle');
+  document.getElementById('btnStart').disabled    = false;
+  document.getElementById('btnStart').textContent = '▶ Start';
+  document.getElementById('btnPause').disabled    = true;
+  document.getElementById('btnStop').disabled     = true;
+  log('Stopped by user.', 'warn');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   11. CANVAS DRAWING
+═══════════════════════════════════════════════════════════ */
+const wfCanvas  = document.getElementById('waveformCanvas');
+const wfCtx     = wfCanvas.getContext('2d');
+const pitCanvas = document.getElementById('pitchCanvas');
+const pitCtx    = pitCanvas.getContext('2d');
+
+function resizeCanvas(c) {
+  c.width  = c.offsetWidth  * (window.devicePixelRatio || 1);
+  c.height = c.offsetHeight * (window.devicePixelRatio || 1);
+  c.getContext('2d').scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+}
+
+function drawWaveform(data) {
+  const w = wfCanvas.offsetWidth, h = wfCanvas.offsetHeight;
+  wfCtx.clearRect(0, 0, w, h);
+  wfCtx.fillStyle = '#161b22'; wfCtx.fillRect(0, 0, w, h);
+  wfCtx.strokeStyle = '#58a6ff'; wfCtx.lineWidth = 1.5;
+  wfCtx.beginPath();
+  const step = w / data.length;
+  for (let i = 0; i < data.length; i++) {
+    const x = i * step, y = (1 - (data[i] + 1) / 2) * h;
+    i === 0 ? wfCtx.moveTo(x, y) : wfCtx.lineTo(x, y);
+  }
+  wfCtx.stroke();
+  wfCtx.strokeStyle = '#30363d'; wfCtx.lineWidth = 1;
+  wfCtx.beginPath(); wfCtx.moveTo(0, h / 2); wfCtx.lineTo(w, h / 2); wfCtx.stroke();
+}
+
+function drawPitchContour() {
+  const data = State.pitchContour;
+  const w = pitCanvas.offsetWidth, h = pitCanvas.offsetHeight;
+  pitCtx.clearRect(0, 0, w, h);
+  pitCtx.fillStyle = '#161b22'; pitCtx.fillRect(0, 0, w, h);
+  if (!data || data.length < 2) return;
+  const note   = State.notes[State.currentIndex];
+  const refF   = note ? note.freq : 440;
+  const minF   = refF * 0.88, maxF = refF * 1.12;
+  const ty     = h - ((refF - minF) / (maxF - minF)) * h;
+  pitCtx.strokeStyle = 'rgba(63,185,80,0.5)'; pitCtx.lineWidth = 1; pitCtx.setLineDash([4,4]);
+  pitCtx.beginPath(); pitCtx.moveTo(0, ty); pitCtx.lineTo(w, ty); pitCtx.stroke();
+  pitCtx.setLineDash([]);
+  pitCtx.strokeStyle = '#f85149'; pitCtx.lineWidth = 2;
+  pitCtx.beginPath();
+  const step = w / (data.length - 1);
+  data.forEach((f, i) => {
+    const x = i * step, y = h - Math.max(0, Math.min(1, (f - minF) / (maxF - minF))) * h;
+    i === 0 ? pitCtx.moveTo(x, y) : pitCtx.lineTo(x, y);
+  });
+  pitCtx.stroke();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   12. CENTS METER
+═══════════════════════════════════════════════════════════ */
+function updateCentsMeter(detectedFreq, targetFreq) {
+  const needle  = document.getElementById('centsNeedle');
+  const label   = document.getElementById('centsValue');
+  const display = document.getElementById('detectedPitchDisplay');
+  if (!detectedFreq || detectedFreq < 50 || !targetFreq) {
+    label.textContent = '— ¢'; display.textContent = '';
+    needle.style.left = '50%'; needle.style.background = 'var(--text-muted)'; needle.style.boxShadow = 'none';
+    return;
+  }
+  const cents   = freqToCents(detectedFreq, targetFreq);
+  const clamped = Math.max(-50, Math.min(50, cents));
+  const pct     = 50 + (clamped / 50) * 50;
+  needle.style.left = `${pct}%`;
+  const abs   = Math.abs(cents);
+  const color = abs <= State.toleranceCents ? 'var(--accent2)' : abs <= State.toleranceCents * 2 ? 'var(--warn)' : 'var(--danger)';
+  needle.style.background = color; needle.style.boxShadow = `0 0 8px ${color}`;
+  label.style.color = color;
+  label.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(1)} ¢`;
+  display.textContent = `${detectedFreq.toFixed(1)} Hz`;
+  display.style.color = color;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   13. CHARTS
+═══════════════════════════════════════════════════════════ */
+let pitchMapChartInst   = null;
+let deviationChartInst  = null;
+
+function initCharts() {
+  const pmCtx = document.getElementById('pitchMapChart').getContext('2d');
+  pitchMapChartInst = new Chart(pmCtx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Detected Median (Hz)',
+          data: [],
+          backgroundColor: ctx => {
+            const v = ctx.raw;
+            if (!v) return '#8b949e';
+            if (v.status === 'ok')    return 'rgba(63,185,80,0.85)';
+            if (v.status === 'flat')  return 'rgba(88,166,255,0.85)';
+            if (v.status === 'sharp') return 'rgba(210,153,34,0.85)';
+            return 'rgba(248,81,73,0.85)';
+          },
+          pointRadius: 6,
+        },
+        {
+          label: 'Target Pitch (Hz)',
+          data: [],
+          backgroundColor: 'rgba(88,166,255,0.25)',
+          pointRadius: 3,
+          pointStyle: 'line',
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 200 },
+      plugins: {
+        legend: { labels: { color: '#e6edf3', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => { const d = ctx.raw; return `${d.note}: ${typeof d.y === 'number' ? d.y.toFixed(2) : '—'} Hz`; } } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Note Index', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' } },
+        y: { title: { display: true, text: 'Frequency (Hz)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' }, type: 'logarithmic' }
+      }
+    }
+  });
+
+  const dvCtx = document.getElementById('deviationChart').getContext('2d');
+  deviationChartInst = new Chart(dvCtx, {
+    type: 'bar',
+    data: { labels: [], datasets: [{ label: 'Deviation (¢)', data: [], backgroundColor: [], borderRadius: 3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', maxRotation: 90, font: { size: 9 } }, grid: { color: '#30363d' } },
+        y: { title: { display: true, text: 'Cents (¢)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' }, suggestedMin: -50, suggestedMax: 50 }
+      }
+    }
+  });
+}
+
+function updatePitchMapChart() {
+  if (!pitchMapChartInst) return;
+  const detected = State.results.map((r, i) => ({ x: i, y: r.median || null, note: r.note.name, status: r.status })).filter(d => d.y);
+  const targets  = State.results.map((r, i) => ({ x: i, y: r.note.freq, note: r.note.name }));
+  pitchMapChartInst.data.datasets[0].data = detected;
+  pitchMapChartInst.data.datasets[1].data = targets;
+  pitchMapChartInst.update('none');
+}
+
+function buildSummary() {
+  const res    = State.results;
+  const total  = res.length;
+  const ok     = res.filter(r => r.status === 'ok').length;
+  const flat   = res.filter(r => r.status === 'flat').length;
+  const sharp  = res.filter(r => r.status === 'sharp').length;
+  const missed = res.filter(r => r.status === 'missed').length;
+  const devs   = res.filter(r => r.cents !== null).map(r => r.cents);
+  const avgDev = devs.length ? devs.reduce((a,b) => a+b, 0) / devs.length : 0;
+
+  document.getElementById('statTotal').textContent   = total;
+  document.getElementById('statSuccess').textContent = ok;
+  document.getElementById('statFlat').textContent    = flat;
+  document.getElementById('statSharp').textContent   = sharp;
+  document.getElementById('statMissed').textContent  = missed;
+  document.getElementById('statAvgDev').textContent  = `${avgDev >= 0 ? '+' : ''}${avgDev.toFixed(1)}`;
+  document.getElementById('statRefA').textContent    = `${State.referenceA4.toFixed(1)}`;
+
+  if (deviationChartInst) {
+    deviationChartInst.data.labels = res.map(r => r.note.name);
+    deviationChartInst.data.datasets[0].data = res.map(r => r.cents ?? 0);
+    deviationChartInst.data.datasets[0].backgroundColor = res.map(r => {
+      if (r.status === 'ok')    return 'rgba(63,185,80,0.75)';
+      if (r.status === 'flat')  return 'rgba(88,166,255,0.75)';
+      if (r.status === 'sharp') return 'rgba(210,153,34,0.75)';
+      return '#30363d';
+    });
+    deviationChartInst.update();
+  }
+
+  const pct = total > 0 ? ((ok / total) * 100).toFixed(1) : 0;
+  let insight = `<strong>${pct}%</strong> of notes were successfully crossed through (target reached). `;
+  if (avgDev > 5)  insight += `Overall tendency: <strong style="color:var(--warn)">Sharp (+${avgDev.toFixed(1)}¢)</strong>. `;
+  if (avgDev < -5) insight += `Overall tendency: <strong style="color:var(--accent)">Flat (${avgDev.toFixed(1)}¢)</strong>. `;
+  insight += `<br>Reference pitch used: <strong>A = ${State.referenceA4.toFixed(1)} Hz</strong>. `;
+  const withDevs = res.filter(r => r.cents !== null).sort((a,b) => Math.abs(b.cents) - Math.abs(a.cents));
+  if (withDevs.length > 0) {
+    const worst = withDevs.slice(0, 3).map(r => `${r.note.name} (${r.cents > 0 ? '+' : ''}${r.cents.toFixed(1)}¢)`).join(', ');
+    insight += `<br>Most deviated notes (by median): <strong>${worst}</strong>.`;
+  }
+  if (missed > 0) insight += `<br><span style="color:var(--danger)">${missed} note(s)</span> produced no detectable pitch.`;
+  document.getElementById('summaryInsights').innerHTML = insight;
+  switchTab('tabSummary');
+}
+
+function clearSummary() {
+  ['statTotal','statSuccess','statFlat','statSharp','statMissed','statAvgDev','statRefA']
+    .forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('summaryInsights').innerHTML = '';
+  if (deviationChartInst) { deviationChartInst.data.labels = []; deviationChartInst.data.datasets[0].data = []; deviationChartInst.update('none'); }
+  if (pitchMapChartInst)  { pitchMapChartInst.data.datasets[0].data = []; pitchMapChartInst.data.datasets[1].data = []; pitchMapChartInst.update('none'); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   14. RESULTS TABLE
+═══════════════════════════════════════════════════════════ */
+function appendResultRow(result, idx) {
+  const tbody = document.getElementById('resultsBody');
+  if (idx === 1) tbody.innerHTML = '';
+  const { note, status, crossed, cents, median, minFreq, maxFreq } = result;
+  const badgeMap  = { ok: 'badge-success', flat: 'badge-warn', sharp: 'badge-warn', missed: 'badge-danger' };
+  const iconMap   = { ok: '✓', flat: '♭', sharp: '♯', missed: '✗' };
+  const centsStr  = cents !== null ? `${cents >= 0 ? '+' : ''}${cents.toFixed(2)} ¢` : '—';
+  const crossedBadge = crossed
+    ? `<span class="badge badge-success">✓ Yes</span>`
+    : `<span class="badge badge-danger">✗ No</span>`;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td style="color:var(--text-muted)">${idx}</td>
+    <td><strong>${note.name}</strong></td>
+    <td>${note.freq.toFixed(4)}</td>
+    <td style="color:var(--text-muted)">${minFreq ? minFreq.toFixed(4) : '—'}</td>
+    <td>${median ? median.toFixed(4) : '—'}</td>
+    <td style="color:var(--text-muted)">${maxFreq ? maxFreq.toFixed(4) : '—'}</td>
+    <td style="font-weight:700; color:${status === 'ok' ? 'var(--accent2)' : 'var(--warn)'}">${centsStr}</td>
+    <td>${crossedBadge}</td>
+    <td><span class="badge ${badgeMap[status]}">${iconMap[status]} ${status.toUpperCase()}</span></td>
+  `;
+  tbody.appendChild(tr);
+  tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearResultsTable() {
+  document.getElementById('resultsBody').innerHTML =
+    `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:1.5rem;">Running…</td></tr>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   15. CSV EXPORT — decimal point, no commas in numbers
+   ─────────────────────────────────────────────────────────
+   All numeric fields are formatted with csvNum() which calls
+   Number.toFixed() — guaranteed to use "." as decimal separator
+   regardless of browser locale.
+   Fields containing note names (strings) are quoted to prevent
+   any ambiguity with note names containing "#".
+═══════════════════════════════════════════════════════════ */
+function exportResults() {
+  if (State.results.length === 0) return;
+
+  /* ─ Metadata header ─ */
+  const meta = [
+    ['Flute Intonation Lab — Export'],
+    [`Reference A4`, csvNum(State.referenceA4, 4), 'Hz'],
+    [`Export date`, new Date().toISOString()],
+    [''],
+  ];
+
+  /* ─ Column headers ─ */
+  const headers = [
+    'index',
+    'note_name',
+    'midi',
+    'target_freq_hz',
+    'min_freq_hz',
+    'median_freq_hz',
+    'max_freq_hz',
+    'deviation_cents',
+    'target_crossed',
+    'status'
+  ];
+
+  /* ─ Data rows ─ */
+  const rows = State.results.map((r, i) => [
+    i + 1,                                   // index — integer
+    `"${r.note.name}"`,                      // quoted string (may contain #)
+    r.note.midi,                             // integer
+    csvNum(r.note.freq,   4),                // target freq — 4 decimal places
+    csvNum(r.minFreq,     4),                // min detected
+    csvNum(r.median,      4),                // median detected
+    csvNum(r.maxFreq,     4),                // max detected
+    csvNum(r.cents,       4),                // deviation in cents
+    r.crossed ? 1 : 0,                       // 1 = crossed, 0 = did not cross
+    `"${r.status}"`                          // quoted status string
+  ]);
+
+  const allRows = [
+    ...meta.map(r => r.join(',')),
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ];
+
+  const csv  = allRows.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.href     = url;
+  a.download = `flute_intonation_A${State.referenceA4.toFixed(0)}_${ts}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  log(`CSV exported (A=${State.referenceA4.toFixed(1)} Hz, ${State.results.length} notes).`, 'success');
+  showToast('CSV exported ✓', 'success');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   16. SAMPLE VERIFICATION
+═══════════════════════════════════════════════════════════ */
+async function verifySamples() {
+  const badge = document.getElementById('sampleStatusBadge');
+  badge.textContent = '⏳ Checking…'; badge.className = 'mode-badge';
+  const notes = buildNoteList(MIDI_START, MIDI_END_MAX, State.referenceA4);
+  let found = 0;
+  for (const n of notes) { const buf = await loadSample(n.name); if (buf) found++; }
+  if (found === 0) {
+    badge.textContent = '✗ No samples found'; badge.className = 'mode-badge';
+    showToast('No WAV samples — synth fallback active.', 'info');
+  } else {
+    badge.textContent = `✓ ${found}/${notes.length} found`; badge.className = 'mode-badge sample';
+    showToast(`${found} samples verified ✓`, 'success');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   17. UI HELPERS
+═══════════════════════════════════════════════════════════ */
+function setMode(m) {
+  State.mode = m;
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+  document.getElementById('synthOptions').classList.toggle('hidden', m !== 'synth');
+  document.getElementById('sampleOptions').classList.toggle('hidden', m !== 'samples');
+}
+function setWave(w) {
+  State.waveform = w;
+  document.querySelectorAll('[data-wave]').forEach(b => b.classList.toggle('active', b.dataset.wave === w));
+}
+function updateVolume(v) {
+  State.volume = v / 100;
+  document.getElementById('volumeVal').textContent = `${v}%`;
+}
+
+function populateNoteSelects() {
+  const loSel = document.getElementById('lowestNote');
+  const hiSel = document.getElementById('highestNote');
+  loSel.innerHTML = ''; hiSel.innerHTML = '';
+  for (let m = MIDI_START; m <= MIDI_START; m++) {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = midiToName(m); o.selected = true;
+    loSel.appendChild(o);
+  }
+  for (let m = MIDI_END_MIN; m <= MIDI_END_MAX; m++) {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = midiToName(m);
+    if (m === State.highestMidi) o.selected = true;
+    hiSel.appendChild(o);
+  }
+  updateRange();
+}
+
+function updateRange() {
+  State.lowestMidi  = parseInt(document.getElementById('lowestNote').value);
+  State.highestMidi = parseInt(document.getElementById('highestNote').value);
+  /* Rebuild note list with current calibration */
+  State.notes = buildNoteList(State.lowestMidi, State.highestMidi, State.referenceA4);
+  const count = State.notes.length;
+  document.getElementById('totalNotesLabel').textContent = count;
+  const pct = ((State.highestMidi - MIDI_END_MIN) / (MIDI_END_MAX - MIDI_END_MIN)) * 100;
+  document.getElementById('rangeIndicator').style.width = `${pct}%`;
+}
+
+function updateCurrentNoteDisplay(note) {
+  document.getElementById('currentNoteName').textContent = note.name;
+  document.getElementById('currentNoteFreq').textContent = `Target: ${note.freq.toFixed(3)} Hz`;
+}
+
+function setPhase(phase) {
+  const el  = document.getElementById('currentPhase');
+  const map = {
+    playing:   ['▶ Playing reference tone…', 'phase-playing'],
+    recording: ['🔴 Recording…',              'phase-recording'],
+    analyzing: ['⚙ Analyzing…',              'phase-analyzing'],
+    idle:      ['Idle',                        'phase-idle']
+  };
+  const [text, cls] = map[phase] || ['Idle', 'phase-idle'];
+  el.textContent = text; el.className = `current-note-phase ${cls}`;
+}
+
+function setMicActive(active) {
+  document.getElementById('micDot').classList.toggle('active', active);
+  document.getElementById('micStatus').textContent = active ? 'Microphone: recording' : 'Microphone: inactive';
+}
+
+function setHeaderStatus(s) {
+  const el  = document.getElementById('headerStatus');
+  const map = { idle: '● Idle', running: '● Running', paused: '⏸ Paused', done: '✓ Complete' };
+  el.textContent = map[s] || '● Idle';
+  el.className   = `header-status-pill ${s}`;
+}
+
+function updateProgress() {
+  const total = State.notes.length || 1;
+  const done  = State.currentIndex;
+  const pct   = Math.round((done / total) * 100);
+  document.getElementById('mainProgress').style.width  = `${pct}%`;
+  document.getElementById('progressLabel').textContent = `${done} / ${total} notes`;
+  document.getElementById('progressPct').textContent   = `${pct}%`;
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const idx = ['tabChart','tabTable','tabSummary'].indexOf(id);
+  document.querySelectorAll('.tab')[idx]?.classList.add('active');
+}
+
+function log(msg, type = 'info') {
+  const box  = document.getElementById('logBox');
+  const time = new Date().toLocaleTimeString('en-GB');
+  const el   = document.createElement('div');
+  el.className = `log-entry ${type}`;
+  el.textContent = `[${time}] ${msg}`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() { document.getElementById('logBox').innerHTML = ''; }
+
+function showToast(msg, type = 'info') {
+  const c   = document.getElementById('toastContainer');
+  const div = document.createElement('div');
+  div.className   = `toast toast-${type}`;
+  div.textContent = msg;
+  c.appendChild(div);
+  setTimeout(() => { div.style.opacity = '0'; div.style.transition = 'opacity .4s'; setTimeout(() => div.remove(), 400); }, 3200);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ═══════════════════════════════════════════════════════════
+   18. INITIALIZATION
+═══════════════════════════════════════════════════════════ */
+window.addEventListener('resize', () => { resizeCanvas(wfCanvas); resizeCanvas(pitCanvas); });
+
+document.addEventListener('DOMContentLoaded', () => {
+  resizeCanvas(wfCanvas);
+  resizeCanvas(pitCanvas);
+  populateNoteSelects();
+  initCharts();
+  updateCalDisplay(State.referenceA4);   // initialise calibration display
+
+  /* Sync timing sliders */
+  const syncSlider = (id, key, parse) => {
+    const el = document.getElementById(id);
+    State[key] = parse(el.value);
+    el.addEventListener('input', e => State[key] = parse(e.target.value));
+  };
+  syncSlider('toneDuration',   'toneDuration',   parseFloat);
+  syncSlider('recDuration',    'recDuration',    parseFloat);
+  syncSlider('gapDuration',    'gapDuration',    parseInt);
+  syncSlider('toleranceCents', 'toleranceCents', parseInt);
+
+  log('Flute Intonation Lab initialized.', 'success');
+  log(`Default reference pitch: A4 = ${State.referenceA4.toFixed(1)} Hz`, 'info');
+  log('Adjust calibration if needed, then click ▶ Start.', 'info');
+
+  if (navigator.permissions) {
+    navigator.permissions.query({ name: 'microphone' }).then(r => {
+      if (r.state === 'granted') {
+        micPermissionGranted = true;
+        log('Microphone already permitted.', 'success');
+      }
+    }).catch(() => {});
+  }
+});
+</script>
+</body>
+</html>
