@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Project Card</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a1a;
+            padding: 30px 15px;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin: 15px 0 6px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .secondary {
+            background: #16a34a;
+        }
+        .secondary:hover {
+            background: #15803d;
+        }
+        .output-area {
+            margin-top: 25px;
+            display: none;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 18px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .copy-msg {
+            color: #16a34a;
+            font-weight: 600;
+            margin-left: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ Gerador de Project Card (HTML)</h1>
+
+        <label for="titulo">Título do aplicativo</label>
+        <input type="text" id="titulo" placeholder="Ex: Calculadora de IMC">
+
+        <label for="descricao">Descrição do aplicativo</label>
+        <textarea id="descricao" placeholder="Ex: Aplicativo que calcula o índice de massa corporal."></textarea>
+
+        <label for="arquivo">Aplicativo HTML (nome do arquivo)</label>
+        <input type="text" id="arquivo" placeholder="Ex: imc.html">
+
+        <button onclick="gerarCodigo()">Gerar Código</button>
+
+        <div class="output-area" id="outputArea">
+            <h1 style="font-size:1.2rem; margin-top:25px;">Código gerado:</h1>
+            <pre id="resultado"></pre>
+            <button class="secondary" onclick="copiar()">Copiar Código</button>
+            <span class="copy-msg" id="copyMsg">✔ Copiado!</span>
+        </div>
+    </div>
+
+    <script>
+        function gerarCodigo() {
+            const titulo = document.getElementById('titulo').value.trim();
+            const descricao = document.getElementById('descricao').value.trim();
+            const arquivo = document.getElementById('arquivo').value.trim();
+
+            // Só produz o código quando os três dados forem informados
+            if (titulo === '' || descricao === '' || arquivo === '') {
+                alert('Por favor, preencha os três campos: Título, Descrição e Aplicativo HTML.');
+                return;
+            }
+
+            const codigo =
+`<div class="project-card">
+    <h2> ${titulo} </h2>
+
+    <p>
+        ${descricao}
+    </p>
+
+    <a class="button"
+       href="${arquivo}">
+        Abrir Aplicação
+    </a>
+</div>`;
+
+            document.getElementById('resultado').textContent = codigo;
+            document.getElementById('outputArea').style.display = 'block';
+        }
+
+        function copiar() {
+            const texto = document.getElementById('resultado').textContent;
+            navigator.clipboard.writeText(texto).then(() => {
+                const msg = document.getElementById('copyMsg');
+                msg.style.display = 'inline';
+                setTimeout(() => { msg.style.display = 'none'; }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
