@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Digital Talk Box — v1</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --panel: #1e222c;
+    --accent: #ff8a3d;
+    --accent2: #3dd6ff;
+    --text: #e8eaf0;
+    --muted: #8a909c;
+    --white-key: #f4f4f0;
+    --black-key: #20242e;
+  }
+  * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column; min-height: 100vh; padding: 12px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .layout { display: grid; grid-template-columns: 240px 1fr 260px; gap: 12px; flex: 1; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border-radius: 10px; padding: 14px;
+    border: 1px solid #2a2f3a;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--accent2); margin: 0 0 12px; }
+  .control { margin-bottom: 12px; }
+  .control label { display: flex; justify-content: space-between; font-size: 12px;
+    color: var(--muted); margin-bottom: 4px; }
+  .control label span { color: var(--text); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  select, button {
+    width: 100%; padding: 8px; background: #262b36; color: var(--text);
+    border: 1px solid #353b48; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.active { background: var(--accent); color: #14161c; border-color: var(--accent); }
+  .btn-row { display: flex; gap: 6px; }
+  .btn-row button { flex: 1; }
+  .center { display: flex; flex-direction: column; gap: 12px; }
+  canvas { width: 100%; background: #0c0e13; border-radius: 8px; display: block; }
+  .keyboard { position: relative; height: 160px; user-select: none; touch-action: none;
+    background: #0c0e13; border-radius: 8px; padding: 8px; overflow: hidden; }
+  .keys { position: relative; height: 100%; display: flex; }
+  .key { position: relative; flex: 1; border: 1px solid #000; border-radius: 0 0 4px 4px;
+    background: var(--white-key); cursor: pointer; }
+  .key.black { position: absolute; width: 60%; height: 60%; background: var(--black-key);
+    z-index: 2; border-radius: 0 0 3px 3px; }
+  .key.pressed { background: var(--accent) !important; }
+  .key .lbl { position: absolute; bottom: 4px; width: 100%; text-align: center;
+    font-size: 9px; color: #999; }
+  .key.black .lbl { color: #ccc; }
+  .meter { height: 14px; background: #0c0e13; border-radius: 4px; overflow: hidden; position: relative; }
+  .meter-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3dd6ff, #ffd23d, #ff3d3d); transition: width 0.05s; }
+  .clip { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    background: #444; margin-left: 6px; vertical-align: middle; }
+  .clip.on { background: #ff3d3d; box-shadow: 0 0 6px #ff3d3d; }
+  .status { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .start-overlay {
+    position: fixed; inset: 0; background: rgba(10,12,16,0.95); z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  }
+  .start-overlay button { width: auto; padding: 14px 40px; font-size: 16px;
+    background: var(--accent); color: #14161c; font-weight: bold; }
+  .toggle-pill { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .small { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="start-overlay" id="startOverlay">
+  <h1>🎤 Digital <span style="color:var(--accent)">Talk Box</span></h1>
+  <p style="max-width:420px;text-align:center;color:var(--muted)">
+    Put the earphone in your mouth, keep the mic close. Play notes and shape the
+    sound with your mouth. Click below to grant microphone access and start.
+  </p>
+  <button id="startBtn">▶ Start Audio Engine</button>
+</div>
+
+<h1>Digital <span>Talk Box</span> <span style="font-size:12px;color:var(--muted)">v1</span></h1>
+<div class="subtitle">Synth → Earphone (in mouth) → Vocal resonance → Mic → Smart Filter → Output</div>
+
+<div class="layout">
+
+  <!-- LEFT: SYNTH -->
+  <div class="panel">
+    <h2>Synthesizer</h2>
+    <div class="control">
+      <label>Waveform</label>
+      <div class="btn-row" id="waveBtns">
+        <button data-wave="sine">Sin</button>
+        <button data-wave="triangle">Tri</button>
+        <button data-wave="sawtooth" class="active">Saw</button>
+        <button data-wave="square">Sqr</button>
+      </div>
+    </div>
+    <div class="control">
+      <label>Octave <span id="octVal">4</span></label>
+      <input type="range" id="octave" min="2" max="6" value="4" step="1">
+    </div>
+    <div class="control">
+      <label>Earphone Output (synth) <span id="synthVolVal">80%</span></label>
+      <input type="range" id="synthVol" min="0" max="100" value="80">
+    </div>
+    <h2 style="margin-top:18px">ADSR Envelope</h2>
+    <div class="control"><label>Attack <span id="atkVal">0.01s</span></label><input type="range" id="atk" min="0" max="2" value="0.01" step="0.01"></div>
+    <div class="control"><label>Decay <span id="decVal">0.2s</span></label><input type="range" id="dec" min="0" max="2" value="0.2" step="0.01"></div>
+    <div class="control"><label>Sustain <span id="susVal">70%</span></label><input type="range" id="sus" min="0" max="100" value="70"></div>
+    <div class="control"><label>Release <span id="relVal">0.3s</span></label><input type="range" id="rel" min="0" max="3" value="0.3" step="0.01"></div>
+    <div class="control"><label>Brightness <span id="briVal">3000Hz</span></label><input type="range" id="bri" min="200" max="8000" value="3000" step="50"></div>
+  </div>
+
+  <!-- CENTER: VISUALS + KEYBOARD -->
+  <div class="center">
+    <div class="panel">
+      <h2>Spectrum (Mic Input)</h2>
+      <canvas id="spectrum" height="120"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Oscilloscope (Output)</h2>
+      <canvas id="scope" height="90"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Keyboard <span class="small">(use computer keys A W S E D F T G Y H U J K)</span></h2>
+      <div class="keyboard"><div class="keys" id="keys"></div></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: MIC + SMART FILTER + OUTPUT -->
+  <div class="panel">
+    <h2>Mic Input</h2>
+    <div class="control">
+      <label>Input Gain (amplify!) <span id="micGainVal">8x</span></label>
+      <input type="range" id="micGain" min="1" max="30" value="8" step="0.5">
+    </div>
+    <div class="control">
+      <label>Noise Gate <span id="gateVal">-50dB</span></label>
+      <input type="range" id="gate" min="-80" max="-20" value="-50">
+    </div>
+    <div class="control">
+      <label>High-Pass <span id="hpVal">120Hz</span></label>
+      <input type="range" id="hp" min="20" max="600" value="120">
+    </div>
+    <div class="control">
+      <label>Low-Pass <span id="lpVal">8000Hz</span></label>
+      <input type="range" id="lp" min="1000" max="14000" value="8000">
+    </div>
+
+    <h2 style="margin-top:18px">🧠 Smart Filter</h2>
+    <p class="small">Tracks played notes and keeps only their harmonics, killing breath/room noise.</p>
+    <div class="control toggle-pill">
+      <button id="smartBtn" class="active">Smart Filter: ON</button>
+    </div>
+    <div class="control">
+      <label>Harmonic Width <span id="qVal">12</span></label>
+      <input type="range" id="qWidth" min="2" max="30" value="12">
+    </div>
+    <div class="control">
+      <label># Harmonics tracked <span id="nhVal">8</span></label>
+      <input type="range" id="numHarm" min="3" max="16" value="8">
+    </div>
+
+    <h2 style="margin-top:18px">Output</h2>
+    <div class="control">
+      <label>Master Volume <span id="masterVal">90%</span></label>
+      <input type="range" id="master" min="0" max="100" value="90">
+    </div>
+    <div class="control">
+      <label>Output Level <span id="clipDot" class="clip"></span></label>
+      <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+    </div>
+
+    <div class="control">
+      <label>Recording</label>
+      <div class="btn-row">
+        <button id="recBtn">● Rec</button>
+        <button id="dlBtn" disabled>↓ WAV</button>
+      </div>
+    </div>
+    <div class="status" id="status">Idle.</div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  DIGITAL TALK BOX — v1
+//  Signal: Synth -> earphone (mouth) -> mic -> smart filter -> out
+// ============================================================
+
+let ctx, masterGain, micStream, micSource;
+let micHP, micLP, micGainNode, micGate, micComp, micLimiter;
+let analyserSpectrum, scopeAnalyser, meterAnalyser;
+let smartFilters = [];        // bandpass filters for tracking harmonics
+let smartMixIn, smartMixOut, smartBypassGain;
+let recorder, recChunks = [], recordedBlobUrl = null;
+
+const state = {
+  wave: 'sawtooth', octave: 4, synthVol: 0.8, master: 0.9,
+  atk: 0.01, dec: 0.2, sus: 0.7, rel: 0.3, bri: 3000,
+  micGain: 8, gate: -50, hp: 120, lp: 8000,
+  smart: true, qWidth: 12, numHarm: 8
+};
+
+const activeVoices = {};   // midi note -> {osc, gain, filter}
+let lowestActiveFreq = 0;  // fundamental used by smart filter
+
+// --- Note helpers ---
+const KEY_LAYOUT = [
+  {n:'C',k:'a',black:false},{n:'C#',k:'w',black:true},
+  {n:'D',k:'s',black:false},{n:'D#',k:'e',black:true},
+  {n:'E',k:'d',black:false},
+  {n:'F',k:'f',black:false},{n:'F#',k:'t',black:true},
+  {n:'G',k:'g',black:false},{n:'G#',k:'y',black:true},
+  {n:'A',k:'h',black:false},{n:'A#',k:'u',black:true},
+  {n:'B',k:'j',black:false},
+  {n:'C2',k:'k',black:false,semis:12}
+];
+const SEMI = {'C':0,'C#':1,'D':2,'D#':3,'E':4,'F':5,'F#':6,'G':7,'G#':8,'A':9,'A#':10,'B':11,'C2':12};
+function midiToFreq(m){ return 440 * Math.pow(2,(m-69)/12); }
+function noteToMidi(name, oct){ return SEMI[name] + (oct+1)*12; }
+
+// ============================================================
+//  AUDIO ENGINE INIT
+// ============================================================
+async function initAudio(){
+  ctx = new (window.AudioContext||window.webkitAudioContext)({ latencyHint:'interactive' });
+
+  masterGain = ctx.createGain();
+  masterGain.gain.value = state.master;
+
+  // ---- Mic input chain ----
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+    });
+  } catch(e){
+    setStatus('Mic access denied: '+e.message); return;
+  }
+  micSource = ctx.createMediaStreamSource(micStream);
+
+  micHP = ctx.createBiquadFilter(); micHP.type='highpass'; micHP.frequency.value=state.hp;
+  micLP = ctx.createBiquadFilter(); micLP.type='lowpass';  micLP.frequency.value=state.lp;
+  micGainNode = ctx.createGain(); micGainNode.gain.value = state.micGain;
+
+  // Noise gate (downward expander via DynamicsCompressor in a simple way + manual gate)
+  micGate = ctx.createGain(); micGate.gain.value = 1;
+
+  // Compressor + limiter to smooth the amplified weak signal
+  micComp = ctx.createDynamicsCompressor();
+  micComp.threshold.value=-30; micComp.ratio.value=4; micComp.attack.value=0.003; micComp.release.value=0.15;
+  micLimiter = ctx.createDynamicsCompressor();
+  micLimiter.threshold.value=-3; micLimiter.ratio.value=20; micLimiter.attack.value=0.001; micLimiter.release.value=0.1;
+
+  // ---- Smart filter bank (parallel bandpass) + dry bypass ----
+  smartMixIn  = ctx.createGain();
+  smartMixOut = ctx.createGain();
+  smartBypassGain = ctx.createGain(); smartBypassGain.gain.value = state.smart ? 0 : 1;
+
+  buildSmartFilters();
+
+  // Analysers
+  analyserSpectrum = ctx.createAnalyser(); analyserSpectrum.fftSize = 2048;
+  scopeAnalyser   = ctx.createAnalyser(); scopeAnalyser.fftSize = 2048;
+  meterAnalyser   = ctx.createAnalyser(); meterAnalyser.fftSize = 512;
+
+  // ---- Wire mic chain ----
+  // mic -> hp -> lp -> gain -> gate -> comp -> [smart bank] -> mixOut -> limiter -> spectrum/scope/meter -> master -> out
+  micSource.connect(micHP);
+  micHP.connect(micLP);
+  micLP.connect(micGainNode);
+  micGainNode.connect(micGate);
+  micGate.connect(micComp);
+
+  // spectrum reads the pre-filter signal (so you see what's coming in)
+  micComp.connect(analyserSpectrum);
+
+  micComp.connect(smartMixIn);
+  micComp.connect(smartBypassGain);   // dry path when smart is off
+  smartBypassGain.connect(smartMixOut);
+
+  smartMixOut.connect(micLimiter);
+  micLimiter.connect(scopeAnalyser);
+  micLimiter.connect(meterAnalyser);
+  micLimiter.connect(masterGain);
+  masterGain.connect(ctx.destination);
+
+  // ---- Recorder taps master ----
+  const recDest = ctx.createMediaStreamDestination();
+  masterGain.connect(recDest);
+  setupRecorder(recDest.stream);
+
+  startGateLoop();
+  draw();
+  setStatus('Engine running. Mic active. Play the keyboard!');
+}
+
+// Build a bank of bandpass filters that we'll re-tune to harmonics of played notes
+function buildSmartFilters(){
+  smartFilters.forEach(f=>{ try{f.bp.disconnect();f.g.disconnect();}catch(e){} });
+  smartFilters = [];
+  const n = state.numHarm;
+  for(let i=0;i<n;i++){
+    const bp = ctx.createBiquadFilter();
+    bp.type='bandpass'; bp.frequency.value=440*(i+1); bp.Q.value=state.qWidth;
+    const g = ctx.createGain(); g.gain.value=0;   // 0 until a note tunes it
+    smartMixIn.connect(bp); bp.connect(g); g.connect(smartMixOut);
+    smartFilters.push({bp, g});
+  }
+  retuneSmartFilters();
+}
+
+// Re-point bandpass filters at harmonics of the lowest active note
+function retuneSmartFilters(){
+  if(!smartFilters.length) return;
+  const on = state.smart && lowestActiveFreq>0;
+  smartFilters.forEach((f,i)=>{
+    if(on){
+      const freq = Math.min(lowestActiveFreq*(i+1), ctx.sampleRate/2 - 100);
+      f.bp.frequency.setTargetAtTime(freq, ctx.currentTime, 0.02);
+      f.bp.Q.value = state.qWidth;
+      f.g.gain.setTargetAtTime(1.0, ctx.currentTime, 0.02);
+    } else {
+      // when smart off OR no note, mute the bank (bypass path carries dry)
+      f.g.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+    }
+  });
+}
+
+// ============================================================
+//  SYNTH VOICES  (synth -> earphone output = ctx.destination)
+//  NOTE: synth also goes to destination so the earbud in mouth plays it.
+// ============================================================
+let synthBus;
+function ensureSynthBus(){
+  if(synthBus) return;
+  synthBus = ctx.createGain();
+  synthBus.gain.value = state.synthVol;
+  synthBus.connect(ctx.destination);   // earphone in the mouth
+}
+
+function noteOn(midi){
+  if(activeVoices[midi]) return;
+  ensureSynthBus();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = state.wave;
+  osc.frequency.value = midiToFreq(midi);
+
+  const filt = ctx.createBiquadFilter();
+  filt.type='lowpass'; filt.frequency.value = state.bri;
+
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(1, t+state.atk);
+  g.gain.linearRampToValueAtTime(state.sus, t+state.atk+state.dec);
+
+  osc.connect(filt); filt.connect(g); g.connect(synthBus);
+  osc.start();
+  activeVoices[midi] = {osc, g, filt};
+  updateLowest();
+}
+
+function noteOff(midi){
+  const v = activeVoices[midi];
+  if(!v) return;
+  const t = ctx.currentTime;
+  v.g.gain.cancelScheduledValues(t);
+  v.g.gain.setValueAtTime(v.g.gain.value, t);
+  v.g.gain.linearRampToValueAtTime(0, t+state.rel);
+  v.osc.stop(t+state.rel+0.05);
+  delete activeVoices[midi];
+  setTimeout(updateLowest, 10);
+}
+
+function updateLowest(){
+  const freqs = Object.keys(activeVoices).map(m=>midiToFreq(+m));
+  lowestActiveFreq = freqs.length ? Math.min(...freqs) : 0;
+  retuneSmartFilters();
+}
+
+// ============================================================
+//  NOISE GATE (sample-level, using meter analyser RMS)
+// ============================================================
+function startGateLoop(){
+  const buf = new Float32Array(meterAnalyser.fftSize);
+  function loop(){
+    meterAnalyser.getFloatTimeDomainData(buf);
+    let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i]*buf[i];
+    const rms = Math.sqrt(sum/buf.length);
+    const db = 20*Math.log10(rms+1e-9);
+    // gate: open if input above threshold (we measure pre-master via meter which is post-limiter,
+    // good enough as proxy). For responsiveness measure on micComp instead:
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// Dedicated gate using micComp analyser
+let gateAnalyser;
+function attachGate(){
+  gateAnalyser = ctx.createAnalyser(); gateAnalyser.fftSize=512;
+  micComp.connect(gateAnalyser);
+  const buf = new Float32Array(gateAnalyser.fftSize);
+  function loop(){
+    gateAnalyser.getFloatTimeDomainData(buf);
+    let sum=0; for(let i=0;i<buf.length;i++) sum+=buf[i]*buf[i];
+    const rms=Math.sqrt(sum/buf.length);
+    const db=20*Math.log10(rms+1e-9);
+    const open = db > state.gate;
+    micGate.gain.setTargetAtTime(open?1:0.0001, ctx.currentTime, open?0.005:0.05);
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// ============================================================
+//  VISUALS
+// ============================================================
+let specCanvas, specCtx, scopeCanvas, scopeCtx, meterFill, clipDot;
+function draw(){
+  const freqData = new Uint8Array(analyserSpectrum.frequencyBinCount);
+  const timeData = new Float32Array(scopeAnalyser.fftSize);
+  const meterData = new Float32Array(meterAnalyser.fftSize);
+
+  function frame(){
+    // Spectrum
+    analyserSpectrum.getByteFrequencyData(freqData);
+    const w=specCanvas.width, h=specCanvas.height;
+    specCtx.clearRect(0,0,w,h);
+    specCtx.fillStyle='#0c0e13'; specCtx.fillRect(0,0,w,h);
+    const bars = 128;
+    for(let i=0;i<bars;i++){
+      const v = freqData[Math.floor(i/bars*freqData.length*0.5)]/255;
+      const bh = v*h;
+      specCtx.fillStyle = `hsl(${30+v*180},90%,55%)`;
+      specCtx.fillRect(i*(w/bars), h-bh, (w/bars)-1, bh);
+    }
+    // overlay tracked harmonics
+    if(state.smart && lowestActiveFreq>0){
+      const nyq=ctx.sampleRate/2;
+      specCtx.strokeStyle='rgba(61,214,255,0.6)';
+      for(let i=0;i<state.numHarm;i++){
+        const f=lowestActiveFreq*(i+1); if(f>nyq) break;
+        const x=(f/(nyq*0.5))*w * 0.5; // map (we show 0..nyq*0.5 across width-ish)
+        const xx=(f/(nyq))*w;
+        specCtx.beginPath(); specCtx.moveTo(xx,0); specCtx.lineTo(xx,h); specCtx.stroke();
+      }
+    }
+
+    // Scope
+    scopeAnalyser.getFloatTimeDomainData(timeData);
+    const sw=scopeCanvas.width, sh=scopeCanvas.height;
+    scopeCtx.fillStyle='#0c0e13'; scopeCtx.fillRect(0,0,sw,sh);
+    scopeCtx.strokeStyle='#ff8a3d'; scopeCtx.lineWidth=2; scopeCtx.beginPath();
+    for(let i=0;i<timeData.length;i++){
+      const x=i/timeData.length*sw;
+      const y=sh/2 + timeData[i]*sh*0.45;
+      i===0?scopeCtx.moveTo(x,y):scopeCtx.lineTo(x,y);
+    }
+    scopeCtx.stroke();
+
+    // Meter
+    meterAnalyser.getFloatTimeDomainData(meterData);
+    let peak=0; for(let i=0;i<meterData.length;i++) peak=Math.max(peak,Math.abs(meterData[i]));
+    meterFill.style.width=(Math.min(peak,1)*100)+'%';
+    if(peak>0.98){ clipDot.classList.add('on'); } else { clipDot.classList.remove('on'); }
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+// ============================================================
+//  RECORDER
+// ============================================================
+function setupRecorder(stream){
+  try { recorder = new MediaRecorder(stream); } catch(e){ return; }
+  recorder.ondataavailable = e=>{ if(e.data.size) recChunks.push(e.data); };
+  recorder.onstop = ()=>{
+    const blob = new Blob(recChunks, {type:'audio/webm'});
+    if(recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
+    recordedBlobUrl = URL.createObjectURL(blob);
+    document.getElementById('dlBtn').disabled=false;
+  };
+}
+
+// ============================================================
+//  UI WIRING
+// ============================================================
+function buildKeyboard(){
+  const keys = document.getElementById('keys');
+  const whites = KEY_LAYOUT.filter(k=>!k.black);
+  // white keys first
+  whites.forEach(k=>{
+    const el=document.createElement('div'); el.className='key';
+    el.dataset.note=k.n; el.innerHTML=`<div class="lbl">${k.k.toUpperCase()}</div>`;
+    keys.appendChild(el);
+    bindKeyEl(el,k);
+  });
+  // black keys positioned over whites
+  const whiteW = 100/whites.length;
+  let whiteIndex=0;
+  KEY_LAYOUT.forEach(k=>{
+    if(k.black){
+      const el=document.createElement('div'); el.className='key black';
+      el.dataset.note=k.n;
+      el.style.left = (whiteIndex*whiteW - whiteW*0.3)+'%';
+      el.style.width = (whiteW*0.6)+'%';
+      el.innerHTML=`<div class="lbl">${k.k.toUpperCase()}</div>`;
+      keys.appendChild(el);
+      bindKeyEl(el,k);
+    } else whiteIndex++;
+  });
+}
+function midiForKey(k){
+  const oct = k.semis===12 ? state.octave+1 : state.octave;
+  const base = k.semis===12 ? 'C' : k.n;
+  return noteToMidi(base, oct);
+}
+function bindKeyEl(el,k){
+  const press=()=>{ if(!ctx) return; const m=midiForKey(k); noteOn(m); el.classList.add('pressed'); el.dataset.midi=m; };
+  const release=()=>{ const m=+el.dataset.midi; if(m){noteOff(m);} el.classList.remove('pressed'); };
+  el.addEventListener('mousedown',press);
+  el.addEventListener('mouseup',release);
+  el.addEventListener('mouseleave',()=>{ if(el.classList.contains('pressed')) release(); });
+  el.addEventListener('touchstart',e=>{e.preventDefault();press();});
+  el.addEventListener('touchend',e=>{e.preventDefault();release();});
+}
+
+// Computer keyboard
+const downKeys={};
+window.addEventListener('keydown',e=>{
+  if(e.repeat||!ctx) return;
+  const k=KEY_LAYOUT.find(x=>x.k===e.key.toLowerCase());
+  if(k){ const m=midiForKey(k); if(!downKeys[e.key]){downKeys[e.key]=m; noteOn(m);
+    document.querySelector(`.key[data-note="${k.n}"]`)?.classList.add('pressed'); } }
+});
+window.addEventListener('keyup',e=>{
+  const m=downKeys[e.key];
+  if(m){ noteOff(m); delete downKeys[e.key];
+    const k=KEY_LAYOUT.find(x=>x.k===e.key.toLowerCase());
+    document.querySelector(`.key[data-note="${k.n}"]`)?.classList.remove('pressed'); }
+});
+
+function bind(id, fn){ document.getElementById(id).addEventListener('input',fn); }
+function setStatus(s){ document.getElementById('status').textContent=s; }
+
+function wireControls(){
+  document.querySelectorAll('#waveBtns button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('#waveBtns button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); state.wave=b.dataset.wave;
+    });
+  });
+  bind('octave',e=>{state.octave=+e.target.value; octVal.textContent=e.target.value;});
+  bind('synthVol',e=>{state.synthVol=e.target.value/100; synthVolVal.textContent=e.target.value+'%'; if(synthBus)synthBus.gain.value=state.synthVol;});
+  bind('atk',e=>{state.atk=+e.target.value; atkVal.textContent=e.target.value+'s';});
+  bind('dec',e=>{state.dec=+e.target.value; decVal.textContent=e.target.value+'s';});
+  bind('sus',e=>{state.sus=e.target.value/100; susVal.textContent=e.target.value+'%';});
+  bind('rel',e=>{state.rel=+e.target.value; relVal.textContent=e.target.value+'s';});
+  bind('bri',e=>{state.bri=+e.target.value; briVal.textContent=e.target.value+'Hz';});
+
+  bind('micGain',e=>{state.micGain=+e.target.value; micGainVal.textContent=e.target.value+'x'; if(micGainNode)micGainNode.gain.value=state.micGain;});
+  bind('gate',e=>{state.gate=+e.target.value; gateVal.textContent=e.target.value+'dB';});
+  bind('hp',e=>{state.hp=+e.target.value; hpVal.textContent=e.target.value+'Hz'; if(micHP)micHP.frequency.value=state.hp;});
+  bind('lp',e=>{state.lp=+e.target.value; lpVal.textContent=e.target.value+'Hz'; if(micLP)micLP.frequency.value=state.lp;});
+
+  bind('qWidth',e=>{state.qWidth=+e.target.value; qVal.textContent=e.target.value; retuneSmartFilters();});
+  bind('numHarm',e=>{state.numHarm=+e.target.value; nhVal.textContent=e.target.value; if(ctx)buildSmartFilters();});
+  bind('master',e=>{state.master=e.target.value/100; masterVal.textContent=e.target.value+'%'; if(masterGain)masterGain.gain.value=state.master;});
+
+  document.getElementById('smartBtn').addEventListener('click',()=>{
+    state.smart=!state.smart;
+    const b=document.getElementById('smartBtn');
+    b.textContent='Smart Filter: '+(state.smart?'ON':'OFF');
+    b.classList.toggle('active',state.smart);
+    if(smartBypassGain) smartBypassGain.gain.setTargetAtTime(state.smart?0:1, ctx.currentTime,0.02);
+    retuneSmartFilters();
+  });
+
+  // Recording
+  document.getElementById('recBtn').addEventListener('click',e=>{
+    if(!recorder) return;
+    if(recorder.state==='inactive'){ recChunks=[]; recorder.start(); e.target.textContent='■ Stop'; e.target.classList.add('active'); setStatus('Recording...'); }
+    else { recorder.stop(); e.target.textContent='● Rec'; e.target.classList.remove('active'); setStatus('Recorded. Download ready.'); }
+  });
+  document.getElementById('dlBtn').addEventListener('click',()=>{
+    if(!recordedBlobUrl) return;
+    const a=document.createElement('a'); a.href=recordedBlobUrl; a.download='talkbox-'+Date.now()+'.webm'; a.click();
+  });
+}
+
+// ============================================================
+//  BOOT
+// ============================================================
+function setupCanvases(){
+  specCanvas=document.getElementById('spectrum'); specCtx=specCanvas.getContext('2d');
+  scopeCanvas=document.getElementById('scope'); scopeCtx=scopeCanvas.getContext('2d');
+  meterFill=document.getElementById('meterFill'); clipDot=document.getElementById('clipDot');
+  const fit=c=>{ c.width=c.clientWidth; };
+  fit(specCanvas); fit(scopeCanvas);
+  window.addEventListener('resize',()=>{fit(specCanvas);fit(scopeCanvas);});
+}
+
+document.getElementById('startBtn').addEventListener('click', async ()=>{
+  document.getElementById('startOverlay').style.display='none';
+  setupCanvases();
+  await initAudio();
+  if(ctx){ attachGate(); }
+});
+
+buildKeyboard();
+wireControls();
+</script>
+</body>
+</html>
