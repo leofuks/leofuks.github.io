@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Vibrato Vocal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        /* Novo: Box de Debug */
+        .debug-box {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .debug-box.success {
+            background: rgba(0, 255, 0, 0.1);
+            border-color: rgba(0, 255, 0, 0.3);
+        }
+
+        .debug-log {
+            color: #aaa;
+            margin: 2px 0;
+        }
+
+        .debug-log.error {
+            color: #ff6b6b;
+        }
+
+        .debug-log.success {
+            color: #00ff88;
+        }
+
+        .debug-log.warn {
+            color: #ffc107;
+        }
+
+        .controls-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+        }
+
+        .status.recording {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, 0.4);
+        }
+
+        .status.analyzing {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.4);
+        }
+
+        .status.ready {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.4);
+        }
+
+        .status.idle {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status.error {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff4444;
+            border: 1px solid rgba(255, 0, 0, 0.4);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .status.recording .status-dot {
+            animation: blink 0.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .btn {
+            padding: 12px 30px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+        }
+
+        .btn-init {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+
+        .btn-init:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-record {
+            background: linear-gradient(45deg, #ff4757, #ff6b81);
+            color: #fff;
+        }
+
+        .btn-record:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 71, 87, 0.4);
+        }
+
+        .btn-record.recording {
+            background: linear-gradient(45deg, #ffc107, #ffdb4d);
+            color: #000;
+        }
+
+        .btn:disabled {
+            background: #333;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            font-family: monospace;
+            color: #00d4ff;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .graphs-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .graph-box {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .graph-box.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .graph-title {
+            font-size: 0.85rem;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .graph-title .icon {
+            font-size: 1.1rem;
+        }
+
+        .canvas-wrapper {
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 180px;
+            display: block;
+        }
+
+        canvas.tall {
+            height: 220px;
+        }
+
+        .results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .result-card {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-card.frequency {
+            border-color: rgba(0, 212, 255, 0.3);
+        }
+
+        .result-card.intensity {
+            border-color: rgba(255, 107, 107, 0.3);
+        }
+
+        .result-card.fundamental {
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+
+        .result-header {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .result-label {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .result-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .result-card.frequency .result-value {
+            color: #00d4ff;
+        }
+
+        .result-card.intensity .result-value {
+            color: #ff6b6b;
+        }
+
+        .result-card.fundamental .result-value {
+            color: #ffd700;
+        }
+
+        .result-big {
+            text-align: center;
+            padding: 15px 0;
+        }
+
+        .result-big .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .result-big .unit {
+            font-size: 1rem;
+            color: #888;
+            margin-left: 5px;
+        }
+
+        .result-big .label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .level-meter {
+            margin-top: 15px;
+        }
+
+        .meter-bar {
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #ffd700, #ff4757);
+            border-radius: 4px;
+            transition: width 0.1s;
+        }
+
+        .meter-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .info-box {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .info-box strong {
+            color: #00d4ff;
+        }
+
+        @media (max-width: 768px) {
+            .graphs-container {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.4rem;
+            }
+
+            canvas {
+                height: 150px;
+            }
+
+            .result-big .value {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Analisador de Vibrato Vocal</h1>
+        <p class="subtitle">Captura de 4 segundos → Análise de variação de frequência e intensidade</p>
+
+        <!-- Debug Box -->
+        <div class="debug-box" id="debugBox">
+            <div class="debug-log">🔧 Console de Debug - Aguardando inicialização...</div>
+        </div>
+
+        <div class="controls-bar">
+            <div class="status idle" id="status">
+                <span class="status-dot"></span>
+                <span id="statusText">Clique em INICIAR para habilitar o microfone</span>
+            </div>
+            <button class="btn btn-init" id="btnInit">🎙️ INICIAR MICROFONE</button>
+            <button class="btn btn-record" id="btnRecord" disabled>🎙️ Gravar 4s</button>
+            <div class="timer" id="timer">0.0s</div>
+        </div>
+
+        <div class="graphs-container">
+            <div class="graph-box">
+                <div class="graph-title">
+                    <span class="icon">📊</span>
+                    Forma de Onda (Tempo Real)
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="waveformCanvas"></canvas>
+                </div>
+                <div class="level-meter">
+                    <div class="meter-bar">
+                        <div class="meter-fill" id="levelMeter" style="width: 0%"></div>
+                    </div>
+                    <div class="meter-labels">
+                        <span>-60 dB</span>
+                        <span>-30 dB</span>
+                        <span>0 dB</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="graph-box">
+                <div class="graph-title">
+                    <span class="icon">🌈</span>
+                    Espectro FFT (Tempo Real)
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="spectrumCanvas"></canvas>
+                </div>
+            </div>
+
+            <div class="graph-box full-width">
+                <div class="graph-title">
+                    <span class="icon">〰️</span>
+                    Variação da Frequência Fundamental (F₀) ao Longo do Tempo
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="f0Canvas" class="tall"></canvas>
+                </div>
+            </div>
+
+            <div class="graph-box full-width">
+                <div class="graph-title">
+                    <span class="icon">📈</span>
+                    Variação da Intensidade (dB) ao Longo do Tempo
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="intensityCanvas" class="tall"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-container">
+            <div class="result-card fundamental">
+                <div class="result-header">🎵 Frequência Fundamental</div>
+                <div class="result-big">
+                    <span class="value" id="f0Mean">---</span>
+                    <span class="unit">Hz</span>
+                    <div class="label">Média (F₀)</div>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Nota Musical</span>
+                    <span class="result-value" id="noteName">--</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">F₀ Mínima</span>
+                    <span class="result-value" id="f0Min">-- Hz</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">F₀ Máxima</span>
+                    <span class="result-value" id="f0Max">-- Hz</span>
+                </div>
+            </div>
+
+            <div class="result-card frequency">
+                <div class="result-header">〰️ Vibrato de Frequência</div>
+                <div class="result-big">
+                    <span class="value" id="vibratoRate">---</span>
+                    <span class="unit">Hz</span>
+                    <div class="label">Taxa do Vibrato (Rate)</div>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Extensão (Extent)</span>
+                    <span class="result-value" id="vibratoExtent">-- cents</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Variação em Hz</span>
+                    <span class="result-value" id="vibratoHz">± -- Hz</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Variação em Semitons</span>
+                    <span class="result-value" id="vibratoSemitones">± -- st</span>
+                </div>
+            </div>
+
+            <div class="result-card intensity">
+                <div class="result-header">📊 Vibrato de Intensidade</div>
+                <div class="result-big">
+                    <span class="value" id="intensityRate">---</span>
+                    <span class="unit">Hz</span>
+                    <div class="label">Taxa de Modulação</div>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Intensidade Média</span>
+                    <span class="result-value" id="intensityMean">-- dB</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Variação</span>
+                    <span class="result-value" id="intensityVariation">± -- dB</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Intensidade Mín/Máx</span>
+                    <span class="result-value" id="intensityRange">-- / -- dB</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Como usar:</strong> 
+            <ol style="margin-top: 10px; margin-left: 20px;">
+                <li>Clique em <strong>"INICIAR MICROFONE"</strong> e permita o acesso ao microfone</li>
+                <li>Verifique se a forma de onda aparece quando você fala</li>
+                <li>Clique em <strong>"Gravar 4s"</strong> e cante uma nota sustentada com vibrato</li>
+            </ol>
+            <br>
+            <strong>Vibrato típico:</strong> Taxa de 4-7 Hz | Extensão de 50-150 cents (meio semitom a um semitom e meio)
+            <br><br>
+            <strong>Atalho:</strong> Pressione ESPAÇO para iniciar a gravação (após habilitar o microfone)
+        </div>
+    </div>
+
+    <script>
+        // ══════════════════════════════════════════════════════════════════
+        // CONFIGURAÇÕES
+        // ══════════════════════════════════════════════════════════════════
+
+        const SAMPLE_RATE = 44100;
+        const FFT_SIZE = 4096;
+        const RECORDING_DURATION = 4000; // 4 segundos em ms
+        const F0_ANALYSIS_INTERVAL = 10; // Análise de F0 a cada 10ms
+        const F0_MIN = 50;
+        const F0_MAX = 600;
+        const MIN_F0_SAMPLES = 50; // Mínimo de amostras de F0 para análise válida
+
+        // ══════════════════════════════════════════════════════════════════
+        // VARIÁVEIS GLOBAIS
+        // ══════════════════════════════════════════════════════════════════
+
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let isMonitoring = false;
+        let isRecording = false;
+        let isInitialized = false;
+        let animationId = null;
+
+        let recordingStartTime = 0;
+        let f0History = [];
+        let intensityHistory = [];
+        let f0AnalysisId = null;
+
+        // ══════════════════════════════════════════════════════════════════
+        // ELEMENTOS DOM
+        // ══════════════════════════════════════════════════════════════════
+
+        const btnInit = document.getElementById('btnInit');
+        const btnRecord = document.getElementById('btnRecord');
+        const statusEl = document.getElementById('status');
+        const statusText = document.getElementById('statusText');
+        const timerEl = document.getElementById('timer');
+        const levelMeter = document.getElementById('levelMeter');
+        const debugBox = document.getElementById('debugBox');
+
+        const waveformCanvas = document.getElementById('waveformCanvas');
+        const waveformCtx = waveformCanvas.getContext('2d');
+        const spectrumCanvas = document.getElementById('spectrumCanvas');
+        const spectrumCtx = spectrumCanvas.getContext('2d');
+        const f0Canvas = document.getElementById('f0Canvas');
+        const f0Ctx = f0Canvas.getContext('2d');
+        const intensityCanvas = document.getElementById('intensityCanvas');
+        const intensityCtx = intensityCanvas.getContext('2d');
+
+        const f0MeanEl = document.getElementById('f0Mean');
+        const noteNameEl = document.getElementById('noteName');
+        const f0MinEl = document.getElementById('f0Min');
+        const f0MaxEl = document.getElementById('f0Max');
+        const vibratoRateEl = document.getElementById('vibratoRate');
+        const vibratoExtentEl = document.getElementById('vibratoExtent');
+        const vibratoHzEl = document.getElementById('vibratoHz');
+        const vibratoSemitonesEl = document.getElementById('vibratoSemitones');
+        const intensityRateEl = document.getElementById('intensityRate');
+        const intensityMeanEl = document.getElementById('intensityMean');
+        const intensityVariationEl = document.getElementById('intensityVariation');
+        const intensityRangeEl = document.getElementById('intensityRange');
+
+        // ══════════════════════════════════════════════════════════════════
+        // FUNÇÕES DE DEBUG
+        // ══════════════════════════════════════════════════════════════════
+
+        function debugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEl = document.createElement('div');
+            logEl.className = `debug-log ${type}`;
+            
+            const prefix = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'error': '❌',
+                'warn': '⚠️'
+            }[type] || 'ℹ️';
+            
+            logEl.textContent = `[${timestamp}] ${prefix} ${message}`;
+            debugBox.appendChild(logEl);
+            debugBox.scrollTop = debugBox.scrollHeight;
+            
+            // Também log no console
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // INICIALIZAÇÃO DO ÁUDIO
+        // ══════════════════════════════════════════════════════════════════
+
+        async function initAudio() {
+            debugLog('Iniciando configuração do áudio...', 'info');
+            
+            try {
+                // Verificar suporte a getUserMedia
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Seu navegador não suporta acesso ao microfone (getUserMedia)');
+                }
+                debugLog('API getUserMedia disponível', 'success');
+
+                // Criar AudioContext
+                debugLog('Criando AudioContext...', 'info');
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: SAMPLE_RATE
+                });
+                debugLog(`AudioContext criado - Sample Rate: ${audioContext.sampleRate}Hz, State: ${audioContext.state}`, 'success');
+
+                // Resumir AudioContext se necessário (requerido por políticas de autoplay)
+                if (audioContext.state === 'suspended') {
+                    debugLog('AudioContext suspenso, tentando resumir...', 'warn');
+                    await audioContext.resume();
+                    debugLog(`AudioContext resumido - State: ${audioContext.state}`, 'success');
+                }
+
+                // Solicitar acesso ao microfone
+                debugLog('Solicitando permissão do microfone...', 'info');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        channelCount: 1,
+                        sampleRate: SAMPLE_RATE
+                    }
+                });
+                debugLog('Permissão do microfone concedida!', 'success');
+
+                // Verificar tracks do stream
+                const audioTracks = stream.getAudioTracks();
+                debugLog(`Tracks de áudio encontradas: ${audioTracks.length}`, 'info');
+                if (audioTracks.length > 0) {
+                    const settings = audioTracks[0].getSettings();
+                    debugLog(`Microfone: ${audioTracks[0].label || 'Desconhecido'}`, 'info');
+                    debugLog(`Config: ${settings.sampleRate || 'N/A'}Hz, ${settings.channelCount || 'N/A'} canal(is)`, 'info');
+                }
+
+                // Criar Analyser
+                debugLog('Criando AnalyserNode...', 'info');
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = FFT_SIZE;
+                analyser.smoothingTimeConstant = 0.5;
+                analyser.minDecibels = -100;
+                analyser.maxDecibels = -10;
+                debugLog(`Analyser configurado - FFT Size: ${analyser.fftSize}, Freq Bins: ${analyser.frequencyBinCount}`, 'success');
+
+                // Conectar microfone ao analyser
+                debugLog('Conectando microfone ao analyser...', 'info');
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                debugLog('Microfone conectado com sucesso!', 'success');
+
+                // Iniciar monitoramento
+                isMonitoring = true;
+                isInitialized = true;
+                drawRealtime();
+
+                setStatus('ready', 'Pronto para gravar');
+                btnInit.style.display = 'none';
+                btnRecord.disabled = false;
+                debugBox.classList.add('success');
+                
+                debugLog('=== SISTEMA PRONTO ===', 'success');
+                debugLog('Cante ou fale para ver a forma de onda', 'info');
+
+            } catch (error) {
+                debugLog(`ERRO: ${error.message}`, 'error');
+                debugLog(`Tipo: ${error.name}`, 'error');
+                
+                setStatus('error', 'Erro ao acessar microfone');
+                
+                if (error.name === 'NotAllowedError') {
+                    debugLog('Permissão negada pelo usuário ou navegador', 'error');
+                    alert('Permissão do microfone negada.\n\nPor favor:\n1. Clique no ícone do cadeado na barra de endereço\n2. Permita o acesso ao microfone\n3. Recarregue a página');
+                } else if (error.name === 'NotFoundError') {
+                    debugLog('Nenhum microfone encontrado no dispositivo', 'error');
+                    alert('Nenhum microfone encontrado.\n\nVerifique se há um microfone conectado ao seu dispositivo.');
+                } else if (error.name === 'NotReadableError') {
+                    debugLog('Microfone em uso por outro aplicativo', 'error');
+                    alert('O microfone está em uso por outro aplicativo.\n\nFeche outros apps que possam estar usando o microfone.');
+                } else {
+                    alert(`Erro ao acessar o microfone: ${error.message}`);
+                }
+            }
+        }
+
+        function setStatus(type, text) {
+            statusEl.className = `status ${type}`;
+            statusText.textContent = text;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // GRAVAÇÃO E ANÁLISE
+        // ══════════════════════════════════════════════════════════════════
+
+        function startRecording() {
+            if (!isInitialized) {
+                debugLog('Sistema não inicializado! Clique em INICIAR primeiro.', 'error');
+                alert('Por favor, clique em "INICIAR MICROFONE" primeiro.');
+                return;
+            }
+
+            debugLog('=== INICIANDO GRAVAÇÃO ===', 'info');
+            
+            f0History = [];
+            intensityHistory = [];
+            recordingStartTime = performance.now();
+            isRecording = true;
+
+            setStatus('recording', 'Gravando... Cante uma nota com vibrato!');
+            btnRecord.textContent = '⏺️ Gravando...';
+            btnRecord.classList.add('recording');
+            btnRecord.disabled = true;
+
+            // Iniciar análise periódica
+            f0AnalysisId = setInterval(analyzeFrame, F0_ANALYSIS_INTERVAL);
+            debugLog(`Análise iniciada (intervalo: ${F0_ANALYSIS_INTERVAL}ms)`, 'info');
+
+            updateTimer();
+
+            setTimeout(stopRecording, RECORDING_DURATION);
+        }
+
+        function stopRecording() {
+            debugLog('=== PARANDO GRAVAÇÃO ===', 'info');
+            isRecording = false;
+
+            if (f0AnalysisId) {
+                clearInterval(f0AnalysisId);
+                f0AnalysisId = null;
+            }
+
+            debugLog(`Amostras F0 coletadas: ${f0History.length}`, 'info');
+            debugLog(`Amostras Intensidade coletadas: ${intensityHistory.length}`, 'info');
+
+            setStatus('analyzing', 'Analisando vibrato...');
+            btnRecord.textContent = '🎙️ Gravar 4s';
+            btnRecord.classList.remove('recording');
+
+            setTimeout(() => {
+                analyzeVibrato();
+                setStatus('ready', 'Análise concluída');
+                btnRecord.disabled = false;
+            }, 100);
+        }
+
+        function updateTimer() {
+            if (!isRecording) return;
+
+            const elapsed = (performance.now() - recordingStartTime) / 1000;
+            timerEl.textContent = elapsed.toFixed(1) + 's';
+
+            if (elapsed < RECORDING_DURATION / 1000) {
+                requestAnimationFrame(updateTimer);
+            }
+        }
+
+        function analyzeFrame() {
+            if (!analyser || !isRecording) return;
+
+            const currentTime = performance.now() - recordingStartTime;
+
+            // Detectar F0
+            const f0 = detectPitch();
+            if (f0 > 0) {
+                f0History.push({ time: currentTime, frequency: f0 });
+            }
+
+            // Medir intensidade
+            const db = measureIntensity();
+            intensityHistory.push({ time: currentTime, db: db });
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // DETECÇÃO DE PITCH (AUTOCORRELAÇÃO)
+        // ══════════════════════════════════════════════════════════════════
+
+        function detectPitch() {
+            const buffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            // Calcular RMS
+            let rms = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                rms += buffer[i] * buffer[i];
+            }
+            rms = Math.sqrt(rms / buffer.length);
+
+            // Threshold de silêncio
+            if (rms < 0.005) return -1;
+
+            const sampleRate = audioContext.sampleRate;
+            const SIZE = buffer.length;
+            const MAX_SAMPLES = Math.floor(SIZE / 2);
+
+            let bestOffset = -1;
+            let bestCorrelation = 0;
+            let foundGoodCorrelation = false;
+
+            const minPeriod = Math.floor(sampleRate / F0_MAX);
+            const maxPeriod = Math.floor(sampleRate / F0_MIN);
+
+            // Autocorrelação
+            for (let offset = minPeriod; offset < maxPeriod && offset < MAX_SAMPLES; offset++) {
+                let correlation = 0;
+
+                for (let i = 0; i < MAX_SAMPLES; i++) {
+                    correlation += Math.abs(buffer[i] - buffer[i + offset]);
+                }
+
+                correlation = 1 - (correlation / MAX_SAMPLES);
+
+                if (correlation > 0.7 && correlation > bestCorrelation) {
+                    bestCorrelation = correlation;
+                    bestOffset = offset;
+                    foundGoodCorrelation = true;
+                } else if (foundGoodCorrelation && correlation < bestCorrelation - 0.1) {
+                    break;
+                }
+            }
+
+            if (bestCorrelation > 0.6 && bestOffset > 0) {
+                return sampleRate / bestOffset;
+            }
+
+            return -1;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // MEDIÇÃO DE INTENSIDADE
+        // ══════════════════════════════════════════════════════════════════
+
+        function measureIntensity() {
+            const buffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            let rms = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                rms += buffer[i] * buffer[i];
+            }
+            rms = Math.sqrt(rms / buffer.length);
+
+            const db = 20 * Math.log10(Math.max(rms, 0.0001));
+
+            return db;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // ANÁLISE DO VIBRATO
+        // ══════════════════════════════════════════════════════════════════
+
+        function analyzeVibrato() {
+            debugLog(`Analisando: ${f0History.length} amostras F0, ${intensityHistory.length} amostras intensidade`, 'info');
+
+            if (f0History.length < MIN_F0_SAMPLES) {
+                debugLog(`Dados insuficientes! Mínimo: ${MIN_F0_SAMPLES}, obtido: ${f0History.length}`, 'error');
+                alert(`Dados insuficientes (${f0History.length} amostras de F0).\n\nDicas:\n- Cante mais alto e próximo ao microfone\n- Mantenha a nota sustentada por todo o período\n- Verifique se a forma de onda está aparecendo`);
+                resetResults();
+                drawF0Graph();
+                drawIntensityGraph();
+                return;
+            }
+
+            // ═══ ANÁLISE DA FREQUÊNCIA FUNDAMENTAL ═══
+
+            const frequencies = f0History.map(d => d.frequency);
+            const f0Mean = frequencies.reduce((a, b) => a + b, 0) / frequencies.length;
+            const f0Min = Math.min(...frequencies);
+            const f0Max = Math.max(...frequencies);
+
+            debugLog(`F0 - Média: ${f0Mean.toFixed(1)}Hz, Min: ${f0Min.toFixed(1)}Hz, Max: ${f0Max.toFixed(1)}Hz`, 'info');
+
+            const centsFromMean = frequencies.map(f => 1200 * Math.log2(f / f0Mean));
+            const extentCents = (Math.max(...centsFromMean) - Math.min(...centsFromMean)) / 2;
+            const extentSemitones = extentCents / 100;
+            const extentHz = (f0Max - f0Min) / 2;
+
+            // ═══ FFT DA VARIAÇÃO DE F0 PARA ENCONTRAR TAXA DO VIBRATO ═══
+
+            const vibratoRateF0 = findVibratoRate(centsFromMean, F0_ANALYSIS_INTERVAL);
+            debugLog(`Taxa do Vibrato (F0): ${vibratoRateF0.toFixed(2)}Hz`, 'success');
+
+            // ═══ ANÁLISE DA INTENSIDADE ═══
+
+            const intensities = intensityHistory.map(d => d.db);
+            const intensityMean = intensities.reduce((a, b) => a + b, 0) / intensities.length;
+            const intensityMin = Math.min(...intensities);
+            const intensityMax = Math.max(...intensities);
+            const intensityVariation = (intensityMax - intensityMin) / 2;
+
+            const intensityCentered = intensities.map(i => i - intensityMean);
+            const vibratoRateIntensity = findVibratoRate(intensityCentered, F0_ANALYSIS_INTERVAL);
+
+            // ═══ ATUALIZAR INTERFACE ═══
+
+            f0MeanEl.textContent = f0Mean.toFixed(1);
+            noteNameEl.textContent = frequencyToNote(f0Mean);
+            f0MinEl.textContent = f0Min.toFixed(1) + ' Hz';
+            f0MaxEl.textContent = f0Max.toFixed(1) + ' Hz';
+
+            vibratoRateEl.textContent = vibratoRateF0.toFixed(1);
+            vibratoExtentEl.textContent = extentCents.toFixed(0) + ' cents';
+            vibratoHzEl.textContent = '± ' + extentHz.toFixed(1) + ' Hz';
+            vibratoSemitonesEl.textContent = '± ' + extentSemitones.toFixed(2) + ' st';
+
+            intensityRateEl.textContent = vibratoRateIntensity.toFixed(1);
+            intensityMeanEl.textContent = intensityMean.toFixed(1) + ' dB';
+            intensityVariationEl.textContent = '± ' + intensityVariation.toFixed(1) + ' dB';
+            intensityRangeEl.textContent = intensityMin.toFixed(0) + ' / ' + intensityMax.toFixed(0) + ' dB';
+
+            // ═══ DESENHAR GRÁFICOS ═══
+
+            drawF0Graph();
+            drawIntensityGraph();
+            
+            debugLog('=== ANÁLISE CONCLUÍDA ===', 'success');
+        }
+
+        function findVibratoRate(signal, intervalMs) {
+            const N = signal.length;
+            if (N < 32) return 0;
+
+            const fftSize = Math.pow(2, Math.ceil(Math.log2(N)));
+            const paddedSignal = new Array(fftSize).fill(0);
+            for (let i = 0; i < N; i++) {
+                paddedSignal[i] = signal[i];
+            }
+
+            const sampleRate = 1000 / intervalMs;
+            const magnitudes = [];
+            const freqResolution = sampleRate / fftSize;
+
+            const minBin = Math.floor(2 / freqResolution);
+            const maxBin = Math.ceil(12 / freqResolution);
+
+            for (let k = minBin; k <= maxBin && k < fftSize / 2; k++) {
+                let real = 0;
+                let imag = 0;
+
+                for (let n = 0; n < fftSize; n++) {
+                    const angle = (2 * Math.PI * k * n) / fftSize;
+                    real += paddedSignal[n] * Math.cos(angle);
+                    imag -= paddedSignal[n] * Math.sin(angle);
+                }
+
+                const magnitude = Math.sqrt(real * real + imag * imag);
+                magnitudes.push({ bin: k, magnitude: magnitude, frequency: k * freqResolution });
+            }
+
+            if (magnitudes.length === 0) return 0;
+
+            magnitudes.sort((a, b) => b.magnitude - a.magnitude);
+            return magnitudes[0].frequency;
+        }
+
+        function resetResults() {
+            f0MeanEl.textContent = '---';
+            noteNameEl.textContent = '--';
+            f0MinEl.textContent = '-- Hz';
+            f0MaxEl.textContent = '-- Hz';
+            vibratoRateEl.textContent = '---';
+            vibratoExtentEl.textContent = '-- cents';
+            vibratoHzEl.textContent = '± -- Hz';
+            vibratoSemitonesEl.textContent = '± -- st';
+            intensityRateEl.textContent = '---';
+            intensityMeanEl.textContent = '-- dB';
+            intensityVariationEl.textContent = '± -- dB';
+            intensityRangeEl.textContent = '-- / -- dB';
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // GRÁFICOS
+        // ══════════════════════════════════════════════════════════════════
+
+        function setupCanvas(canvas, ctx) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            return { width: rect.width, height: rect.height };
+        }
+
+        function drawRealtime() {
+            if (!isMonitoring) return;
+
+            animationId = requestAnimationFrame(drawRealtime);
+
+            drawWaveform();
+            drawSpectrum();
+            updateLevelMeter();
+        }
+
+        function drawWaveform() {
+            const { width, height } = setupCanvas(waveformCanvas, waveformCtx);
+
+            const buffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            waveformCtx.fillStyle = '#000';
+            waveformCtx.fillRect(0, 0, width, height);
+
+            // Linha central
+            waveformCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            waveformCtx.lineWidth = 1;
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, height / 2);
+            waveformCtx.lineTo(width, height / 2);
+            waveformCtx.stroke();
+
+            // Forma de onda
+            waveformCtx.strokeStyle = '#00d4ff';
+            waveformCtx.lineWidth = 1.5;
+            waveformCtx.beginPath();
+
+            const sliceWidth = width / buffer.length;
+            let x = 0;
+
+            for (let i = 0; i < buffer.length; i++) {
+                const y = (1 - buffer[i]) * height / 2;
+
+                if (i === 0) {
+                    waveformCtx.moveTo(x, y);
+                } else {
+                    waveformCtx.lineTo(x, y);
+                }
+
+                x += sliceWidth;
+            }
+
+            waveformCtx.stroke();
+        }
+
+        function drawSpectrum() {
+            const { width, height } = setupCanvas(spectrumCanvas, spectrumCtx);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            spectrumCtx.fillStyle = '#000';
+            spectrumCtx.fillRect(0, 0, width, height);
+
+            const barCount = 64;
+            const barWidth = width / barCount;
+            const step = Math.floor(bufferLength / barCount);
+
+            for (let i = 0; i < barCount; i++) {
+                const value = dataArray[i * step];
+                const barHeight = (value / 255) * height;
+
+                const hue = (i / barCount) * 180 + 180;
+                spectrumCtx.fillStyle = `hsl(${hue}, 80%, 50%)`;
+                spectrumCtx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
+            }
+        }
+
+        function updateLevelMeter() {
+            const buffer = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(buffer);
+
+            let rms = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                rms += buffer[i] * buffer[i];
+            }
+            rms = Math.sqrt(rms / buffer.length);
+
+            const db = 20 * Math.log10(Math.max(rms, 0.0001));
+            const percent = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+
+            levelMeter.style.width = percent + '%';
+        }
+
+        function drawF0Graph() {
+            const { width, height } = setupCanvas(f0Canvas, f0Ctx);
+
+            f0Ctx.fillStyle = '#000';
+            f0Ctx.fillRect(0, 0, width, height);
+
+            drawGraphGrid(f0Ctx, width, height, 100, 500, 'Hz', 4);
+
+            if (f0History.length < 2) {
+                f0Ctx.fillStyle = '#666';
+                f0Ctx.font = '14px Segoe UI';
+                f0Ctx.textAlign = 'center';
+                f0Ctx.fillText('Aguardando dados...', width / 2, height / 2);
+                return;
+            }
+
+            const frequencies = f0History.map(d => d.frequency);
+            const f0Mean = frequencies.reduce((a, b) => a + b, 0) / frequencies.length;
+            const f0Min = Math.min(...frequencies);
+            const f0Max = Math.max(...frequencies);
+            const range = Math.max(f0Max - f0Min, 20);
+
+            const yMin = f0Mean - range;
+            const yMax = f0Mean + range;
+
+            f0Ctx.fillStyle = '#000';
+            f0Ctx.fillRect(0, 0, width, height);
+            drawGraphGrid(f0Ctx, width, height, yMin, yMax, 'Hz', 4);
+
+            // Linha média
+            const yMean = height - ((f0Mean - yMin) / (yMax - yMin)) * height;
+            f0Ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+            f0Ctx.lineWidth = 1;
+            f0Ctx.setLineDash([5, 5]);
+            f0Ctx.beginPath();
+            f0Ctx.moveTo(0, yMean);
+            f0Ctx.lineTo(width, yMean);
+            f0Ctx.stroke();
+            f0Ctx.setLineDash([]);
+
+            // Curva F0
+            f0Ctx.strokeStyle = '#00d4ff';
+            f0Ctx.lineWidth = 2;
+            f0Ctx.beginPath();
+
+            const duration = RECORDING_DURATION;
+
+            f0History.forEach((point, i) => {
+                const x = (point.time / duration) * width;
+                const y = height - ((point.frequency - yMin) / (yMax - yMin)) * height;
+
+                if (i === 0) {
+                    f0Ctx.moveTo(x, y);
+                } else {
+                    f0Ctx.lineTo(x, y);
+                }
+            });
+
+            f0Ctx.stroke();
+
+            // Legenda
+            f0Ctx.fillStyle = '#ffd700';
+            f0Ctx.font = 'bold 12px Segoe UI';
+            f0Ctx.textAlign = 'left';
+            f0Ctx.fillText(`Média: ${f0Mean.toFixed(1)} Hz | Amostras: ${f0History.length}`, 10, 20);
+        }
+
+        function drawIntensityGraph() {
+            const { width, height } = setupCanvas(intensityCanvas, intensityCtx);
+
+            intensityCtx.fillStyle = '#000';
+            intensityCtx.fillRect(0, 0, width, height);
+
+            drawGraphGrid(intensityCtx, width, height, -60, 0, 'dB', 4);
+
+            if (intensityHistory.length < 2) {
+                intensityCtx.fillStyle = '#666';
+                intensityCtx.font = '14px Segoe UI';
+                intensityCtx.textAlign = 'center';
+                intensityCtx.fillText('Aguardando dados...', width / 2, height / 2);
+                return;
+            }
+
+            const intensities = intensityHistory.map(d => d.db);
+            const dbMin = Math.min(...intensities);
+            const dbMax = Math.max(...intensities);
+            const dbMean = intensities.reduce((a, b) => a + b, 0) / intensities.length;
+            const range = Math.max(dbMax - dbMin, 10);
+
+            const yMin = dbMean - range;
+            const yMax = dbMean + range;
+
+            intensityCtx.fillStyle = '#000';
+            intensityCtx.fillRect(0, 0, width, height);
+            drawGraphGrid(intensityCtx, width, height, yMin, yMax, 'dB', 4);
+
+            // Linha média
+            const yMean = height - ((dbMean - yMin) / (yMax - yMin)) * height;
+            intensityCtx.strokeStyle = 'rgba(255, 107, 107, 0.5)';
+            intensityCtx.lineWidth = 1;
+            intensityCtx.setLineDash([5, 5]);
+            intensityCtx.beginPath();
+            intensityCtx.moveTo(0, yMean);
+            intensityCtx.lineTo(width, yMean);
+            intensityCtx.stroke();
+            intensityCtx.setLineDash([]);
+
+            // Curva de intensidade
+            intensityCtx.strokeStyle = '#ff6b6b';
+            intensityCtx.lineWidth = 2;
+            intensityCtx.beginPath();
+
+            const duration = RECORDING_DURATION;
+
+            intensityHistory.forEach((point, i) => {
+                const x = (point.time / duration) * width;
+                const y = height - ((point.db - yMin) / (yMax - yMin)) * height;
+
+                if (i === 0) {
+                    intensityCtx.moveTo(x, y);
+                } else {
+                    intensityCtx.lineTo(x, y);
+                }
+            });
+
+            intensityCtx.stroke();
+
+            // Legenda
+            intensityCtx.fillStyle = '#ff6b6b';
+            intensityCtx.font = 'bold 12px Segoe UI';
+            intensityCtx.textAlign = 'left';
+            intensityCtx.fillText(`Média: ${dbMean.toFixed(1)} dB`, 10, 20);
+        }
+
+        function drawGraphGrid(ctx, width, height, yMin, yMax, unit, durationSeconds) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = '9px Segoe UI';
+
+            const steps = 5;
+            for (let i = 0; i <= steps; i++) {
+                const y = (i / steps) * height;
+                const value = yMax - (i / steps) * (yMax - yMin);
+
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+
+                ctx.textAlign = 'right';
+                ctx.fillText(value.toFixed(0) + ' ' + unit, width - 5, y + 12);
+            }
+
+            const timeSteps = durationSeconds;
+            for (let i = 0; i <= timeSteps; i++) {
+                const x = (i / timeSteps) * width;
+                const time = i;
+
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+
+                ctx.textAlign = 'left';
+                ctx.fillText(time + 's', x + 3, height - 5);
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // UTILITÁRIOS
+        // ══════════════════════════════════════════════════════════════════
+
+        function frequencyToNote(freq) {
+            if (freq <= 0) return '--';
+
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const semitones = 12 * Math.log2(freq / 440);
+            const noteIndex = Math.round(semitones) % 12;
+            const octave = Math.floor(4 + (Math.round(semitones) + 9) / 12);
+            const adjustedIndex = ((noteIndex % 12) + 12) % 12;
+            const cents = Math.round((semitones - Math.round(semitones)) * 100);
+            const centsStr = cents >= 0 ? `+${cents}` : `${cents}`;
+
+            return `${noteNames[adjustedIndex]}${octave} (${centsStr}¢)`;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // EVENT LISTENERS
+        // ══════════════════════════════════════════════════════════════════
+
+        btnInit.addEventListener('click', () => {
+            debugLog('Botão INICIAR clicado pelo usuário', 'info');
+            initAudio();
+        });
+
+        btnRecord.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isRecording && isInitialized) {
+                e.preventDefault();
+                startRecording();
+            }
+        });
+
+        // Log inicial
+        debugLog('Página carregada. Clique em "INICIAR MICROFONE" para começar.', 'info');
+    </script>
+</body>
+</html>
