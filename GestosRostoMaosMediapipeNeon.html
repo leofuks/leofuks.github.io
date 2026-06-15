@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>FaceMesh + Hands Sonoro — v5 🎵</title>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg:     #06060e;
+      --panel:  #0e0e1c;
+      --panel2: #12122a;
+      --border: #252550;
+      --face:   #aa55ff;
+      --muted:  #6666aa;
+      --text:   #e0e0f0;
+      --green:  #44ff99;
+      --yellow: #ffcc00;
+      --red:    #ff4455;
+      --r:      10px;
+    }
+    body {
+      background:var(--bg); color:var(--text);
+      font-family:'Segoe UI',system-ui,sans-serif;
+      display:flex; flex-direction:column; align-items:center;
+      min-height:100vh; padding-bottom:30px;
+    }
+    header {
+      width:100%; background:linear-gradient(135deg,#15002e,#00001a);
+      padding:13px 20px; text-align:center; border-bottom:1px solid #2a0055;
+    }
+    header h1 { font-size:1.25rem; color:var(--face); letter-spacing:2px; }
+    header p  { font-size:.68rem; color:var(--muted); margin-top:3px; }
+
+    #status-bar {
+      width:100%; max-width:720px;
+      display:flex; align-items:center; gap:8px;
+      padding:7px 16px; background:#0a0a16;
+      border-bottom:1px solid var(--border);
+      font-size:.73rem; color:var(--muted);
+    }
+    #sdot {
+      width:9px; height:9px; border-radius:50%;
+      background:var(--red); flex-shrink:0; transition:background .3s;
+    }
+    #sdot.active  { background:var(--green); }
+    #sdot.loading { background:var(--yellow); animation:blink .7s infinite alternate; }
+    @keyframes blink { from{opacity:.3} to{opacity:1} }
+
+    .wrap {
+      width:100%; max-width:720px;
+      display:flex; flex-direction:column;
+      gap:10px; padding:12px 10px 0;
+    }
+
+    /* ── CÂMERA */
+    #cam-wrap {
+      position:relative; width:100%; border-radius:var(--r);
+      overflow:hidden; background:#000; aspect-ratio:4/3;
+    }
+    #video {
+      width:100%; height:100%; object-fit:cover;
+      display:block; transform:scaleX(-1);
+      transition: opacity .05s linear;
+    }
+    #canvas {
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      transform:scaleX(-1);
+      pointer-events:none;
+    }
+    /* Overlay escuro sobre o vídeo — controlado por JS */
+    #dim-overlay {
+      position:absolute; inset:0;
+      background:#000;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .05s linear;
+    }
+
+    /* ── PAINÉIS */
+    .ctrl-panel {
+      background:var(--panel); border-radius:var(--r);
+      border:1px solid var(--border); padding:14px 18px;
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .panel-title {
+      font-size:.67rem; text-transform:uppercase;
+      letter-spacing:1.5px; color:var(--muted);
+    }
+    .ctrl-row { display:flex; align-items:center; gap:10px; }
+    .ctrl-lbl {
+      font-size:.72rem; color:var(--muted);
+      white-space:nowrap; min-width:110px;
+    }
+
+    input[type=range] {
+      flex:1; height:6px; -webkit-appearance:none; appearance:none;
+      border-radius:3px; outline:none; cursor:pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+      background:#fff; border:3px solid var(--face); cursor:pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width:16px; height:16px; border-radius:50%;
+      background:#fff; border:3px solid var(--face); cursor:pointer;
+    }
+    .val-box {
+      min-width:90px; text-align:center; background:var(--panel2);
+      border:1px solid var(--border); border-radius:6px; padding:4px 8px;
+      font-size:.8rem; font-family:monospace; color:var(--text);
+    }
+
+    /* Gradientes dos sliders */
+    #thresh-slider { background:linear-gradient(to right,var(--green),var(--yellow),var(--red)); }
+    #size-slider   { background:linear-gradient(to right,#223,#aa55ff); }
+    #reverb-slider { background:linear-gradient(to right,#223,#55aaff); }
+    #spread-slider { background:linear-gradient(to right,#223,var(--yellow)); }
+
+    /* Slider de escurecimento: claro → escuro */
+    #dim-slider {
+      background: linear-gradient(to right, #cccccc, #111122);
+    }
+    /* Slider de neon: apagado → neon vibrante */
+    #neon-slider {
+      background: linear-gradient(to right,
+        #223,
+        #ff00ff
+      );
+    }
+
+    /* Badge sensibilidade */
+    #sens-badge {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:3px 10px; border-radius:20px;
+      font-size:.7rem; font-weight:600;
+      align-self:flex-start; transition:all .3s;
+    }
+    .sh-vhigh{background:#002a15;color:var(--green); border:1px solid var(--green);}
+    .sh-high {background:#1a2200;color:#aaff55;      border:1px solid #aaff55;}
+    .sh-mid  {background:#2a2200;color:var(--yellow); border:1px solid var(--yellow);}
+    .sh-low  {background:#2a1000;color:#ffaa44;       border:1px solid #ffaa44;}
+    .sh-vlow {background:#2a0008;color:var(--red);    border:1px solid var(--red);}
+    #sens-desc { font-size:.7rem; color:var(--muted); line-height:1.5; }
+
+    .ruler { display:grid; grid-template-columns:repeat(5,1fr); gap:4px; }
+    .ri    { text-align:center; font-size:.56rem; line-height:1.4; }
+
+    #ev-row { display:flex; align-items:center; gap:8px; }
+    #ev-lbl { font-size:.68rem; color:var(--muted); white-space:nowrap; }
+    #ev-wrap{ flex:1; height:6px; background:#1a1a33; border-radius:3px; overflow:hidden; }
+    #ev-bar { height:100%; width:0%; border-radius:3px;
+              background:linear-gradient(to right,var(--green),var(--face)); transition:width .3s; }
+    #ev-cnt { font-size:.75rem; font-family:monospace; color:#55aaff; min-width:40px; text-align:right; }
+
+    /* Forma de onda */
+    .wave-btns { display:flex; gap:6px; flex-wrap:wrap; }
+    .wave-btn {
+      padding:6px 14px; border-radius:7px; border:1px solid var(--border);
+      background:var(--panel2); color:var(--muted); cursor:pointer;
+      font-size:.9rem; font-family:monospace; transition:all .2s;
+    }
+    .wave-btn:hover    { border-color:var(--face); color:var(--text); }
+    .wave-btn.selected { background:var(--face); color:#fff; border-color:var(--face); }
+    #wave-canvas {
+      width:100%; height:52px; border-radius:6px;
+      background:#080810; border:1px solid var(--border); display:block;
+    }
+
+    #freq-range {
+      display:flex; justify-content:space-between;
+      font-size:.67rem; font-family:monospace; color:var(--muted); padding:0 2px;
+    }
+
+    /* Botões */
+    #controls { display:flex; gap:10px; }
+    button.action {
+      flex:1; padding:13px; border:none; border-radius:var(--r);
+      font-size:.95rem; font-weight:700; cursor:pointer;
+      transition:opacity .2s, transform .1s;
+    }
+    button.action:active   { transform:scale(.97); }
+    #btn-start { background:linear-gradient(135deg,#6600cc,#3300aa); color:#fff; }
+    #btn-stop  { background:linear-gradient(135deg,#440022,#220011); color:#ffaacc; }
+    button.action:disabled { opacity:.35; cursor:not-allowed; }
+
+    /* Instruções */
+    #instructions {
+      background:var(--panel); border-radius:var(--r);
+      border:1px solid var(--border); padding:12px 16px;
+      font-size:.7rem; color:var(--muted); line-height:1.7; margin-bottom:10px;
+    }
+    #instructions strong { color:var(--text); }
+    #instructions ul { padding-left:16px; margin-top:4px; }
+    .tf{color:#aa55ff;font-weight:600;}
+    .tx{color:#dd88ff;font-weight:600;}
+    .tl{color:#55ffaa;font-weight:600;}
+    .tr{color:#ff8844;font-weight:600;}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎵 FaceMesh + Hands Sonoro — v5</h1>
+  <p>96 pontos · visualização neon · câmera escurecível · controles em tempo real</p>
+</header>
+
+<div id="status-bar">
+  <div id="sdot"></div>
+  <span id="stxt">Aguardando início...</span>
+</div>
+
+<div class="wrap">
+
+  <!-- CÂMERA -->
+  <div id="cam-wrap">
+    <video id="video" autoplay playsinline muted></video>
+    <div id="dim-overlay"></div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- ═══ PAINEL VISUAL — ESCURECIMENTO + NEON ═══ -->
+  <div class="ctrl-panel">
+    <span class="panel-title">🎨 Controles Visuais</span>
+
+    <!-- Escurecimento da câmera -->
+    <div class="ctrl-row">
+      <span class="ctrl-lbl">☀️ Câmera</span>
+      <input type="range" id="dim-slider" min="0" max="100" step="1" value="0"/>
+      <span style="font-size:.66rem;color:#111122;background:#ccc;padding:1px 5px;border-radius:4px;white-space:nowrap">🌑 Escuro</span>
+      <div class="val-box" id="dim-val">0% — Visível</div>
+    </div>
+
+    <!-- Neon / Saturação dos círculos -->
+    <div class="ctrl-row">
+      <span class="ctrl-lbl">💡 Neon</span>
+      <input type="range" id="neon-slider" min="0" max="100" step="1" value="0"/>
+      <span style="font-size:.66rem;color:#ff00ff;white-space:nowrap">✨ Máx</span>
+      <div class="val-box" id="neon-val">0% — Natural</div>
+    </div>
+  </div>
+
+  <!-- PAINEL 1: THRESHOLD -->
+  <div class="ctrl-panel">
+    <span class="panel-title">🎚️ Sensibilidade — Limiar de Movimento</span>
+    <div class="ctrl-row">
+      <span style="font-size:.66rem;color:var(--green);white-space:nowrap">+ Sensível</span>
+      <input type="range" id="thresh-slider" min="1" max="300" step="1" value="40"/>
+      <span style="font-size:.66rem;color:var(--red);white-space:nowrap">− Sensível</span>
+      <div class="val-box" id="thresh-val">0.0040</div>
+    </div>
+    <div id="sens-badge" class="sh-mid">⚖️ Sensibilidade Equilibrada</div>
+    <div id="sens-desc">Expressões e movimentos moderados ativam os sons.</div>
+    <div class="ruler">
+      <div class="ri" style="color:var(--green)">0.001<br><span style="opacity:.6">Micro-<br>tremores</span></div>
+      <div class="ri" style="color:#aaff55">0.003<br><span style="opacity:.6">Sutis</span></div>
+      <div class="ri" style="color:var(--yellow)">0.006<br><span style="opacity:.6">Normal</span></div>
+      <div class="ri" style="color:#ffaa44">0.012<br><span style="opacity:.6">Amplos</span></div>
+      <div class="ri" style="color:var(--red)">0.020+<br><span style="opacity:.6">Grandes</span></div>
+    </div>
+    <div id="ev-row">
+      <span id="ev-lbl">Eventos/s:</span>
+      <div id="ev-wrap"><div id="ev-bar"></div></div>
+      <span id="ev-cnt">0/s</span>
+    </div>
+  </div>
+
+  <!-- PAINEL 2: TAMANHO -->
+  <div class="ctrl-panel">
+    <span class="panel-title">⚪ Tamanho dos Círculos — Escala Proporcional</span>
+    <div class="ctrl-row">
+      <span class="ctrl-lbl">Uniforme ↔ Prop.</span>
+      <input type="range" id="size-slider" min="100" max="200" step="1" value="100"/>
+      <div class="val-box" id="size-val">1.00 — Uniforme</div>
+    </div>
+    <div style="font-size:.68rem;color:var(--muted);line-height:1.5">
+      <strong style="color:var(--text)">1.0</strong> = raio uniforme ·
+      <strong style="color:var(--text)">2.0</strong> = proporcional ao índice (3px → 20px)
+    </div>
+  </div>
+
+  <!-- PAINEL 3: REVERB + FORMA DE ONDA -->
+  <div class="ctrl-panel">
+    <span class="panel-title">🔊 Reverberação e Forma de Onda</span>
+    <div class="ctrl-row">
+      <span class="ctrl-lbl">Reverb (decay)</span>
+      <input type="range" id="reverb-slider" min="0" max="2000" step="10" value="50"/>
+      <div class="val-box" id="reverb-val">50 ms</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      <span style="font-size:.68rem;color:var(--muted)">Forma de onda:</span>
+      <div class="wave-btns">
+        <button class="wave-btn selected" data-wave="sine">∿ Senoidal</button>
+        <button class="wave-btn" data-wave="triangle">△ Triangular</button>
+        <button class="wave-btn" data-wave="sawtooth">⊿ Dente de Serra</button>
+        <button class="wave-btn" data-wave="square">⊓ Quadrada</button>
+      </div>
+      <canvas id="wave-canvas" width="400" height="52"></canvas>
+    </div>
+  </div>
+
+  <!-- PAINEL 4: SPREAD -->
+  <div class="ctrl-panel">
+    <span class="panel-title">📐 Espalhamento de Frequência</span>
+    <div class="ctrl-row">
+      <span class="ctrl-lbl">Uníssono ↔ Pleno</span>
+      <input type="range" id="spread-slider" min="0" max="100" step="1" value="100"/>
+      <div class="val-box" id="spread-val">1.00</div>
+    </div>
+    <div id="freq-range">
+      <span id="freq-min">Min: 110.0 Hz</span>
+      <span id="freq-mid">Meio: —</span>
+      <span id="freq-max">Máx: — Hz</span>
+    </div>
+    <div style="font-size:.68rem;color:var(--muted);line-height:1.5">
+      <strong style="color:var(--text)">1.0</strong> = 110 Hz → ~13.289 Hz ·
+      <strong style="color:var(--text)">0.5</strong> = comprimido ·
+      <strong style="color:var(--text)">0.0</strong> = uníssono
+    </div>
+  </div>
+
+  <!-- BOTÕES -->
+  <div id="controls">
+    <button class="action" id="btn-start">▶ Iniciar</button>
+    <button class="action" id="btn-stop" disabled>⏹ Parar</button>
+  </div>
+
+  <!-- INSTRUÇÕES -->
+  <div id="instructions">
+    <strong>Como usar:</strong>
+    <ul>
+      <li>Clique <strong>▶ Iniciar</strong> — modelo Holistic carrega em ~5–10s.</li>
+      <li><strong>☀️ Câmera:</strong> deslize para a direita para escurecer o fundo gradualmente até sumir completamente, deixando apenas os círculos flutuando no escuro.</li>
+      <li><strong>💡 Neon:</strong> deslize para aumentar saturação, brilho e glow dos círculos — efeito neon total ao máximo.</li>
+      <li><span class="tf">Roxo/lilás</span> = rosto (54 pts) · <span class="tl">Verde</span> = mão esq. · <span class="tr">Laranja</span> = mão dir.</li>
+      <li>Mova rosto ou mãos para gerar notas musicais.</li>
+      <li><strong>Celular:</strong> acesse via HTTPS (GitHub Pages, Netlify, Vercel…).</li>
+    </ul>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// 1. TABELA DE 96 PONTOS
+// ═══════════════════════════════════════════════════════
+const BASE_FREQ  = 110;
+const NOTE_NAMES = ['A','A#','B','C','C#','D','D#','E','F','F#','G','G#'];
+const NOTE_DUR   = 0.10;
+const COOLDOWN   = 115;
+const N_TOTAL    = 96;
+const R_BASE     = 4;
+const R_MAX      = 20;
+
+const FACE_BASE_IDX = [1, 61, 291, 199, 168, 10];
+const FACE_EXT_IDX  = [
+  78,95,88,178,87,14,317,402,318,324,
+  308,415,310,311,312,13,82,81,80,191,
+  159,145,386,374,161,160,158,157,173,
+  384,385,387,388,466,
+  46,53,52,65,55,283,282,295,285,276,
+  5,6,122,351
+];
+const HAND_IDX = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];
+
+function buildPoints() {
+  const pts = [];
+  const push = (source, lmIdx, semitone) => pts.push({
+    source, lmIdx, semitone,
+    noteName: NOTE_NAMES[semitone % 12],
+    octave: 2 + Math.floor(semitone / 12)
+  });
+  FACE_BASE_IDX.forEach((lm, i) => push('face',  lm, i));
+  FACE_EXT_IDX .forEach((lm, i) => push('faceX', lm, 6 + i));
+  HAND_IDX     .forEach((lm, i) => push('left',  lm, 54 + i));
+  HAND_IDX     .forEach((lm, i) => push('right', lm, 75 + i));
+  return pts;
+}
+const POINTS = buildPoints();
+
+// ═══════════════════════════════════════════════════════
+// 2. PARÂMETROS GLOBAIS
+// ═══════════════════════════════════════════════════════
+let THRESHOLD   = 0.004;
+let SIZE_SCALE  = 1.0;
+let REVERB_TIME = 0.05;
+let WAVE_TYPE   = 'sine';
+let FREQ_SPREAD = 1.0;
+let DIM_LEVEL   = 0;      // 0 = câmera visível, 1 = câmera totalmente escura
+let NEON_LEVEL  = 0;      // 0 = natural, 1 = neon máximo
+
+function getFreq(s) {
+  return BASE_FREQ * Math.pow(2, (s * FREQ_SPREAD) / 12);
+}
+function getRadius(idx) {
+  if (SIZE_SCALE <= 1.0) return R_BASE;
+  return Math.min(R_BASE + (SIZE_SCALE - 1.0) * R_BASE * (idx / (N_TOTAL / 8)), R_MAX);
+}
+
+// ═══════════════════════════════════════════════════════
+// 3. ESTADO DE RASTREAMENTO
+// ═══════════════════════════════════════════════════════
+let prevPos   = new Array(N_TOTAL).fill(null);
+let lastSound = new Array(N_TOTAL).fill(0);
+let evtCnt = 0, evtSec = 0;
+setInterval(() => { evtSec = evtCnt; evtCnt = 0; updateEvBar(); }, 1000);
+
+// ═══════════════════════════════════════════════════════
+// 4. WEB AUDIO
+// ═══════════════════════════════════════════════════════
+let audioCtx = null;
+function getACtx() {
+  if (!audioCtx || audioCtx.state === 'closed')
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playNote(semitone) {
+  const ctx  = getACtx();
+  const freq = getFreq(semitone);
+  const t    = ctx.currentTime;
+
+  const osc = ctx.createOscillator();
+  osc.type = WAVE_TYPE;
+  osc.frequency.setValueAtTime(freq, t);
+
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(freq * 2, t);
+
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.50, t + 0.010);
+  g.gain.linearRampToValueAtTime(0.32, t + 0.040);
+  g.gain.setValueAtTime(0.32, t + NOTE_DUR - 0.015);
+  g.gain.linearRampToValueAtTime(0, t + NOTE_DUR);
+
+  const g2 = ctx.createGain();
+  g2.gain.setValueAtTime(0.10, t);
+  g2.gain.linearRampToValueAtTime(0, t + NOTE_DUR);
+
+  if (WAVE_TYPE === 'sawtooth' || WAVE_TYPE === 'square') {
+    const flt = ctx.createBiquadFilter();
+    flt.type = 'lowpass';
+    flt.frequency.value = Math.min(freq * 4, 8000);
+    osc.connect(flt); flt.connect(g);
+  } else {
+    osc.connect(g);
+  }
+  osc2.connect(g2);
+
+  const revDelay = ctx.createDelay(2.1);
+  revDelay.delayTime.value = Math.min(REVERB_TIME, 2.0);
+  const revFB = ctx.createGain();
+  revFB.gain.value = REVERB_TIME < 0.001 ? 0
+    : Math.min(Math.pow(10, -3 / (REVERB_TIME * 12 + 0.01)), 0.92);
+  const revWet = ctx.createGain();
+  revWet.gain.value = Math.min(REVERB_TIME * 0.3, 0.35);
+
+  g.connect(ctx.destination);
+  g2.connect(ctx.destination);
+  g.connect(revDelay);
+  revDelay.connect(revFB);
+  revFB.connect(revDelay);
+  revDelay.connect(revWet);
+  revWet.connect(ctx.destination);
+
+  const stop = t + Math.max(NOTE_DUR, REVERB_TIME) + 0.15;
+  osc.start(t);  osc.stop(stop);
+  osc2.start(t); osc2.stop(t + NOTE_DUR + 0.08);
+}
+
+// ═══════════════════════════════════════════════════════
+// 5. DETECÇÃO DE MOVIMENTO
+// ═══════════════════════════════════════════════════════
+function checkPoint(pt, idx, lm) {
+  if (!lm) return;
+  const now = Date.now();
+  const cur = { x: lm.x, y: lm.y, z: lm.z || 0 };
+  const prv = prevPos[idx];
+  if (prv) {
+    const dx = cur.x - prv.x, dy = cur.y - prv.y;
+    const dz = (cur.z - prv.z) * 0.5;
+    if (Math.sqrt(dx*dx + dy*dy + dz*dz) > THRESHOLD && (now - lastSound[idx]) > COOLDOWN) {
+      playNote(pt.semitone);
+      lastSound[idx] = now;
+      evtCnt++;
+    }
+  }
+  prevPos[idx] = cur;
+}
+
+function processResults(res) {
+  const FL = res.faceLandmarks      || null;
+  const LL = res.leftHandLandmarks  || null;
+  const RL = res.rightHandLandmarks || null;
+  POINTS.forEach((pt, i) => {
+    let lm = null;
+    if ((pt.source==='face'||pt.source==='faceX') && FL) lm = FL[pt.lmIdx];
+    if (pt.source==='left'  && LL) lm = LL[pt.lmIdx];
+    if (pt.source==='right' && RL) lm = RL[pt.lmIdx];
+    checkPoint(pt, i, lm);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// 6. CANVAS — CÍRCULOS COM EFEITO NEON DINÂMICO
+// ═══════════════════════════════════════════════════════
+const video      = document.getElementById('video');
+const canvas     = document.getElementById('canvas');
+const dimOverlay = document.getElementById('dim-overlay');
+const c2d        = canvas.getContext('2d');
+
+// Hue único por semitom — arco-íris de 0° a 300°
+function ptHue(s) { return (s / 95) * 300; }
+
+// Parâmetros visuais calculados a partir de NEON_LEVEL (0→1)
+function getNeonParams(hue, active) {
+  const n = NEON_LEVEL;
+
+  // Saturação: 70% (natural) → 100% (neon)
+  const sat = 70 + n * 30;
+
+  // Brilho do centro: 55% → 95% (quase branco neon)
+  const lightnessCenter = active ? 72 + n * 23 : 55 + n * 35;
+
+  // Brilho da borda do círculo
+  const lightnessEdge = active ? 55 + n * 20 : 40 + n * 25;
+
+  // Número de camadas de glow: 0 → 4
+  const glowLayers = Math.round(n * 4);
+
+  // Raio extra do glow (px além do círculo)
+  const glowSpread = n * 28;
+
+  // Opacidade do glow
+  const glowAlpha  = n * 0.75;
+
+  // Espessura da borda
+  const strokeW = active ? 1.8 + n * 2.5 : 0.8 + n * 1.5;
+
+  // Cor da borda (brilhante no neon)
+  const borderL = active ? 88 + n * 7 : 65 + n * 25;
+  const borderA = active ? 0.9 : 0.35 + n * 0.55;
+
+  // Fundo do canvas quando DIM_LEVEL > 0: cor quase preta com leve tint de hue
+  // (tratado separadamente)
+
+  return { sat, lightnessCenter, lightnessEdge, glowLayers, glowSpread, glowAlpha, strokeW, borderL, borderA };
+}
+
+const HAND_CONN = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17]
+];
+
+// Desenha um círculo com efeito neon completo
+function drawNeonCircle(cx, cy, r, hue, active) {
+  const p = getNeonParams(hue, active);
+  const n = NEON_LEVEL;
+
+  // ── Camadas de glow (apenas quando neon > 0)
+  if (n > 0 && p.glowLayers > 0) {
+    for (let layer = p.glowLayers; layer >= 1; layer--) {
+      const spread = (p.glowSpread / p.glowLayers) * layer;
+      const alpha  = (p.glowAlpha / p.glowLayers) * (p.glowLayers - layer + 1);
+
+      // Glow extra intenso quando ativo
+      const activeBoost = active ? 1.6 : 1.0;
+
+      const glow = c2d.createRadialGradient(cx, cy, r * 0.3, cx, cy, r + spread * activeBoost);
+      glow.addColorStop(0, `hsla(${hue},${p.sat}%,${p.lightnessEdge}%,${alpha * activeBoost})`);
+      glow.addColorStop(1, `hsla(${hue},${p.sat}%,${p.lightnessEdge}%,0)`);
+      c2d.beginPath();
+      c2d.arc(cx, cy, r + spread * activeBoost, 0, Math.PI * 2);
+      c2d.fillStyle = glow;
+      c2d.fill();
+    }
+  }
+
+  // ── Halo de pulso ao ativar (sempre presente)
+  if (active) {
+    const age   = Date.now() - lastSound[POINTS.findIndex(p_ =>
+      Math.round(ptHue(p_.semitone)) === Math.round(hue))] || 0;
+    const pulse = 1 + (age / 250) * (1.5 + n * 1.5);
+    const grad  = c2d.createRadialGradient(cx, cy, r, cx, cy, r * pulse * (2 + n));
+    grad.addColorStop(0, `hsla(${hue},${p.sat}%,${p.lightnessEdge}%,${0.5 + n * 0.35})`);
+    grad.addColorStop(1, `hsla(${hue},${p.sat}%,${p.lightnessEdge}%,0)`);
+    c2d.beginPath();
+    c2d.arc(cx, cy, r * pulse * (2 + n), 0, Math.PI * 2);
+    c2d.fillStyle = grad;
+    c2d.fill();
+  }
+
+  // ── Corpo principal do círculo — gradiente radial
+  const bodyR = active ? r * (1.3 + n * 0.2) : r;
+  const grd   = c2d.createRadialGradient(cx - r * .3, cy - r * .3, r * .05, cx, cy, bodyR);
+  grd.addColorStop(0, `hsl(${hue},${Math.min(p.sat + 10, 100)}%,${Math.min(p.lightnessCenter, 98)}%)`);
+  grd.addColorStop(0.55, `hsl(${hue},${p.sat}%,${p.lightnessEdge + 8}%)`);
+  grd.addColorStop(1,    `hsl(${hue},${p.sat}%,${p.lightnessEdge - (active ? 0 : 10)}%)`);
+  c2d.beginPath();
+  c2d.arc(cx, cy, bodyR, 0, Math.PI * 2);
+  c2d.fillStyle = grd;
+  c2d.fill();
+
+  // ── Borda luminosa
+  c2d.beginPath();
+  c2d.arc(cx, cy, bodyR, 0, Math.PI * 2);
+  c2d.strokeStyle = `hsla(${hue},100%,${p.borderL}%,${p.borderA})`;
+  c2d.lineWidth   = p.strokeW;
+  c2d.stroke();
+
+  // ── Reflexo interno (brilho superior esquerdo)
+  if (n > 0.15) {
+    const refR  = bodyR * 0.38;
+    const refGr = c2d.createRadialGradient(
+      cx - bodyR * .3, cy - bodyR * .3, 0,
+      cx - bodyR * .3, cy - bodyR * .3, refR
+    );
+    refGr.addColorStop(0, `hsla(0,0%,100%,${n * 0.55})`);
+    refGr.addColorStop(1, `hsla(0,0%,100%,0)`);
+    c2d.beginPath();
+    c2d.arc(cx - bodyR * .3, cy - bodyR * .3, refR, 0, Math.PI * 2);
+    c2d.fillStyle = refGr;
+    c2d.fill();
+  }
+}
+
+function drawAll(res) {
+  canvas.width  = video.videoWidth  || canvas.offsetWidth;
+  canvas.height = video.videoHeight || canvas.offsetHeight;
+  const W = canvas.width, H = canvas.height;
+  c2d.clearRect(0, 0, W, H);
+  const now = Date.now();
+
+  // Fundo extra escuro no canvas quando DIM > 50%
+  // (o overlay HTML cobre o vídeo; o canvas fica sobre ele)
+  // Quando DIM alto + NEON alto, o fundo do canvas recebe leve tint colorido
+  if (DIM_LEVEL > 0.5) {
+    const bgAlpha = (DIM_LEVEL - 0.5) * 0.18 * NEON_LEVEL;
+    c2d.fillStyle = `rgba(10,0,30,${bgAlpha})`;
+    c2d.fillRect(0, 0, W, H);
+  }
+
+  // ── Malha de fundo do rosto (pontos suaves)
+  if (res.faceLandmarks) {
+    const meshAlpha = 0.18 * (1 - DIM_LEVEL * 0.6); // desvanece com escurecimento
+    c2d.save();
+    res.faceLandmarks.forEach(lm => {
+      c2d.beginPath();
+      c2d.arc(lm.x * W, lm.y * H, 1, 0, Math.PI * 2);
+      c2d.fillStyle = `rgba(130,80,210,${meshAlpha})`;
+      c2d.fill();
+    });
+    c2d.restore();
+
+    // 54 pontos monitorados do rosto
+    POINTS.forEach((pt, idx) => {
+      if (pt.source !== 'face' && pt.source !== 'faceX') return;
+      const lm = res.faceLandmarks[pt.lmIdx];
+      if (!lm) return;
+      const x   = lm.x * W, y = lm.y * H;
+      const r   = getRadius(idx);
+      const hue = ptHue(pt.semitone);
+      const active = (now - lastSound[idx]) < 250;
+      drawNeonCircle(x, y, r, hue, active);
+    });
+  }
+
+  // ── Mãos
+  ['left', 'right'].forEach(side => {
+    const lms = side === 'left' ? res.leftHandLandmarks : res.rightHandLandmarks;
+    if (!lms) return;
+
+    // Linhas do esqueleto com gradiente — opacidade reduz quando escuro + sem neon
+    const skelAlpha = 0.28 * (1 - DIM_LEVEL * 0.5) + NEON_LEVEL * 0.18;
+    c2d.save();
+    c2d.globalAlpha = skelAlpha;
+    HAND_CONN.forEach(([a, b]) => {
+      const hA = ptHue(POINTS.find(p => p.source===side && p.lmIdx===a)?.semitone ?? 60);
+      const hB = ptHue(POINTS.find(p => p.source===side && p.lmIdx===b)?.semitone ?? 60);
+      const grd = c2d.createLinearGradient(
+        lms[a].x*W, lms[a].y*H, lms[b].x*W, lms[b].y*H
+      );
+      const sat = 70 + NEON_LEVEL * 30;
+      grd.addColorStop(0, `hsl(${hA},${sat}%,55%)`);
+      grd.addColorStop(1, `hsl(${hB},${sat}%,55%)`);
+      c2d.beginPath();
+      c2d.moveTo(lms[a].x*W, lms[a].y*H);
+      c2d.lineTo(lms[b].x*W, lms[b].y*H);
+      c2d.strokeStyle = grd;
+      c2d.lineWidth   = 1.5 + NEON_LEVEL * 1.5;
+      c2d.stroke();
+    });
+    c2d.restore();
+
+    // Círculos dos 21 pontos
+    POINTS.forEach((pt, idx) => {
+      if (pt.source !== side) return;
+      const lm = lms[pt.lmIdx];
+      if (!lm) return;
+      const x   = lm.x * W, y = lm.y * H;
+      const r   = getRadius(idx);
+      const hue = ptHue(pt.semitone);
+      const active = (now - lastSound[idx]) < 250;
+      drawNeonCircle(x, y, r, hue, active);
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// 7. CONTROLES — THRESHOLD
+// ═══════════════════════════════════════════════════════
+const SENS_LEVELS = [
+  { max:.002, cls:'sh-vhigh', icon:'🔴', label:'Sensibilidade Máxima',
+    desc:'Microtremores e jitter ativam sons continuamente.' },
+  { max:.005, cls:'sh-high',  icon:'🟠', label:'Alta Sensibilidade',
+    desc:'Pequenas expressões e movimentos sutis ativam sons.' },
+  { max:.010, cls:'sh-mid',   icon:'⚖️', label:'Sensibilidade Equilibrada',
+    desc:'Expressões normais ativam sons. Equilíbrio ideal.' },
+  { max:.018, cls:'sh-low',   icon:'🔵', label:'Baixa Sensibilidade',
+    desc:'Apenas movimentos amplos e deliberados ativam sons.' },
+  { max:Infinity, cls:'sh-vlow', icon:'⚫', label:'Sensibilidade Mínima',
+    desc:'Somente grandes movimentos ativam sons.' }
+];
+
+const thSlider = document.getElementById('thresh-slider');
+const thVal    = document.getElementById('thresh-val');
+const sBadge   = document.getElementById('sens-badge');
+const sDesc    = document.getElementById('sens-desc');
+function updateThresh(v) {
+  THRESHOLD = parseFloat(((v / 300) * 0.029 + 0.001).toFixed(4));
+  thVal.textContent = THRESHOLD.toFixed(4);
+  const lv = SENS_LEVELS.find(l => THRESHOLD <= l.max);
+  sBadge.className  = `sens-badge ${lv.cls}`;
+  sBadge.textContent = `${lv.icon} ${lv.label}`;
+  sDesc.textContent  = lv.desc;
+  const pct = (v-1)/299, hue = Math.round(120 - pct*120);
+  thVal.style.color  = `hsl(${hue},90%,65%)`;
+  thVal.style.border = `1px solid hsl(${hue},60%,35%)`;
+}
+thSlider.addEventListener('input', () => updateThresh(+thSlider.value));
+updateThresh(+thSlider.value);
+
+const evBar   = document.getElementById('ev-bar');
+const evCntEl = document.getElementById('ev-cnt');
+function updateEvBar() {
+  evBar.style.width   = Math.min((evtSec/50)*100, 100) + '%';
+  evCntEl.textContent = evtSec + '/s';
+}
+
+// ═══════════════════════════════════════════════════════
+// 8. ESCURECIMENTO DA CÂMERA
+// ═══════════════════════════════════════════════════════
+const dimSlider = document.getElementById('dim-slider');
+const dimValEl  = document.getElementById('dim-val');
+
+function updateDim(v) {
+  DIM_LEVEL = v / 100;
+  dimOverlay.style.opacity = DIM_LEVEL;
+
+  let label;
+  if      (DIM_LEVEL <= 0.01) label = '— Visível';
+  else if (DIM_LEVEL <= 0.30) label = '— Levemente escuro';
+  else if (DIM_LEVEL <= 0.60) label = '— Meio escuro';
+  else if (DIM_LEVEL <= 0.90) label = '— Quase escuro';
+  else                         label = '— Câmera oculta';
+
+  dimValEl.textContent = `${v}% ${label}`;
+  dimValEl.style.color = DIM_LEVEL > 0.5
+    ? `hsl(240,60%,${80 - DIM_LEVEL*50}%)`
+    : `hsl(40,80%,${60 + DIM_LEVEL*20}%)`;
+}
+dimSlider.addEventListener('input', () => updateDim(+dimSlider.value));
+updateDim(0);
+
+// ═══════════════════════════════════════════════════════
+// 9. NEON — SATURAÇÃO E GLOW DOS CÍRCULOS
+// ═══════════════════════════════════════════════════════
+const neonSlider = document.getElementById('neon-slider');
+const neonValEl  = document.getElementById('neon-val');
+
+function updateNeon(v) {
+  NEON_LEVEL = v / 100;
+
+  let label;
+  if      (NEON_LEVEL <= 0.01) label = '— Natural';
+  else if (NEON_LEVEL <= 0.30) label = '— Leve brilho';
+  else if (NEON_LEVEL <= 0.60) label = '— Semi-neon';
+  else if (NEON_LEVEL <= 0.85) label = '— Neon intenso';
+  else                          label = '— Neon máximo ✨';
+
+  neonValEl.textContent = `${v}% ${label}`;
+
+  // Cor do val-box varia de cinza para magenta vibrante
+  const hue = 290 + NEON_LEVEL * 10;
+  const lit  = 45 + NEON_LEVEL * 40;
+  neonValEl.style.color  = `hsl(${hue},${Math.round(NEON_LEVEL*100)}%,${lit}%)`;
+  neonValEl.style.border = `1px solid hsl(${hue},${Math.round(NEON_LEVEL*80)}%,${lit-10}%)`;
+
+  // Quando neon alto, o fundo da página fica levemente mais escuro para contraste
+  const bgLight = Math.max(6 - NEON_LEVEL * 4, 2);
+  document.documentElement.style.setProperty('--bg', `hsl(240,20%,${bgLight}%)`);
+  document.body.style.background = `hsl(240,20%,${bgLight}%)`;
+}
+neonSlider.addEventListener('input', () => updateNeon(+neonSlider.value));
+updateNeon(0);
+
+// ═══════════════════════════════════════════════════════
+// 10. TAMANHO DOS PONTOS
+// ═══════════════════════════════════════════════════════
+const szSlider = document.getElementById('size-slider');
+const szVal    = document.getElementById('size-val');
+szSlider.addEventListener('input', () => {
+  SIZE_SCALE = +szSlider.value / 100;
+  szVal.textContent = SIZE_SCALE.toFixed(2)
+    + (SIZE_SCALE<=1.01 ? ' — Uniforme' : SIZE_SCALE>=1.99 ? ' — Prop. Máximo' : ' — Proporcional');
+});
+
+// ═══════════════════════════════════════════════════════
+// 11. REVERB
+// ═══════════════════════════════════════════════════════
+const rvSlider = document.getElementById('reverb-slider');
+const rvVal    = document.getElementById('reverb-val');
+rvSlider.addEventListener('input', () => {
+  REVERB_TIME = +rvSlider.value / 1000;
+  rvVal.textContent = `${rvSlider.value} ms`;
+});
+
+// ═══════════════════════════════════════════════════════
+// 12. FORMA DE ONDA
+// ═══════════════════════════════════════════════════════
+const waveCanvas = document.getElementById('wave-canvas');
+const wCtx = waveCanvas.getContext('2d');
+
+function drawWavePreview(type) {
+  const W = waveCanvas.offsetWidth || 400, H = 52;
+  waveCanvas.width = W; waveCanvas.height = H;
+  wCtx.clearRect(0, 0, W, H);
+  wCtx.strokeStyle = '#1e1e3a'; wCtx.lineWidth = 1;
+  wCtx.beginPath(); wCtx.moveTo(0, H/2); wCtx.lineTo(W, H/2); wCtx.stroke();
+  const grd = wCtx.createLinearGradient(0, 0, W, 0);
+  grd.addColorStop(0, '#4400aa'); grd.addColorStop(.5, '#aa55ff'); grd.addColorStop(1, '#ff88dd');
+  wCtx.strokeStyle = grd; wCtx.lineWidth = 2.5;
+  wCtx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const t = (x / W) * 3 * Math.PI * 2;
+    let y;
+    if      (type==='sine')     y = Math.sin(t);
+    else if (type==='triangle') y = (2/Math.PI) * Math.asin(Math.sin(t));
+    else if (type==='sawtooth') y = 1 - (t % (2*Math.PI)) / Math.PI;
+    else                        y = Math.sign(Math.sin(t));
+    const py = (H/2) - y * (H/2 - 5);
+    x === 0 ? wCtx.moveTo(x, py) : wCtx.lineTo(x, py);
+  }
+  wCtx.stroke();
+}
+document.querySelectorAll('.wave-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.wave-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    WAVE_TYPE = btn.dataset.wave;
+    drawWavePreview(WAVE_TYPE);
+  });
+});
+setTimeout(() => drawWavePreview(WAVE_TYPE), 100);
+window.addEventListener('resize', () => drawWavePreview(WAVE_TYPE));
+
+// ═══════════════════════════════════════════════════════
+// 13. ESPALHAMENTO DE FREQUÊNCIA
+// ═══════════════════════════════════════════════════════
+const spSlider  = document.getElementById('spread-slider');
+const spVal     = document.getElementById('spread-val');
+const freqMinEl = document.getElementById('freq-min');
+const freqMidEl = document.getElementById('freq-mid');
+const freqMaxEl = document.getElementById('freq-max');
+function updateSpread(v) {
+  FREQ_SPREAD = v / 100;
+  spVal.textContent = FREQ_SPREAD.toFixed(2)
+    + (FREQ_SPREAD>=.99 ? ' — Escala Completa' : FREQ_SPREAD<=.01 ? ' — Uníssono' : ' — Comprimido');
+  freqMinEl.textContent = `Min: ${getFreq(0).toFixed(1)} Hz`;
+  freqMidEl.textContent = `Meio(s47): ${getFreq(47).toFixed(1)} Hz`;
+  freqMaxEl.textContent = `Máx: ${getFreq(95).toFixed(1)} Hz`;
+}
+spSlider.addEventListener('input', () => updateSpread(+spSlider.value));
+updateSpread(+spSlider.value);
+
+// ═══════════════════════════════════════════════════════
+// 14. HOLISTIC
+// ═══════════════════════════════════════════════════════
+let holistic = null, running = false;
+
+function setStatus(txt, state='idle') {
+  document.getElementById('stxt').textContent = txt;
+  const d = document.getElementById('sdot');
+  d.className = state==='active' ? 'active' : state==='loading' ? 'loading' : '';
+}
+
+function onResults(res) {
+  const hF = !!(res.faceLandmarks?.length);
+  const hL = !!(res.leftHandLandmarks?.length);
+  const hR = !!(res.rightHandLandmarks?.length);
+  drawAll(res);
+  processResults(res);
+  const parts = [];
+  if (hF) parts.push('🎭 Rosto');
+  if (hL) parts.push('🤚 Esq.');
+  if (hR) parts.push('✋ Dir.');
+  setStatus(
+    parts.length ? `Detectando: ${parts.join(' · ')} — mova para criar música!`
+                 : '⚠️ Centralize rosto e mãos na câmera',
+    parts.length ? 'active' : 'loading'
+  );
+}
+
+async function startDetection() {
+  getACtx();
+  setStatus('Carregando MediaPipe Holistic...', 'loading');
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-stop').disabled  = false;
+  prevPos   = new Array(N_TOTAL).fill(null);
+  lastSound = new Array(N_TOTAL).fill(0);
+
+  holistic = new Holistic({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${f}`
+  });
+  holistic.setOptions({
+    modelComplexity:        1,
+    smoothLandmarks:        true,
+    enableSegmentation:     false,
+    smoothSegmentation:     false,
+    refineFaceLandmarks:    true,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence:  0.5
+  });
+  holistic.onResults(onResults);
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:'user', width:{ideal:640}, height:{ideal:480} },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+  } catch(err) {
+    setStatus('❌ Erro na câmera: ' + err.message);
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled  = true;
+    return;
+  }
+
+  setStatus('Inicializando modelo (~5–10s)...', 'loading');
+  running = true;
+
+  async function loop() {
+    if (!running) return;
+    if (video.readyState >= 2) { try { await holistic.send({ image: video }); } catch(_){} }
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function stopDetection() {
+  running = false;
+  if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+  if (holistic) { holistic.close(); holistic = null; }
+  c2d.clearRect(0, 0, canvas.width, canvas.height);
+  setStatus('Parado.');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled  = true;
+}
+
+document.getElementById('btn-start').addEventListener('click', startDetection);
+document.getElementById('btn-stop').addEventListener('click',  stopDetection);
+
+new ResizeObserver(() => {
+  canvas.style.width  = video.offsetWidth  + 'px';
+  canvas.style.height = video.offsetHeight + 'px';
+  drawWavePreview(WAVE_TYPE);
+}).observe(video);
+</script>
+</body>
+</html>
