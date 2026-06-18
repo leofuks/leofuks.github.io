@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enquete sobre Hermeto Pascoal</title>
+<style>
+  :root {
+    --bg: #0f1220; --card: #1a1f35; --accent: #6c8cff; --accent2: #ff6c8c;
+    --text: #eef1ff; --muted: #9aa3c7; --ok: #3ecf8e; --border: #2a3152;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: linear-gradient(160deg, #0f1220, #161b30); color: var(--text); line-height: 1.55; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 18px 80px; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; }
+  h2 { font-size: 1.15rem; color: var(--accent); margin: 22px 0 10px; }
+  p { color: var(--text); }
+  .muted { color: var(--muted); font-size: .92rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 22px; margin-bottom: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .step { display: none; }
+  .step.active { display: block; animation: fade .35s ease; }
+  @keyframes fade { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+  label { display: block; margin: 12px 0 6px; font-weight: 600; }
+  input[type=text], select { width: 100%; padding: 11px 13px; border-radius: 10px;
+    border: 1px solid var(--border); background: #11152a; color: var(--text); font-size: 1rem; }
+  .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .opt { display: flex; align-items: center; gap: 10px; background: #11152a;
+    border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: .15s; }
+  .opt:hover { border-color: var(--accent); }
+  .opt input { accent-color: var(--accent); width: 18px; height: 18px; }
+  .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none;
+    padding: 13px 22px; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer;
+    margin-top: 18px; transition: .2s; width: 100%; }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .verses { background: #11152a; border-left: 4px solid var(--accent); padding: 16px 18px;
+    border-radius: 10px; font-style: italic; white-space: pre-line; margin: 14px 0; }
+  .verses .src { font-style: normal; color: var(--muted); font-size: .88rem; margin-top: 8px; }
+  .rec-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .rec-btn { flex: 1; min-width: 140px; padding: 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: #20264a; color: var(--text); font-weight: 600; cursor: pointer; }
+  .rec-btn.rec { background: #b03050; border-color: #b03050; }
+  .timer { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent2); }
+  audio { width: 100%; margin-top: 12px; }
+  .status { margin-top: 10px; font-size: .9rem; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--accent2); }
+  .progress { height: 6px; background: #11152a; border-radius: 99px; margin-bottom: 20px; overflow: hidden; }
+  .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0; transition: width .3s; }
+  .req { color: var(--accent2); }
+  .pill { display:inline-block; background:#11152a; border:1px solid var(--border); padding:4px 10px; border-radius:99px; font-size:.8rem; color:var(--muted); }
+  .note { background:#11152a; border:1px dashed var(--accent); border-radius:10px; padding:14px 16px; margin-top:14px; color:var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="progress"><div id="progressBar"></div></div>
+
+  <!-- STEP 0: APRESENTAÇÃO -->
+  <section class="step active card" data-step="0">
+    <h1>Enquete sobre Hermeto Pascoal</h1>
+    <p>Você está sendo convidado(a) a participar de uma enquete sobre o músico brasileiro <strong>Hermeto Pascoal</strong>.</p>
+    <p>A participação consiste em responder algumas perguntas simples e gravar dois pequenos áudios lendo trechos curtos. Não há respostas certas ou erradas.</p>
+    <p>Sua voz será gravada para fins de pesquisa acadêmica, com preservação da identidade dos participantes sempre que possível.</p>
+    <p class="muted">Ao continuar, você declara estar de acordo com a gravação de sua voz para fins de pesquisa.</p>
+    <button class="btn" onclick="next()">Concordo e quero participar</button>
+  </section>
+
+  <!-- STEP 1: BLOCO 1 -->
+  <section class="step card" data-step="1">
+    <h2>Bloco 1 — Perfil geral</h2>
+    <label>Faixa etária <span class="req">*</span></label>
+    <div class="opts" data-name="age_range">
+      <label class="opt"><input type="radio" name="age_range" value="Até 18 anos"> Até 18 anos</label>
+      <label class="opt"><input type="radio" name="age_range" value="19 a 29 anos"> 19 a 29 anos</label>
+      <label class="opt"><input type="radio" name="age_range" value="30 a 44 anos"> 30 a 44 anos</label>
+      <label class="opt"><input type="radio" name="age_range" value="45 a 59 anos"> 45 a 59 anos</label>
+      <label class="opt"><input type="radio" name="age_range" value="60 anos ou mais"> 60 anos ou mais</label>
+    </div>
+    <label>Cidade onde nasceu <span class="req">*</span></label>
+    <input type="text" name="birth_city" placeholder="Ex.: Lagoa da Canoa">
+    <label>Estado onde nasceu <span class="req">*</span></label>
+    <input type="text" name="birth_state" placeholder="Ex.: AL">
+    <label>Cidade onde mora atualmente <span class="req">*</span></label>
+    <input type="text" name="current_city" placeholder="Ex.: Rio de Janeiro">
+    <label>Estado onde mora atualmente <span class="req">*</span></label>
+    <input type="text" name="current_state" placeholder="Ex.: RJ">
+    <label>Você viveu por mais de cinco anos em outro estado ou região do Brasil? <span class="req">*</span></label>
+    <div class="opts" data-name="lived_elsewhere">
+      <label class="opt"><input type="radio" name="lived_elsewhere" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="lived_elsewhere" value="Não"> Não</label>
+    </div>
+    <label>Se sim, qual/quais?</label>
+    <input type="text" name="lived_elsewhere_which" placeholder="Opcional">
+    <label>Língua materna <span class="req">*</span></label>
+    <div class="opts" data-name="mother_tongue">
+      <label class="opt"><input type="radio" name="mother_tongue" value="Português brasileiro"> Português brasileiro</label>
+      <label class="opt"><input type="radio" name="mother_tongue" value="Português europeu"> Português europeu</label>
+      <label class="opt"><input type="radio" name="mother_tongue" value="Espanhol"> Espanhol</label>
+      <label class="opt"><input type="radio" name="mother_tongue" value="Inglês"> Inglês</label>
+      <label class="opt"><input type="radio" name="mother_tongue" value="Outra"> Outra</label>
+    </div>
+    <label>Você fala outras línguas com frequência? <span class="req">*</span></label>
+    <div class="opts" data-name="other_languages">
+      <label class="opt"><input type="radio" name="other_languages" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="other_languages" value="Não"> Não</label>
+    </div>
+    <label>Se sim, quais?</label>
+    <input type="text" name="other_languages_which" placeholder="Opcional">
+    <div class="rec-row">
+      <button class="rec-btn" onclick="prev()">Voltar</button>
+      <button class="rec-btn" style="background:var(--accent)" onclick="next()">Continuar</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: BLOCO 2 -->
+  <section class="step card" data-step="2">
+    <h2>Bloco 2 — Relação com música</h2>
+    <label>Qual é a sua relação com música? <span class="muted">(pode marcar mais de uma)</span> <span class="req">*</span></label>
+    <div class="opts" data-name="musical_profile" data-multi="1">
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Ouvinte casual"> Ouvinte casual</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Ouvinte frequente"> Ouvinte frequente</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Estudante de música"> Estudante de música</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Músico(a) amador(a)"> Músico(a) amador(a)</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Músico(a) profissional"> Músico(a) profissional</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Professor(a) de música"> Professor(a) de música</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Pesquisador(a)"> Pesquisador(a)</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Profissional da área musical"> Produtor(a), técnico(a), jornalista ou profissional da área musical</label>
+      <label class="opt"><input type="checkbox" name="musical_profile" value="Outra"> Outra</label>
+    </div>
+    <label>Você toca algum instrumento musical? <span class="req">*</span></label>
+    <div class="opts" data-name="plays_instrument">
+      <label class="opt"><input type="radio" name="plays_instrument" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="plays_instrument" value="Não"> Não</label>
+    </div>
+    <label>Se sim, qual/quais?</label>
+    <input type="text" name="plays_instrument_which" placeholder="Opcional">
+    <label>Você tem formação musical formal? <span class="req">*</span></label>
+    <div class="opts" data-name="musical_education">
+      <label class="opt"><input type="radio" name="musical_education" value="Não"> Não</label>
+      <label class="opt"><input type="radio" name="musical_education" value="Sim, básica"> Sim, básica</label>
+      <label class="opt"><input type="radio" name="musical_education" value="Sim, técnica"> Sim, técnica</label>
+      <label class="opt"><input type="radio" name="musical_education" value="Sim, universitária"> Sim, universitária</label>
+      <label class="opt"><input type="radio" name="musical_education" value="Sim, pós-graduação"> Sim, pós-graduação</label>
+      <label class="opt"><input type="radio" name="musical_education" value="Autodidata"> Aprendi principalmente de forma autodidata</label>
+    </div>
+    <div class="rec-row">
+      <button class="rec-btn" onclick="prev()">Voltar</button>
+      <button class="rec-btn" style="background:var(--accent)" onclick="next()">Continuar</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: BLOCO 3 -->
+  <section class="step card" data-step="3">
+    <h2>Bloco 3 — Familiaridade com Hermeto Pascoal</h2>
+    <label>Você conhece Hermeto Pascoal? <span class="req">*</span></label>
+    <div class="opts" data-name="knows_hermeto">
+      <label class="opt"><input type="radio" name="knows_hermeto" value="Sim, conheço bem a obra"> Sim, conheço bem a obra</label>
+      <label class="opt"><input type="radio" name="knows_hermeto" value="Sim, conheço um pouco"> Sim, conheço um pouco</label>
+      <label class="opt"><input type="radio" name="knows_hermeto" value="Conheço apenas de nome"> Conheço apenas de nome</label>
+      <label class="opt"><input type="radio" name="knows_hermeto" value="Não conheço"> Não conheço</label>
+      <label class="opt"><input type="radio" name="knows_hermeto" value="Não tenho certeza"> Não tenho certeza</label>
+    </div>
+    <label>Você já ouviu discos, vídeos ou apresentações de Hermeto Pascoal? <span class="req">*</span></label>
+    <div class="opts" data-name="heard_hermeto">
+      <label class="opt"><input type="radio" name="heard_hermeto" value="Sim, muitas vezes"> Sim, muitas vezes</label>
+      <label class="opt"><input type="radio" name="heard_hermeto" value="Sim, algumas vezes"> Sim, algumas vezes</label>
+      <label class="opt"><input type="radio" name="heard_hermeto" value="Raramente"> Raramente</label>
+      <label class="opt"><input type="radio" name="heard_hermeto" value="Nunca"> Nunca</label>
+      <label class="opt"><input type="radio" name="heard_hermeto" value="Não tenho certeza"> Não tenho certeza</label>
+    </div>
+    <label>Você já viu Hermeto Pascoal ao vivo? <span class="req">*</span></label>
+    <div class="opts" data-name="saw_live">
+      <label class="opt"><input type="radio" name="saw_live" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="saw_live" value="Não"> Não</label>
+    </div>
+    <label>Você já teve contato pessoal com Hermeto Pascoal? <span class="req">*</span></label>
+    <div class="opts" data-name="personal_contact_hermeto">
+      <label class="opt"><input type="radio" name="personal_contact_hermeto" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="personal_contact_hermeto" value="Não"> Não</label>
+    </div>
+    <label>Você já teve contato pessoal com músicos que tocaram com Hermeto Pascoal? <span class="req">*</span></label>
+    <div class="opts" data-name="contact_with_musicians">
+      <label class="opt"><input type="radio" name="contact_with_musicians" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="contact_with_musicians" value="Não"> Não</label>
+      <label class="opt"><input type="radio" name="contact_with_musicians" value="Não sei"> Não sei</label>
+    </div>
+    <label>Você já estudou a obra de Hermeto Pascoal em aulas, cursos, pesquisas ou trabalhos acadêmicos? <span class="req">*</span></label>
+    <div class="opts" data-name="studied_hermeto">
+      <label class="opt"><input type="radio" name="studied_hermeto" value="Sim"> Sim</label>
+      <label class="opt"><input type="radio" name="studied_hermeto" value="Não"> Não</label>
+    </div>
+    <label>Em quais meios você mais teve contato com o nome e/ou a música de Hermeto Pascoal? <span class="muted">(marque quantos quiser)</span></label>
+    <div class="opts" data-name="media_contact" data-multi="1">
+      <label class="opt"><input type="checkbox" name="media_contact" value="Discos/CDs"> Discos/CDs</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Rádio"> Rádio</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Televisão"> Televisão</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Shows"> Shows</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Aulas"> Aulas</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Conversas com músicos"> Conversas com músicos</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="YouTube"> YouTube</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Streaming"> Streaming</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Redes sociais"> Redes sociais</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Livros/artigos"> Livros/artigos</label>
+      <label class="opt"><input type="checkbox" name="media_contact" value="Nunca tive contato relevante"> Nunca tive contato relevante</label>
+    </div>
+    <div class="rec-row">
+      <button class="rec-btn" onclick="prev()">Voltar</button>
+      <button class="rec-btn" style="background:var(--accent)" onclick="next()">Continuar para a leitura</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: GRAVAÇÃO 1 -->
+  <section class="step card" data-step="4">
+    <h2>Leitura 1 de 2</h2>
+    <p>Leia em voz alta o texto abaixo, da maneira que achar melhor, porém de forma bem pronunciada. A gravação pode ter até <strong>30 segundos</strong>.</p>
+    <div class="verses">Hermeto Pascoal descobre instrumentos escondidos nas coisas. Na obra de Hermeto, o Universo é música e a música é Universal.</div>
+    <div class="rec-row">
+      <button class="rec-btn" id="rec1Btn" onclick="toggleRec(1)">● Gravar</button>
+      <span class="pill">Tempo: <span class="timer" id="timer1">00:00</span> / 00:30</span>
+    </div>
+    <audio id="audio1" controls style="display:none"></audio>
+    <div class="status" id="status1"></div>
+    <button class="btn" id="next4" onclick="next()" disabled>Salvar leitura 1 e continuar</button>
+  </section>
+
+  <!-- STEP 5: GRAVAÇÃO 2 -->
+  <section class="step card" data-step="5">
+    <h2>Leitura 2 de 2</h2>
+    <p>Leia em voz alta os versos abaixo, da maneira que achar melhor, porém de forma bem pronunciada. A gravação pode ter até <strong>30 segundos</strong>.</p>
+    <div class="verses">Gil e Hermeto, palmas para
+Todos os instrumentistas<span class="src">— Chico Buarque, “Paratodos”</span></div>
+    <div class="verses">O amor é cego, Ray Charles é cego, Stevie Wonder é cego
+E o albino Hermeto não enxerga mesmo muito bem<span class="src">— Caetano Veloso, “O Estrangeiro”</span></div>
+    <div class="rec-row">
+      <button class="rec-btn" id="rec2Btn" onclick="toggleRec(2)">● Gravar</button>
+      <span class="pill">Tempo: <span class="timer" id="timer2">00:00</span> / 00:30</span>
+    </div>
+    <audio id="audio2" controls style="display:none"></audio>
+    <div class="status" id="status2"></div>
+    <button class="btn" id="next5" onclick="next()" disabled>Salvar leitura 2 e continuar</button>
+  </section>
+
+  <!-- STEP 6: ENVIO -->
+  <section class="step card" data-step="6">
+    <h2>Tudo pronto!</h2>
+    <p>Obrigado por preencher a enquete e gravar as duas leituras. Clique no botão abaixo para gerar e baixar o arquivo compactado com suas respostas e os dois áudios.</p>
+    <button class="btn" id="sendBtn" onclick="gerarZip()">GERAR ARQUIVO E BAIXAR</button>
+    <div class="status" id="sendStatus"></div>
+    <div class="note">
+      <strong>Importante:</strong> após o download, por favor envie um e-mail para
+      <strong>fuks.leonardo@gmail.com</strong> e anexe o arquivo compactado que foi baixado no seu dispositivo.
+    </div>
+  </section>
+
+  <!-- STEP 7: AGRADECIMENTO -->
+  <section class="step card" data-step="7">
+    <h2>Obrigado pela participação!</h2>
+    <p>Sua contribuição é muito importante para esta pesquisa sobre Hermeto Pascoal.</p>
+    <div class="note">
+      <strong>Importante:</strong> após o download, por favor envie um e-mail para
+      <strong>fuks.leonardo@gmail.com</strong> e anexe o arquivo compactado que foi baixado no seu dispositivo.
+    </div>
+    <p class="status ok">✔ Participação concluída.</p>
+  </section>
+</div>
+
+<!-- Biblioteca de compactação ZIP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+/* CONFIGURAÇÃO */
+const CONFIG = { destinatario: "fuks.leonardo@gmail.com" };
+
+/* ESTADO */
+let current = 0;
+const totalSteps = 8;
+const recordings = { 1: null, 2: null };
+let mediaRecorder = null, chunks = [], activeRec = null, timerInt = null, secs = 0;
+const participantId = "HP-" + new Date().getFullYear() + "-" +
+  Math.floor(Math.random() * 900000 + 100000);
+
+/* NAVEGAÇÃO */
+function showStep(n){
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
+  document.getElementById('progressBar').style.width = ((n)/(totalSteps-1)*100) + '%';
+  window.scrollTo({top:0, behavior:'smooth'});
+  current = n;
+}
+function validateStep(n){
+  const step = document.querySelector(`.step[data-step="${n}"]`);
+  const radioGroups = step.querySelectorAll('.opts:not([data-multi])');
+  for(const g of radioGroups){
+    const name = g.dataset.name;
+    if(!step.querySelector(`input[name="${name}"]:checked`)){
+      alert("Por favor, responda todas as perguntas obrigatórias antes de continuar.");
+      return false;
+    }
+  }
+  const mp = step.querySelector('.opts[data-name="musical_profile"]');
+  if(mp && !step.querySelector('input[name="musical_profile"]:checked')){
+    alert("Por favor, marque pelo menos uma opção sobre sua relação com música.");
+    return false;
+  }
+  const texts = step.querySelectorAll('input[type=text]');
+  for(const t of texts){
+    if(t.placeholder !== "Opcional" && !t.value.trim()){
+      alert("Por favor, preencha os campos obrigatórios.");
+      t.focus(); return false;
+    }
+  }
+  return true;
+}
+function next(){
+  if(current >= 1 && current <= 3 && !validateStep(current)) return;
+  showStep(current + 1);
+}
+function prev(){ showStep(current - 1); }
+
+/* GRAVAÇÃO */
+async function toggleRec(idx){
+  const btn = document.getElementById('rec'+idx+'Btn');
+  if(activeRec === idx){ stopRec(); return; }
+  if(activeRec){ return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunks, {type:'audio/webm'});
+      recordings[idx] = blob;
+      const url = URL.createObjectURL(blob);
+      const aud = document.getElementById('audio'+idx);
+      aud.src = url; aud.style.display = 'block';
+      const st = document.getElementById('status'+idx);
+      st.innerHTML = '✔ Gravação salva. Você pode ouvir e regravar se quiser.';
+      st.className = 'status ok';
+      document.getElementById('next'+(idx+3)).disabled = false;
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start();
+    activeRec = idx;
+    btn.classList.add('rec'); btn.textContent = '■ Parar';
+    secs = 0; document.getElementById('timer'+idx).textContent = '00:00';
+    timerInt = setInterval(() => {
+      secs++;
+      const m = String(Math.floor(secs/60)).padStart(2,'0');
+      const s = String(secs%60).padStart(2,'0');
+      document.getElementById('timer'+idx).textContent = m+':'+s;
+      if(secs >= 30) stopRec();
+    }, 1000);
+  } catch(err){
+    const st = document.getElementById('status'+idx);
+    st.innerHTML = 'Não foi possível acessar o microfone. Verifique as permissões.';
+    st.className = 'status err';
+  }
+}
+function stopRec(){
+  if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  clearInterval(timerInt);
+  const idx = activeRec;
+  if(idx){
+    const btn = document.getElementById('rec'+idx+'Btn');
+    btn.classList.remove('rec'); btn.textContent = '● Regravar';
+  }
+  activeRec = null;
+}
+
+/* COLETA */
+function collectData(){
+  const form = {};
+  document.querySelectorAll('input[type=radio]:checked').forEach(r => form[r.name] = r.value);
+  document.querySelectorAll('input[type=text]').forEach(t => { if(t.value.trim()) form[t.name] = t.value.trim(); });
+  ['musical_profile','media_contact'].forEach(name => {
+    const vals = [];
+    document.querySelectorAll(`input[name="${name}"]:checked`).forEach(c => vals.push(c.value));
+    form[name] = vals.join('; ');
+  });
+  form['participant_id'] = participantId;
+  form['timestamp'] = new Date().toISOString();
+  return form;
+}
+function toCSV(data){
+  const keys = Object.keys(data);
+  const esc = v => '"' + String(v).replace(/"/g,'""') + '"';
+  return keys.map(esc).join(',') + '\n' + keys.map(k => esc(data[k])).join(',');
+}
+
+/* GERAÇÃO DO ZIP */
+async function gerarZip(){
+  const btn = document.getElementById('sendBtn');
+  const st = document.getElementById('sendStatus');
+  if(!recordings[1] || !recordings[2]){
+    st.className = 'status err';
+    st.textContent = 'É necessário gravar as duas leituras antes de gerar o arquivo.';
+    return;
+  }
+  btn.disabled = true;
+  st.className = 'status';
+  st.textContent = 'Gerando arquivo compactado...';
+  try {
+    const data = collectData();
+    const csv = "\uFEFF" + toCSV(data);
+    const zip = new JSZip();
+    zip.file("HP_Codigo_Respostas.csv", csv);
+    zip.file("HP_Leitura_1.webm", recordings[1]);
+    zip.file("HP_Leitura_2.webm", recordings[2]);
+    const blob = await zip.generateAsync({type:"blob", compression:"DEFLATE"});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = participantId + "_enquete_hermeto.zip";
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    st.className = 'status ok';
+    st.innerHTML = '✔ Arquivo <strong>' + participantId + '_enquete_hermeto.zip</strong> baixado com sucesso!';
+    setTimeout(() => showStep(7), 2500);
+  } catch(e){
+    st.className = 'status err';
+    st.textContent = 'Ocorreu um erro ao gerar o arquivo. Tente novamente.';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
