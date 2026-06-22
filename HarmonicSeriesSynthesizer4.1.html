@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Harmonic Series Synthesizer v4.1 — Position-Locked Slide</title>
+<style>
+  :root{
+    --bg1:#0b1020; --bg2:#1a1f3a; --panel:#141a30;
+    --txt:#e9ecff; --accent:#7af0ff; --muted:#8a92b2;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh;
+    background:linear-gradient(135deg,var(--bg1),var(--bg2));
+    color:var(--txt);
+    font-family:'Segoe UI',Roboto,system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px;
+  }
+  h1{
+    margin:0 0 6px; font-weight:300; letter-spacing:2px;
+    background:linear-gradient(90deg,#ff2020,#ff8000,#ffd000,#40d040,#00b0ff,#7040ff,#c040ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  p.sub{margin:0 0 18px; color:var(--muted); font-size:.95em; text-align:center; max-width:900px}
+  .credit{
+    margin:0 0 18px; padding:10px 16px; font-size:.82em; color:var(--muted);
+    border-left:3px solid var(--accent); background:rgba(122,240,255,.06);
+    border-radius:0 8px 8px 0; max-width:900px;
+  }
+  .credit strong{color:var(--accent)}
+
+  .panel{
+    background:var(--panel); border:1px solid #2a3158; border-radius:14px;
+    padding:16px 22px; margin-bottom:14px;
+    display:flex; flex-wrap:wrap; gap:22px; align-items:center;
+    box-shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  .ctrl{display:flex; flex-direction:column; gap:6px; min-width:160px}
+  .ctrl label{font-size:.78em; color:var(--muted); text-transform:uppercase; letter-spacing:1px}
+  .ctrl input[type=range]{width:220px; accent-color:var(--accent)}
+  .ctrl input[type=number]{
+    background:#0e1430; color:var(--txt); border:1px solid #2a3158;
+    border-radius:6px; padding:6px 8px; width:120px; font-size:1em;
+  }
+  .val{font-variant-numeric:tabular-nums; color:var(--accent); font-size:.9em}
+  .mode{display:flex; gap:8px; flex-wrap:wrap}
+  .mode button{
+    background:#0e1430; color:var(--txt); border:1px solid #2a3158;
+    padding:8px 14px; border-radius:8px; cursor:pointer; font-size:.9em;
+    transition:.2s;
+  }
+  .mode button.active{background:var(--accent); color:#001020; border-color:var(--accent)}
+  .mode button:hover:not(.active){border-color:var(--accent)}
+
+  #hud{
+    display:flex; gap:18px; flex-wrap:wrap; justify-content:center;
+    padding:8px 14px; margin-bottom:8px;
+    background:rgba(20,26,48,.7); border:1px solid #2a3158; border-radius:10px;
+    font-family:'JetBrains Mono',Consolas,monospace; font-size:.85em;
+    min-height:36px; min-width:480px;
+  }
+  #hud .item{display:flex; gap:6px; align-items:center}
+  #hud .k{color:var(--muted); text-transform:uppercase; font-size:.75em; letter-spacing:1px}
+  #hud .v{color:var(--accent); font-weight:bold; font-variant-numeric:tabular-nums; min-width:60px}
+
+  #keyboard-wrap{
+    width:100%; overflow-x:auto;
+    padding:14px 8px 16px;
+    background:linear-gradient(to bottom,#070a18 0%, #0d1228 100%);
+    border-radius:14px; border:1px solid #1c2244;
+    box-shadow:inset 0 0 30px rgba(0,0,0,.7);
+  }
+  #piano-case{
+    position:relative; margin:0 auto;
+    padding:14px 10px 10px 10px;
+    background:linear-gradient(to bottom,#2a1810 0%,#4a2a18 8%,#2a1810 14%,#1a0f08 100%);
+    border:2px solid #1a0a04; border-radius:6px 6px 4px 4px;
+    box-shadow:0 8px 20px rgba(0,0,0,.6),
+               inset 0 2px 4px rgba(255,200,150,.15),
+               inset 0 -4px 8px rgba(0,0,0,.5);
+    width:fit-content;
+  }
+  #felt{
+    height:6px; background:linear-gradient(to bottom,#5a0a0a,#8a1010,#5a0a0a);
+    border-radius:2px; margin-bottom:2px;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.5);
+  }
+  #keyboard{position:relative; height:185px; display:flex; user-select:none; touch-action:none}
+  .white{
+    position:relative; width:26px; height:185px;
+    background:linear-gradient(to bottom,#fefefe 0%,#f4f4f4 92%,#d0d0d0 100%);
+    border:1px solid #555; border-top:1px solid #888;
+    border-radius:0 0 4px 4px;
+    margin-right:1px; cursor:pointer;
+    box-shadow:inset 0 -3px 4px rgba(0,0,0,.15);
+    transition:filter .08s;
+  }
+  .white:hover{filter:brightness(.96)}
+  .white.lit{box-shadow:inset 0 0 25px var(--glow), 0 0 14px var(--glow), inset 0 -3px 4px rgba(0,0,0,.15)}
+  .black{
+    position:absolute; width:15px; height:118px;
+    background:linear-gradient(to bottom,#3a3a3a 0%,#0a0a0a 60%,#1a1a1a 100%);
+    border:1px solid #000; border-radius:0 0 3px 3px;
+    z-index:2; cursor:pointer;
+    box-shadow:0 4px 5px rgba(0,0,0,.6),
+               inset 0 -3px 3px rgba(255,255,255,.1),
+               inset 0 1px 1px rgba(255,255,255,.2);
+  }
+  .black.lit{box-shadow:0 0 18px var(--glow), inset 0 0 15px var(--glow), 0 4px 5px rgba(0,0,0,.6)}
+  .label{
+    position:absolute; bottom:4px; left:0; right:0;
+    text-align:center; font-size:7.5px; color:#888; pointer-events:none;
+    font-family:monospace;
+  }
+  .harm-num{
+    position:absolute; top:6px; left:0; right:0;
+    text-align:center; font-size:11px; font-weight:bold;
+    color:#fff; text-shadow:0 0 4px #000, 0 0 2px #000;
+    pointer-events:none;
+  }
+  /* Permanent harmonic markers (visible in harmonic mode at all times) */
+  .harm-marker{
+    position:absolute; top:24px; left:0; right:0;
+    text-align:center; font-size:9px; font-weight:bold;
+    color:#7af0ff; opacity:.55; pointer-events:none;
+    text-shadow:0 0 3px #000;
+  }
+  #slide-cursor{
+    position:absolute; top:-12px; width:2px; height:200px;
+    background:linear-gradient(to bottom, transparent, #7af0ff 10%, #7af0ff 90%, transparent);
+    pointer-events:none; opacity:0; z-index:10;
+    box-shadow:0 0 8px #7af0ff;
+    transition:opacity .15s;
+  }
+  #slide-cursor.active{opacity:.8}
+
+  #info{
+    margin-top:14px; font-size:.82em; color:var(--muted);
+    text-align:center; max-width:980px; line-height:1.6;
+  }
+  kbd{
+    background:#0e1430; border:1px solid #2a3158; border-radius:4px;
+    padding:2px 6px; font-family:monospace; color:var(--accent); font-size:.9em;
+  }
+</style>
+</head>
+<body>
+
+<h1>🌈 HARMONIC SERIES SYNTHESIZER · v4.1</h1>
+<p class="sub">
+  88-key sinusoidal synth · pitch-accurate harmonic placement · <strong>position-locked slide-play</strong>:
+  in Harmonic mode, sliding the cursor across the keyboard plays each harmonic exactly when the cursor is over its corresponding piano key.
+</p>
+<div class="credit">
+  <strong>Slide-Play interaction</strong> conceived and developed by <strong>Leonardo Fuks</strong> for <strong>Sérgio Basbaum</strong> — research project <em>"How Harmonic are Jew's Harps?"</em>, UFRJ.
+</div>
+
+<div class="panel">
+  <div class="ctrl">
+    <label>Fundamental f₀ (Hz)</label>
+    <input type="number" id="fundFreq" min="20" max="2000" step="0.1" value="100">
+  </div>
+  <div class="ctrl">
+    <label>Scroll fundamental <span class="val" id="fundVal">100.0 Hz</span></label>
+    <input type="range" id="fundSlider" min="50" max="800" step="0.5" value="100">
+  </div>
+  <div class="ctrl">
+    <label>Master Volume <span class="val" id="volVal">50%</span></label>
+    <input type="range" id="volume" min="0" max="100" value="50">
+  </div>
+  <div class="ctrl">
+    <label>Mode</label>
+    <div class="mode">
+      <button id="modeHarm" class="active">Harmonic Series</button>
+      <button id="modeChrom">Chromatic</button>
+      <button id="modeFree">Free Sinus</button>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="item"><span class="k">Mode</span><span class="v" id="hudMode">Harmonic</span></div>
+  <div class="item"><span class="k">Freq</span><span class="v" id="hudFreq">— Hz</span></div>
+  <div class="item"><span class="k">Note</span><span class="v" id="hudNote">—</span></div>
+  <div class="item"><span class="k">Harmonic</span><span class="v" id="hudHarm">—</span></div>
+  <div class="item"><span class="k">Cents</span><span class="v" id="hudCents">—</span></div>
+</div>
+
+<div id="keyboard-wrap">
+  <div id="piano-case">
+    <div id="felt"></div>
+    <div id="keyboard">
+      <div id="slide-cursor"></div>
+    </div>
+  </div>
+</div>
+
+<div id="info">
+  <strong>Click and drag</strong> across the keyboard. In <em>Harmonic</em> mode, the cursor's position on the keyboard <strong>locks</strong> the harmonic to the key it is over: H1 sounds while the cursor is over C1, H2 over C2, H3 over G2, H4 over C3, H5 over E3, etc. In <em>Chromatic</em> mode it steps through semitones; in <em>Free Sinus</em> it glides continuously with magnetic harmonic snap.
+  <br>
+  <strong>Computer keyboard</strong>: <kbd>Z X C V B N M , . /</kbd> · <kbd>A S D F G H J K L ; ' \</kbd> · <kbd>Q W E R T Y U I O P [ ]</kbd> · <kbd>1 2 3 4 5 6 7 8 9 0 - =</kbd>
+</div>
+
+<script>
+/* ============================================================
+ *  HARMONIC SERIES SYNTHESIZER — v4.1
+ *  ----------------------------------------------------------
+ *  Slide-Play interaction conceived and developed by
+ *  Leonardo Fuks for Sérgio Basbaum
+ *  Research project: "How Harmonic are Jew's Harps?" (UFRJ)
+ *
+ *  v4.1 CHANGE: In Harmonic-Series mode, the slide is now
+ *  POSITION-LOCKED to the keyboard. Each harmonic n sounds
+ *  exactly while the cursor is over the piano key that
+ *  represents its pitch (12·log2(n) semitones above C1).
+ *  Between harmonic positions, the system holds the harmonic
+ *  whose key is closest to the cursor in keyboard distance.
+ * ============================================================ */
+
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = AC.createGain();
+masterGain.gain.value = 0.5;
+masterGain.connect(AC.destination);
+
+// ---- 88-key piano ----
+const FIRST_MIDI = 21, LAST_MIDI = 108, NUM_KEYS = 88;
+const LOWEST_C_MIDI = 24;
+const LOWEST_C_INDEX = LOWEST_C_MIDI - FIRST_MIDI; // 3
+const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function octaveRainbow(midi){
+  const pc = midi % 12;
+  return `hsl(${(pc/12)*300}, 95%, 55%)`;
+}
+function midiToNoteName(m){
+  const r = Math.round(m);
+  return noteNames[r%12] + (Math.floor(r/12)-1);
+}
+function midiToFreq(m){ return 440 * Math.pow(2,(m-69)/12); }
+function freqToMidi(f){ return 69 + 12*Math.log2(f/440); }
+
+// ---- Build key data ----
+const keys = [];
+for(let i=0;i<NUM_KEYS;i++){
+  const midi = FIRST_MIDI + i;
+  const pc = midi % 12;
+  const isBlack = [1,3,6,8,10].includes(pc);
+  const octave = Math.floor(midi/12)-1;
+  keys.push({ index:i, midi, isBlack, name:noteNames[pc]+octave, color:octaveRainbow(midi) });
+}
+
+// Physical computer-keyboard mapping
+const PHYS_ORDER = [
+  'KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash',
+  'KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon','Quote','Backslash',
+  'KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP','BracketLeft','BracketRight',
+  'Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal'
+];
+const codeToHarmonic = {};
+PHYS_ORDER.forEach((c,i)=>{ codeToHarmonic[c] = i+1; });
+
+// =================================================================
+//  Pitch-accurate placement of harmonic n over the lowest C
+// =================================================================
+function harmonicPlacement(n, f0){
+  const semis = 12 * Math.log2(n);
+  const nearestSemis = Math.round(semis);
+  const cents = (semis - nearestSemis)*100;
+  const nearestKeyIndex = LOWEST_C_INDEX + nearestSemis;
+  let neighborKeyIndex = null;
+  if(Math.abs(cents) >= 5){
+    const ns = nearestSemis + (cents>0?1:-1);
+    const ni = LOWEST_C_INDEX + ns;
+    if(ni>=0 && ni<NUM_KEYS) neighborKeyIndex = ni;
+  }
+  return { nearestKeyIndex, neighborKeyIndex, centsDeviation:cents, frequencyHz:n*f0 };
+}
+
+// =================================================================
+//  PRE-COMPUTE harmonic table for the current fundamental.
+//  For each harmonic n that fits in the 88-key range, record:
+//    - n (harmonic number)
+//    - keyIndex (piano key it lives on)
+//    - freq (n * f0)
+//    - cents (deviation from equal temperament)
+//  Rebuilt every time f0 changes.
+// =================================================================
+let harmonicTable = []; // sorted by keyIndex ascending
+
+function rebuildHarmonicTable(){
+  harmonicTable = [];
+  const MAX_HARM = 64;
+  for(let n=1; n<=MAX_HARM; n++){
+    const p = harmonicPlacement(n, fundamental);
+    const f = p.frequencyHz;
+    if(f<=0 || f>20000) continue;
+    if(p.nearestKeyIndex<0 || p.nearestKeyIndex>=NUM_KEYS) continue;
+    harmonicTable.push({
+      n, keyIndex:p.nearestKeyIndex, freq:f, cents:p.centsDeviation,
+      neighbor:p.neighborKeyIndex
+    });
+  }
+  // sort by keyIndex; if multiple harmonics fall on same key (shouldn't, but safe), keep all
+  harmonicTable.sort((a,b)=>a.keyIndex - b.keyIndex);
+  refreshHarmonicMarkers();
+}
+
+// =================================================================
+//  Build piano DOM
+// =================================================================
+const kb = document.getElementById('keyboard');
+const slideCursor = document.getElementById('slide-cursor');
+const whiteWidth = 26, blackWidth = 15;
+let whiteCount = 0;
+const whiteIndexOf = [];
+keys.forEach(k=>{ whiteIndexOf[k.index] = k.isBlack ? -1 : whiteCount++; });
+const totalWidth = whiteCount*(whiteWidth+1);
+kb.style.width = totalWidth+'px';
+
+keys.forEach(k=>{
+  if(k.isBlack) return;
+  const el=document.createElement('div');
+  el.className='white'; el.dataset.index=k.index;
+  el.style.setProperty('--glow', k.color);
+  const lbl=document.createElement('div'); lbl.className='label'; lbl.textContent=k.name;
+  el.appendChild(lbl);
+  const hn=document.createElement('div'); hn.className='harm-num'; hn.dataset.role='harm';
+  el.appendChild(hn);
+  const hm=document.createElement('div'); hm.className='harm-marker'; hm.dataset.role='marker';
+  el.appendChild(hm);
+  kb.appendChild(el); k.el=el;
+});
+keys.forEach(k=>{
+  if(!k.isBlack) return;
+  const el=document.createElement('div');
+  el.className='black'; el.dataset.index=k.index;
+  el.style.setProperty('--glow', k.color);
+  let prevWhite=k.index-1;
+  while(prevWhite>=0 && keys[prevWhite].isBlack) prevWhite--;
+  const wIdx=whiteIndexOf[prevWhite];
+  el.style.left = ((wIdx+1)*(whiteWidth+1) - blackWidth/2 - 1)+'px';
+  const hn=document.createElement('div'); hn.className='harm-num'; hn.dataset.role='harm';
+  el.appendChild(hn);
+  const hm=document.createElement('div'); hm.className='harm-marker'; hm.dataset.role='marker';
+  el.appendChild(hm);
+  kb.appendChild(el); k.el=el;
+});
+
+// =================================================================
+//  Compute the LEFT-EDGE pixel position of any key (for hit-testing).
+//  We use the DOM bounding boxes (most accurate, accounts for borders).
+// =================================================================
+function keyCenterX(idx){
+  const k = keys[idx];
+  const elRect = k.el.getBoundingClientRect();
+  const kbRect = kb.getBoundingClientRect();
+  return (elRect.left - kbRect.left) + elRect.width/2;
+}
+function keyLeftX(idx){
+  const k = keys[idx];
+  const elRect = k.el.getBoundingClientRect();
+  const kbRect = kb.getBoundingClientRect();
+  return elRect.left - kbRect.left;
+}
+function keyRightX(idx){
+  return keyLeftX(idx) + keys[idx].el.getBoundingClientRect().width;
+}
+
+// =================================================================
+//  Permanent harmonic-position markers
+// =================================================================
+function refreshHarmonicMarkers(){
+  // clear all markers
+  keys.forEach(k=>{
+    const m = k.el.querySelector('[data-role=marker]');
+    if(m) m.textContent='';
+  });
+  if(mode!=='harmonic') return;
+  // place a small "Hn" marker on each piano key that hosts a harmonic
+  harmonicTable.forEach(h=>{
+    const k = keys[h.keyIndex];
+    if(!k) return;
+    const m = k.el.querySelector('[data-role=marker]');
+    if(m){
+      const existing = m.textContent;
+      m.textContent = existing ? existing+','+h.n : 'H'+h.n;
+    }
+  });
+}
+
+// =================================================================
+//  Lighting (reference-counted)
+// =================================================================
+const litCounter = new Array(NUM_KEYS).fill(0);
+function lightKey(idx, intensity, harmonicNumber){
+  if(idx<0 || idx>=NUM_KEYS) return;
+  const k = keys[idx];
+  litCounter[idx]++;
+  k.el.classList.add('lit');
+  const a = intensity;
+  if(k.isBlack){
+    k.el.style.background = `linear-gradient(to bottom, ${k.color} 0%, #111 90%)`;
+  } else {
+    const stop = Math.round(100 - a*100);
+    k.el.style.background = `linear-gradient(to bottom, #ffffff 0%, ${k.color} ${stop+10}%, ${k.color} 100%)`;
+  }
+  k.el.style.opacity = String(0.55 + 0.45*a);
+  if(harmonicNumber!=null){
+    const hn = k.el.querySelector('[data-role=harm]');
+    hn.textContent = harmonicNumber;
+  }
+}
+function unlightKey(idx){
+  if(idx<0 || idx>=NUM_KEYS) return;
+  if(litCounter[idx]>0) litCounter[idx]--;
+  if(litCounter[idx]===0){
+    const k=keys[idx];
+    k.el.classList.remove('lit');
+    k.el.style.background='';
+    k.el.style.opacity='';
+    k.el.querySelector('[data-role=harm]').textContent='';
+  }
+}
+
+// =================================================================
+//  State
+// =================================================================
+let mode = 'harmonic';
+let fundamental = 100;
+const activeOsc = new Map();
+const slideVoices = new Map();
+
+// =================================================================
+//  Discrete voice (computer keyboard)
+// =================================================================
+function startOsc(id, freq, lit){
+  if(activeOsc.has(id)) return;
+  const osc = AC.createOscillator(), g = AC.createGain();
+  osc.type='sine'; osc.frequency.value=freq; g.gain.value=0;
+  osc.connect(g).connect(masterGain);
+  const t=AC.currentTime;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(0.22, t+0.012);
+  osc.start();
+  activeOsc.set(id,{osc,g,lit});
+  if(lit){
+    lightKey(lit.main, 1.0, lit.harmonic);
+    if(lit.neighbor!=null) lightKey(lit.neighbor, 0.45, null);
+  }
+}
+function stopOsc(id){
+  const o=activeOsc.get(id); if(!o) return;
+  const t=AC.currentTime;
+  o.g.gain.cancelScheduledValues(t);
+  o.g.gain.setValueAtTime(o.g.gain.value,t);
+  o.g.gain.linearRampToValueAtTime(0, t+0.05);
+  o.osc.stop(t+0.06);
+  activeOsc.delete(id);
+  if(o.lit){
+    unlightKey(o.lit.main);
+    if(o.lit.neighbor!=null) unlightKey(o.lit.neighbor);
+  }
+}
+
+function physTriggerOn(n){
+  const id = 'PK'+n;
+  if(activeOsc.has(id)) return;
+  let f, lit;
+  if(mode==='harmonic'){
+    const p = harmonicPlacement(n, fundamental);
+    if(p.nearestKeyIndex<0||p.nearestKeyIndex>=NUM_KEYS) return;
+    f = p.frequencyHz;
+    lit = { main:p.nearestKeyIndex, neighbor:p.neighborKeyIndex, harmonic:n };
+  } else {
+    const idx = LOWEST_C_INDEX + (n-1);
+    if(idx<0||idx>=NUM_KEYS) return;
+    f = midiToFreq(FIRST_MIDI + idx);
+    lit = { main:idx, neighbor:null, harmonic:null };
+  }
+  startOsc(id, f, lit);
+}
+function physTriggerOff(n){ stopOsc('PK'+n); }
+
+window.addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  const n = codeToHarmonic[e.code];
+  if(n!==undefined){ e.preventDefault(); AC.resume(); physTriggerOn(n); }
+});
+window.addEventListener('keyup', e=>{
+  const n = codeToHarmonic[e.code];
+  if(n!==undefined){ e.preventDefault(); physTriggerOff(n); }
+});
+
+// =================================================================
+//  HUD
+// =================================================================
+const hudMode = document.getElementById('hudMode');
+const hudFreq = document.getElementById('hudFreq');
+const hudNote = document.getElementById('hudNote');
+const hudHarm = document.getElementById('hudHarm');
+const hudCents= document.getElementById('hudCents');
+function setHud({freq, midi, harmonic, cents}){
+  hudFreq.textContent = freq!=null ? freq.toFixed(2)+' Hz' : '— Hz';
+  hudNote.textContent = midi!=null ? midiToNoteName(midi) : '—';
+  hudHarm.textContent = harmonic!=null ? ('H'+harmonic) : '—';
+  hudCents.textContent= cents!=null ? ((cents>0?'+':'')+cents.toFixed(1)+' ¢') : '—';
+}
+function clearHud(){ setHud({freq:null,midi:null,harmonic:null,cents:null}); }
+
+// =================================================================
+//  ===========   POSITION-LOCKED SLIDE-PLAY (v4.1)              ===
+// =================================================================
+const SLIDE_SMOOTH_TC = 0.005;
+const SLIDE_ATTACK    = 0.012;
+const SLIDE_RELEASE   = 0.06;
+const MAGNET_TOLERANCE_CENTS = 15;
+
+function pixelToMidi(x){
+  const t = Math.max(0, Math.min(1, x/totalWidth));
+  return FIRST_MIDI + t*(LAST_MIDI-FIRST_MIDI);
+}
+
+// ----- HARMONIC MODE: position-locked resolver -----
+// Given cursor x (in keyboard pixels), find the harmonic whose
+// piano key is CLOSEST in keyboard distance to the cursor.
+// This is the CORE FIX: we use VISUAL/KEYBOARD distance, not
+// frequency distance. So as the cursor crosses, say, C1->C2->G2->C3,
+// the system plays exactly H1->H2->H3->H4 in spatial order.
+function resolveHarmonicByPosition(x){
+  if(harmonicTable.length===0) return null;
+  // scan for the harmonic whose key center is nearest to x
+  let best = harmonicTable[0];
+  let bestDist = Math.abs(keyCenterX(best.keyIndex) - x);
+  for(let i=1;i<harmonicTable.length;i++){
+    const h = harmonicTable[i];
+    const d = Math.abs(keyCenterX(h.keyIndex) - x);
+    if(d < bestDist){ bestDist = d; best = h; }
+    else if(keyCenterX(h.keyIndex) > x && d > bestDist) break; // sorted -> can stop early
+  }
+  return best;
+}
+
+function resolveSlide(x){
+  const midiCont = pixelToMidi(x);
+  const fCont = midiToFreq(midiCont);
+
+  if(mode==='harmonic'){
+    // POSITION-LOCKED: harmonic chosen by keyboard distance, NOT by frequency
+    const h = resolveHarmonicByPosition(x);
+    if(!h) return null;
+    return {
+      freq: h.freq,
+      midi: freqToMidi(h.freq),
+      harmonic: h.n,
+      cents: h.cents,
+      lit:{ main:h.keyIndex, neighbor:h.neighbor, harmonic:h.n }
+    };
+  }
+  if(mode==='chromatic'){
+    const m = Math.round(midiCont);
+    const f = midiToFreq(m);
+    const idx = m - FIRST_MIDI;
+    return {
+      freq: f, midi: m, harmonic:null, cents:0,
+      lit:{ main:idx, neighbor:null, harmonic:null }
+    };
+  }
+  // free sinus
+  let outF = fCont;
+  let snapHarm = null, snapCents = (midiCont - Math.round(midiCont))*100;
+  const nGuess = Math.max(1, Math.round(fCont/fundamental));
+  for(const n of [nGuess-1, nGuess, nGuess+1]){
+    if(n<1) continue;
+    const fn = n*fundamental;
+    if(fn<=0||fn>20000) continue;
+    const cents = 1200*Math.log2(fCont/fn);
+    if(Math.abs(cents) < MAGNET_TOLERANCE_CENTS){
+      const t = 1 - Math.abs(cents)/MAGNET_TOLERANCE_CENTS;
+      const w = t*t*(3-2*t);
+      outF = (1-w)*fCont + w*fn;
+      snapHarm = n;
+      snapCents = cents;
+      break;
+    }
+  }
+  const m = freqToMidi(outF);
+  const lower = Math.floor(m), upper = lower+1;
+  const frac = m - lower;
+  const idxL = lower - FIRST_MIDI, idxU = upper - FIRST_MIDI;
+  return {
+    freq: outF, midi:m, harmonic: snapHarm, cents:snapCents,
+    lit:{ main:idxL, neighbor:idxU, mainAlpha:1-frac, neighAlpha:frac, harmonic:null }
+  };
+}
+
+function startSlideVoice(pointerId, x){
+  AC.resume();
+  const r = resolveSlide(x);
+  if(!r) return;
+  const osc = AC.createOscillator(), g = AC.createGain();
+  osc.type='sine';
+  osc.frequency.value = r.freq;
+  g.gain.value = 0;
+  osc.connect(g).connect(masterGain);
+  const t = AC.currentTime;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(0.25, t+SLIDE_ATTACK);
+  osc.start();
+
+  const voice = { osc, g, litMain:null, litNeighbor:null, lastResolved:r };
+  slideVoices.set(pointerId, voice);
+  applyLighting(voice, r);
+  updateHud(r);
+  updateSlideCursor(x);
+}
+
+function updateSlideVoice(pointerId, x){
+  const voice = slideVoices.get(pointerId);
+  if(!voice) return;
+  const r = resolveSlide(x);
+  if(!r) return;
+  voice.osc.frequency.setTargetAtTime(r.freq, AC.currentTime, SLIDE_SMOOTH_TC);
+  applyLighting(voice, r);
+  voice.lastResolved = r;
+  updateHud(r);
+  updateSlideCursor(x);
+}
+
+function endSlideVoice(pointerId){
+  const voice = slideVoices.get(pointerId);
+  if(!voice) return;
+  const t = AC.currentTime;
+  voice.g.gain.cancelScheduledValues(t);
+  voice.g.gain.setValueAtTime(voice.g.gain.value, t);
+  voice.g.gain.linearRampToValueAtTime(0, t+SLIDE_RELEASE);
+  voice.osc.stop(t+SLIDE_RELEASE+0.01);
+  if(voice.litMain!=null) unlightKey(voice.litMain);
+  if(voice.litNeighbor!=null) unlightKey(voice.litNeighbor);
+  slideVoices.delete(pointerId);
+  if(slideVoices.size===0){
+    slideCursor.classList.remove('active');
+    clearHud();
+  }
+}
+
+function applyLighting(voice, r){
+  const newMain = r.lit && r.lit.main!=null ? r.lit.main : null;
+  const newNeigh = r.lit && r.lit.neighbor!=null ? r.lit.neighbor : null;
+  if(newMain !== voice.litMain){
+    if(voice.litMain!=null) unlightKey(voice.litMain);
+    if(newMain!=null) lightKey(newMain, r.lit.mainAlpha!=null ? Math.max(0.4,r.lit.mainAlpha) : 1.0, r.lit.harmonic);
+    voice.litMain = newMain;
+  }
+  if(newNeigh !== voice.litNeighbor){
+    if(voice.litNeighbor!=null) unlightKey(voice.litNeighbor);
+    if(newNeigh!=null) lightKey(newNeigh, r.lit.neighAlpha!=null ? Math.max(0.3,r.lit.neighAlpha) : 0.45, null);
+    voice.litNeighbor = newNeigh;
+  }
+}
+
+function updateHud(r){
+  setHud({freq:r.freq, midi:r.midi, harmonic:r.harmonic, cents:r.cents});
+}
+function updateSlideCursor(x){
+  slideCursor.style.left = (x-1)+'px';
+  slideCursor.classList.add('active');
+}
+
+function getLocalX(evt){
+  const rect = kb.getBoundingClientRect();
+  return evt.clientX - rect.left;
+}
+
+kb.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  kb.setPointerCapture(e.pointerId);
+  startSlideVoice(e.pointerId, getLocalX(e));
+});
+kb.addEventListener('pointermove', e=>{
+  if(!slideVoices.has(e.pointerId)) return;
+  e.preventDefault();
+  updateSlideVoice(e.pointerId, getLocalX(e));
+});
+kb.addEventListener('pointerup', e=>{
+  if(!slideVoices.has(e.pointerId)) return;
+  e.preventDefault();
+  endSlideVoice(e.pointerId);
+  try{ kb.releasePointerCapture(e.pointerId); }catch(_){}
+});
+kb.addEventListener('pointercancel', e=>{ endSlideVoice(e.pointerId); });
+
+// =================================================================
+//  UI controls
+// =================================================================
+const fundFreq=document.getElementById('fundFreq');
+const fundSlider=document.getElementById('fundSlider');
+const fundVal=document.getElementById('fundVal');
+const volume=document.getElementById('volume');
+const volVal=document.getElementById('volVal');
+
+function setFundamental(f){
+  fundamental = Math.max(20, Math.min(5000, f));
+  fundFreq.value = fundamental;
+  if(fundamental>=fundSlider.min && fundamental<=fundSlider.max) fundSlider.value=fundamental;
+  fundVal.textContent = fundamental.toFixed(1)+' Hz';
+  rebuildHarmonicTable();
+  activeOsc.forEach((o,id)=>{
+    if(!id.startsWith('PK')) return;
+    const n = parseInt(id.slice(2),10);
+    let f;
+    if(mode==='harmonic') f = n*fundamental;
+    else f = midiToFreq(FIRST_MIDI + LOWEST_C_INDEX + (n-1));
+    o.osc.frequency.setTargetAtTime(f, AC.currentTime, 0.01);
+  });
+  // also update sustained slide voices
+  slideVoices.forEach((v,pid)=>{
+    if(v.lastResolved && v.lastResolved.harmonic){
+      const newF = v.lastResolved.harmonic * fundamental;
+      v.osc.frequency.setTargetAtTime(newF, AC.currentTime, 0.01);
+    }
+  });
+}
+setFundamental(100);
+fundFreq.addEventListener('input', ()=>setFundamental(parseFloat(fundFreq.value)||100));
+fundSlider.addEventListener('input',()=>setFundamental(parseFloat(fundSlider.value)));
+volume.addEventListener('input', ()=>{
+  masterGain.gain.setTargetAtTime(volume.value/100, AC.currentTime, 0.02);
+  volVal.textContent = volume.value+'%';
+});
+
+const btnH=document.getElementById('modeHarm');
+const btnC=document.getElementById('modeChrom');
+const btnF=document.getElementById('modeFree');
+function setMode(m, btn){
+  Array.from(activeOsc.keys()).forEach(id=>stopOsc(id));
+  Array.from(slideVoices.keys()).forEach(pid=>endSlideVoice(pid));
+  mode = m;
+  [btnH,btnC,btnF].forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  hudMode.textContent = m==='harmonic'?'Harmonic':(m==='chromatic'?'Chromatic':'Free Sinus');
+  refreshHarmonicMarkers();
+}
+btnH.addEventListener('click', ()=>setMode('harmonic',btnH));
+btnC.addEventListener('click', ()=>setMode('chromatic',btnC));
+btnF.addEventListener('click', ()=>setMode('free',btnF));
+
+document.body.addEventListener('click',()=>AC.resume(),{once:true});
+</script>
+</body>
+</html>
