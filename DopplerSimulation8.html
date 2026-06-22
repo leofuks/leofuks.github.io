@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doppler v10 — Cents Reverso + Gravação WAV</title>
+<style>
+  :root{
+    --bg:#0e1525; --panel:#18223a; --accent:#5ad1c5; --accent2:#f6ad55;
+    --text:#e6edf5; --muted:#93a1b8; --src:#f56565; --obs:#48bb78;
+    --warn:#f56565; --mach:#b794f6; --rev:#f687b3; --file:#63b3ed;
+    --up:#48bb78; --down:#f6ad55;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif;}
+  body{background:var(--bg);color:var(--text);padding:14px;line-height:1.4;}
+  .wrap{max-width:920px;margin:0 auto;}
+  h1{font-size:1.15rem;color:var(--accent);margin-bottom:8px;}
+  .topbar{background:var(--panel);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .topbar .field{display:flex;align-items:center;gap:8px;flex:1;min-width:220px;}
+  .topbar label{font-size:.78rem;color:var(--muted);white-space:nowrap;}
+  .topbar .val{font-size:.78rem;color:var(--accent);font-weight:600;min-width:96px;text-align:right;font-variant-numeric:tabular-nums;}
+  input[type=range]{flex:1;-webkit-appearance:none;height:5px;border-radius:4px;background:#28344e;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 5px var(--accent);}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border:none;border-radius:50%;background:var(--accent);cursor:pointer;}
+  .mbtn{background:transparent;border:1px solid var(--accent);color:var(--accent);padding:5px 12px;border-radius:7px;font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s;}
+  .mbtn.active{background:var(--accent);color:#06251f;box-shadow:0 0 6px var(--accent);}
+  .mtag{font-size:.8rem;color:var(--accent2);font-weight:700;min-width:42px;text-align:center;}
+  canvas#stage{width:100%;height:280px;background:#070b14;border-radius:10px;display:block;margin-bottom:8px;}
+  .data{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .chip{background:var(--panel);border-radius:7px;padding:5px 9px;border-top:2px solid var(--accent);min-width:88px;flex:1;}
+  .chip .k{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+  .chip .v{font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums;}
+  .chip.mach{border-top-color:var(--mach);} .chip.vel{border-top-color:var(--src);} .chip.cents{border-top-color:var(--accent2);}
+  .chip .v small{font-size:.6rem;color:var(--muted);font-weight:400;}
+  .arrow.up{color:var(--up);} .arrow.down{color:var(--down);} .arrow.zero{color:var(--muted);} .arrow.rev{color:var(--rev);}
+  .regime{border-radius:9px;padding:9px 13px;margin-bottom:10px;font-size:.82rem;font-weight:600;display:flex;gap:9px;align-items:center;line-height:1.35;transition:.2s;}
+  .regime .ico{font-size:1.25rem;}
+  .regime.sub{background:rgba(72,187,120,.14);color:var(--obs);border:1px solid rgba(72,187,120,.4);}
+  .regime.eq{background:rgba(245,101,101,.16);color:var(--warn);border:1px solid rgba(245,101,101,.5);}
+  .regime.sup{background:rgba(246,135,179,.14);color:var(--rev);border:1px solid rgba(246,135,179,.45);}
+  .regime small{font-weight:400;color:var(--muted);}
+  .panel{background:var(--panel);border-radius:10px;padding:12px 14px;margin-bottom:8px;}
+  .panel h2{font-size:.82rem;color:var(--accent);margin-bottom:9px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  button{background:var(--accent);color:#06251f;border:none;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:.82rem;}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+  button.ghost{background:transparent;border:1px solid var(--accent);color:var(--accent);}
+  button.rec{background:var(--src);color:#fff;}
+  button.file{background:var(--file);color:#06223a;}
+  select{background:#28344e;color:var(--text);border:none;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:.82rem;}
+  .ctrl{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;}
+  .ctrl label{font-size:.76rem;color:var(--muted);white-space:nowrap;}
+  .ctrl .val{font-size:.76rem;color:var(--accent);font-weight:600;min-width:60px;text-align:right;}
+  .status{font-size:.74rem;padding:4px 10px;border-radius:7px;background:#28344e;color:var(--muted);}
+  .status.live{background:rgba(245,101,101,.2);color:var(--src);}
+  .status.on{background:rgba(72,187,120,.2);color:var(--obs);}
+  .status.rev{background:rgba(246,135,179,.22);color:var(--rev);}
+  .filepanel{border:1px dashed rgba(99,179,237,.5);}
+  .recpanel{border:1px dashed rgba(245,101,101,.45);}
+  .filename{font-size:.76rem;color:var(--file);font-weight:600;margin-top:4px;}
+  .hint{font-size:.68rem;color:var(--muted);margin-top:6px;}
+  .flash{animation:flash .5s ease;}
+  @keyframes flash{0%{background:rgba(246,135,179,.5);}100%{background:transparent;}}
+  a.dl{font-size:.76rem;color:var(--accent);text-decoration:none;border:1px solid var(--accent);padding:6px 12px;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚗💨 Doppler v10 — Afinação Reversa + Gravação WAV</h1>
+
+  <div class="topbar">
+    <div class="field">
+      <label>Velocidade</label>
+      <input type="range" id="vel" min="-100" max="100" step="1" value="0">
+      <span class="val" id="velVal">0 km/h</span>
+    </div>
+    <button class="mbtn" id="mult10">×10</button>
+    <button class="mbtn" id="mult30">×30</button>
+    <span class="mtag" id="multTag">×1</span>
+  </div>
+
+  <canvas id="stage"></canvas>
+
+  <div class="regime sub" id="regime">
+    <span class="ico" id="regimeIco">🟢</span>
+    <span id="regimeTxt">Regime subsônico — som normal.</span>
+  </div>
+
+  <div class="data">
+    <div class="chip vel"><div class="k">Velocidade</div><div class="v"><span id="rVel">0</span><small> km/h</small></div></div>
+    <div class="chip mach"><div class="k">Velocidade (Mach)</div><div class="v"><span id="rMach">0.000</span><small> M</small></div></div>
+    <div class="chip"><div class="k">f real</div><div class="v"><span id="rFreal">440</span><small> Hz</small></div></div>
+    <div class="chip"><div class="k">f aparente</div><div class="v"><span id="rFap">440</span><small> Hz</small></div></div>
+    <div class="chip cents"><div class="k">Δ afinação (vs 440)</div><div class="v"><span id="rCents">0</span><small> ct</small> <span id="arrow" class="arrow zero">—</span></div></div>
+    <div class="chip"><div class="k">λ real</div><div class="v"><span id="rLamReal">0.780</span><small> m</small></div></div>
+    <div class="chip"><div class="k">λ aparente</div><div class="v"><span id="rLamAp">0.780</span><small> m</small></div></div>
+  </div>
+
+  <!-- TOM PURO -->
+  <div class="panel">
+    <h2>🎚️ Gerador de tom puro</h2>
+    <div class="row" style="margin-bottom:10px;">
+      <select id="waveType" title="Tipo de onda">
+        <option value="sine">Senoidal (tom puro)</option>
+        <option value="square">Onda quadrada</option>
+        <option value="triangle">Onda triangular</option>
+        <option value="sawtooth">Onda dente de serra</option>
+      </select>
+      <button id="toneToggle">▶ Tom</button>
+      <button id="dirToggle" class="ghost">↔ Inverter sentido</button>
+      <button id="resetVel" class="ghost">⟲ Zerar velocidade</button>
+    </div>
+    <div class="row">
+      <div class="ctrl"><label>Frequência</label><input type="range" id="freq" min="100" max="2000" step="1" value="440"><span class="val" id="freqVal">440 Hz</span></div>
+      <div class="ctrl"><label>Amplitude</label><input type="range" id="amp" min="0" max="100" step="1" value="50"><span class="val" id="ampVal">50 %</span></div>
+    </div>
+    <div class="hint">Frequência padrão: <b>440 Hz</b> (100–2000 Hz). Convenção: no supersônico o som é
+      <b>reverso</b> = frequência <b>negativa</b>; a afinação em cents é calculada pelo módulo, marcada como reversa.</div>
+  </div>
+
+  <!-- ARQUIVO -->
+  <div class="panel filepanel">
+    <h2>📂 Arquivo de áudio (WAV / MP3) — reversão automática com crossfade ao cruzar 1 Mach</h2>
+    <div class="row">
+      <input type="file" id="fileInput" accept=".wav,.mp3,audio/wav,audio/mpeg" style="display:none">
+      <button id="btnOpenFile" class="file">📁 Abrir WAV/MP3</button>
+      <button id="btnPlayFile" disabled>▶ Tocar</button>
+      <button id="btnStopFile" disabled>■ Parar</button>
+      <label style="font-size:.76rem;color:var(--muted);display:flex;align-items:center;gap:5px;">
+        <input type="checkbox" id="loopChk" checked> repetir (loop)
+      </label>
+      <span id="fileStatus" class="status">Nenhum arquivo</span>
+    </div>
+    <div class="filename" id="fileName"></div>
+  </div>
+
+  <!-- GRAVAÇÃO WAV -->
+  <div class="panel recpanel">
+    <h2>🎤 Gravação de áudio (WAV real — grava toda a saída)</h2>
+    <div class="row">
+      <button id="btnRec" class="rec">● Gravar</button>
+      <button id="btnStop" disabled>■ Parar</button>
+      <span id="recStatus" class="status">Aguardando</span>
+      <span id="recTime" class="status">00:00</span>
+      <span id="dlWrap"></span>
+    </div>
+    <div class="hint">Captura amostra a amostra a saída do sistema e gera um <b>.wav</b> reproduzível em
+      qualquer player. Funciona com tom puro e/ou arquivo em loop contínuo.</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const C=343, AUDIO_MIN=20, AUDIO_MAX=20000, MACH_EPS=0.001, REF=440, XFADE=0.03;
+  const $=id=>document.getElementById(id);
+
+  let baseVelKmh=0, speedFactor=1, baseFreq=440, amplitude=0.5, waveType='sine';
+
+  let audioCtx=null, masterGain=null;
+  let osc=null, oscGain=null, tonePlaying=false;
+  let fileBuffer=null, fileReversed=null, active=null, isPlaying=false, isLooping=true, lastMode=null, lastKnownPos=0;
+
+  /* Gravação WAV */
+  let recNode=null, recording=false, recL=[], recR=[], recSampleRate=44100, recStart=0, recTimer=null;
+
+  const effectiveKmh =()=>baseVelKmh*speedFactor;
+  const effectiveVs  =()=>effectiveKmh()/3.6;
+  const machNumber   =()=>Math.abs(effectiveVs())/C;
+  const isApproaching=()=>effectiveVs()<0;
+  function regime(){ const M=machNumber(); if(M<1-MACH_EPS)return 'sub'; if(M<=1+MACH_EPS)return 'eq'; return 'sup'; }
+  function desiredMode(){ const r=regime(),a=isApproaching(); if(a&&r==='eq')return 'mute'; if(a&&r==='sup')return 'reverse'; return 'normal'; }
+
+  function safeRate(){ const d=C+effectiveVs(); let r=C/Math.abs(d||1e-9); if(!isFinite(r))r=0.05; return Math.min(4,Math.max(0.05,r)); }
+
+  /* f aparente COM SINAL (negativo = reverso). Para tocar o tom usamos |f|. */
+  function apparentFreqSigned(){ const d=C+effectiveVs(); return (Math.abs(d)>1e-9)?baseFreq*C/d:Infinity; }
+  function toneOutputFreq(){
+    const fs=apparentFreqSigned(); const f=Math.abs(fs);
+    if(regime()==='eq' && isApproaching()) return null;     // 1 Mach: silêncio
+    return (isFinite(f)&&f>=AUDIO_MIN&&f<=AUDIO_MAX)?f:null;
+  }
+
+  function ensureCtx(){
+    if(!audioCtx){
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      masterGain=audioCtx.createGain(); masterGain.gain.value=1;
+      masterGain.connect(audioCtx.destination);
+      recSampleRate=audioCtx.sampleRate;
+    }
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  /* ---- TOM ---- */
+  function startTone(){
+    ensureCtx();
+    osc=audioCtx.createOscillator(); oscGain=audioCtx.createGain(); osc.type=waveType;
+    const fp=toneOutputFreq();
+    osc.frequency.value=fp!==null?fp:baseFreq;
+    oscGain.gain.value=fp!==null?amplitude*0.4:0;
+    osc.connect(oscGain).connect(masterGain);
+    osc.start(); tonePlaying=true; $('toneToggle').textContent='⏸ Tom';
+  }
+  function stopTone(){ if(osc){ try{osc.stop();}catch(e){} osc.disconnect(); osc=null; } tonePlaying=false; $('toneToggle').textContent='▶ Tom'; }
+  function updateToneLive(){
+    if(!osc) return;
+    const t=audioCtx.currentTime, fp=toneOutputFreq();
+    if(fp===null) oscGain.gain.setTargetAtTime(0,t,0.02);
+    else { osc.frequency.setTargetAtTime(fp,t,0.03); oscGain.gain.setTargetAtTime(amplitude*0.4,t,0.02); }
+  }
+  $('toneToggle').addEventListener('click',()=>tonePlaying?stopTone():startTone());
+  $('waveType').addEventListener('change',e=>{ waveType=e.target.value; if(osc) osc.type=waveType; });
+  $('freq').addEventListener('input',e=>{ baseFreq=parseFloat(e.target.value); $('freqVal').textContent=baseFreq+' Hz'; refreshAll(); });
+  $('amp').addEventListener('input',e=>{ amplitude=parseFloat(e.target.value)/100; $('ampVal').textContent=e.target.value+' %'; updateToneLive(); });
+
+  /* ---- ARQUIVO ---- */
+  function getReversed(){
+    if(fileReversed) return fileReversed;
+    const b=fileBuffer, rev=audioCtx.createBuffer(b.numberOfChannels,b.length,b.sampleRate);
+    for(let ch=0;ch<b.numberOfChannels;ch++){ const i=b.getChannelData(ch),o=rev.getChannelData(ch),n=b.length; for(let k=0;k<n;k++)o[k]=i[n-1-k]; }
+    fileReversed=rev; return rev;
+  }
+  function currentNormalPos(){
+    if(!fileBuffer||!active) return active?active.startOffset:lastKnownPos;
+    const dur=fileBuffer.duration, el=(audioCtx.currentTime-active.startCtxTime)*safeRate();
+    let p=(active.dir==='normal')?active.startOffset+el:active.startOffset-el;
+    if(isLooping) p=((p%dur)+dur)%dur; else p=Math.min(dur,Math.max(0,p));
+    return p;
+  }
+  function makeVoice(posNormal,mode,fadeIn){
+    if(mode==='mute') return null;
+    const dur=fileBuffer.duration, src=audioCtx.createBufferSource(), gain=audioCtx.createGain();
+    src.loop=isLooping; let dir,offset;
+    if(mode==='reverse'){ src.buffer=getReversed(); dir='reverse'; offset=Math.min(dur-1e-3,Math.max(0,dur-posNormal)); }
+    else { src.buffer=fileBuffer; dir='normal'; offset=Math.min(dur-1e-3,Math.max(0,posNormal)); }
+    src.playbackRate.value=safeRate(); src.connect(gain).connect(masterGain);
+    const t=audioCtx.currentTime;
+    if(fadeIn){ gain.gain.setValueAtTime(0,t); gain.gain.linearRampToValueAtTime(1,t+XFADE); } else gain.gain.setValueAtTime(1,t);
+    src.start(0,offset);
+    return { src,gain,dir,startCtxTime:t,startOffset:posNormal };
+  }
+  function fadeOutAndStop(v){
+    if(!v) return; const t=audioCtx.currentTime;
+    try{ v.gain.gain.cancelScheduledValues(t); v.gain.gain.setValueAtTime(v.gain.gain.value,t); v.gain.gain.linearRampToValueAtTime(0,t+XFADE); }catch(e){}
+    v.src.onended=null; setTimeout(()=>{ try{ v.src.stop(); v.src.disconnect(); v.gain.disconnect(); }catch(e){} }, XFADE*1000+20);
+  }
+  function switchMode(mode){
+    const pos=active?currentNormalPos():lastKnownPos;
+    const old=active, next=makeVoice(pos,mode,!!old);
+    if(old) fadeOutAndStop(old);
+    active=next; lastMode=mode;
+    if(mode==='mute') setFileStatus('🔴 1 Mach — silenciado','live');
+    else if(mode==='reverse') setFileStatus('🟣 Supersônico — AO CONTRÁRIO','rev');
+    else setFileStatus('🟢 Tocando c/ Doppler','on');
+    if(active) active.src.onended=()=>{ if(!isLooping) onSrcEnded(); };
+  }
+  function onSrcEnded(){ if(isLooping||!isPlaying) return; isPlaying=false; active=null; $('btnPlayFile').disabled=false; $('btnStopFile').disabled=true; setFileStatus('Concluído','on'); }
+
+  function setFileStatus(t,c){ $('fileStatus').className='status '+(c||''); $('fileStatus').textContent=t; }
+  $('btnOpenFile').addEventListener('click',()=>$('fileInput').click());
+  $('fileInput').addEventListener('change',async e=>{
+    const f=e.target.files[0]; if(!f) return;
+    try{ ensureCtx(); setFileStatus('Decodificando…','live');
+      fileBuffer=await audioCtx.decodeAudioData(await f.arrayBuffer()); fileReversed=null;
+      $('fileName').textContent='🎵 '+f.name+'  ('+fileBuffer.duration.toFixed(1)+'s)';
+      $('btnPlayFile').disabled=false; setFileStatus('Pronto','on');
+    }catch(err){ setFileStatus('Falha ao decodificar',''); $('fileName').textContent='⚠ Formato não suportado.'; }
+  });
+  $('btnPlayFile').addEventListener('click',()=>{
+    if(!fileBuffer)return; ensureCtx(); isPlaying=true; lastMode=null; lastKnownPos=0; active=null;
+    switchMode(desiredMode()); $('btnPlayFile').disabled=true; $('btnStopFile').disabled=false;
+  });
+  $('btnStopFile').addEventListener('click',()=>{
+    isPlaying=false; if(active) fadeOutAndStop(active); active=null; lastMode=null;
+    $('btnPlayFile').disabled=false; $('btnStopFile').disabled=true; setFileStatus('Parado','');
+  });
+  $('loopChk').addEventListener('change',e=>{ isLooping=e.target.checked; if(active) active.src.loop=isLooping; });
+
+  /* ===================================================================
+     GRAVAÇÃO WAV REAL — captura amostras do masterGain via ScriptProcessor
+     =================================================================== */
+  function setRec(t,c){ $('recStatus').className='status '+(c||''); $('recStatus').textContent=t; }
+  function fmtTime(s){ const m=Math.floor(s/60),x=Math.floor(s%60); return String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'); }
+
+  $('btnRec').addEventListener('click',()=>{
+    ensureCtx();
+    if($('dlWrap').dataset.url){ URL.revokeObjectURL($('dlWrap').dataset.url); $('dlWrap').innerHTML=''; delete $('dlWrap').dataset.url; }
+    recL=[]; recR=[]; recording=true;
+    recNode=audioCtx.createScriptProcessor(4096,2,2);
+    recNode.onaudioprocess=e=>{
+      if(!recording) return;
+      const L=e.inputBuffer.getChannelData(0), R=e.inputBuffer.getChannelData(1);
+      recL.push(new Float32Array(L)); recR.push(new Float32Array(R));
+    };
+    // master -> recNode -> destino mudo (necessário p/ processar), saída áudio já vai pelo master->destination
+    const silent=audioCtx.createGain(); silent.gain.value=0;
+    masterGain.connect(recNode); recNode.connect(silent); silent.connect(audioCtx.destination);
+    recNode._silent=silent;
+    recStart=performance.now();
+    recTimer=setInterval(()=>$('recTime').textContent=fmtTime((performance.now()-recStart)/1000),250);
+    setRec('Gravando…','live'); $('btnRec').disabled=true; $('btnStop').disabled=false;
+  });
+
+  $('btnStop').addEventListener('click',()=>{
+    if(!recording) return; recording=false;
+    clearInterval(recTimer);
+    try{ masterGain.disconnect(recNode); recNode.disconnect(); recNode._silent.disconnect(); }catch(e){}
+    recNode=null;
+    const wav=encodeWAV(flatten(recL),flatten(recR),recSampleRate);
+    const url=URL.createObjectURL(wav);
+    const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    $('dlWrap').innerHTML=`<a class="dl" href="${url}" download="doppler-${stamp}.wav">💾 Salvar gravação (.wav)</a>`;
+    $('dlWrap').dataset.url=url;
+    setRec('Gravação pronta','on'); $('btnRec').disabled=false; $('btnStop').disabled=true;
+  });
+
+  function flatten(chunks){ let len=0; chunks.forEach(c=>len+=c.length); const out=new Float32Array(len); let off=0; chunks.forEach(c=>{out.set(c,off);off+=c.length;}); return out; }
+  function encodeWAV(L,R,sr){
+    const n=L.length, buf=new ArrayBuffer(44+n*4), dv=new DataView(buf);
+    const ws=(o,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i,s.charCodeAt(i)); };
+    ws(0,'RIFF'); dv.setUint32(4,36+n*4,true); ws(8,'WAVE'); ws(12,'fmt ');
+    dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,2,true);
+    dv.setUint32(24,sr,true); dv.setUint32(28,sr*4,true); dv.setUint16(32,4,true); dv.setUint16(34,16,true);
+    ws(36,'data'); dv.setUint32(40,n*4,true);
+    let off=44;
+    for(let i=0;i<n;i++){
+      let l=Math.max(-1,Math.min(1,L[i])), r=Math.max(-1,Math.min(1,R[i]));
+      dv.setInt16(off,l<0?l*0x8000:l*0x7FFF,true); off+=2;
+      dv.setInt16(off,r<0?r*0x8000:r*0x7FFF,true); off+=2;
+    }
+    return new Blob([dv],{type:'audio/wav'});
+  }
+
+  /* ---- MONITOR ---- */
+  function monitorAudio(){
+    if(isPlaying && fileBuffer){
+      const want=desiredMode();
+      if(active) lastKnownPos=currentNormalPos();
+      if(want!==lastMode){ switchMode(want); $('regime').classList.add('flash'); setTimeout(()=>$('regime').classList.remove('flash'),10); }
+      else if(active) active.src.playbackRate.setTargetAtTime(safeRate(),audioCtx.currentTime,0.03);
+    }
+    updateToneLive();
+    requestAnimationFrame(monitorAudio);
+  }
+
+  /* ===================================================================
+     READOUT — CENTS CORRIGIDO (convenção de frequência negativa/reverso)
+     =================================================================== */
+  function updateRegimeBanner(){
+    const box=$('regime'),ico=$('regimeIco'),txt=$('regimeTxt');
+    const M=machNumber(),reg=regime(),appr=isApproaching();
+    box.classList.remove('sub','eq','sup');
+    if(!appr){ box.classList.add('sub'); ico.textContent='🟢'; txt.innerHTML=(M<MACH_EPS)?'Fonte parada — sem Doppler.':`Afastamento a <b>${M.toFixed(3)} Mach</b> — som normal.`; return; }
+    if(reg==='sub'){ box.classList.add('sub'); ico.textContent='🟢'; txt.innerHTML=`<b>Subsônico</b> — <b>${M.toFixed(3)} Mach</b>. Som normal, frequência elevada.`; }
+    else if(reg==='eq'){ box.classList.add('eq'); ico.textContent='🔴'; txt.innerHTML=`<b>1 Mach!</b> Choque sônico — saída silenciada.`; }
+    else{ box.classList.add('sup'); ico.textContent='🟣'; txt.innerHTML=`<b>Supersônico — ${M.toFixed(3)} Mach</b>. Som <b>reverso</b> (frequência negativa).`; }
+  }
+  function updateReadout(){
+    const vs=effectiveVs(), denom=C+vs;
+    const fSigned=apparentFreqSigned();         // pode ser negativa (reverso)
+    const fAbs=Math.abs(fSigned);
+    const lamReal=C/baseFreq;
+    const lamAp=(Math.abs(baseFreq)>1e-9)?(C+vs)/baseFreq:Infinity;   // negativo no reverso = onda invertida
+
+    $('rVel').textContent=effectiveKmh().toFixed(0);
+    $('rMach').textContent=machNumber().toFixed(3);
+    $('rFreal').textContent=Math.round(baseFreq);
+
+    // f aparente: exibe com sinal (negativa = reverso)
+    $('rFap').textContent = isFinite(fSigned) ? (fSigned<0?'−':'')+fAbs.toFixed(1) : '∞';
+
+    $('rLamReal').textContent=lamReal.toFixed(3);
+    $('rLamAp').textContent=isFinite(lamAp)?lamAp.toFixed(3):'—';
+
+    /* ===== CENTS ===== 
+       Convenção: som reverso = frequência negativa.
+       Calculamos os cents pelo MÓDULO de f' (sempre existe, nunca ∞ por sinal),
+       e SINALIZAMOS quando é caso reverso (supersônico em aproximação). */
+    const a=$('arrow');
+    if(!isFinite(fAbs) || fAbs<=0){
+      $('rCents').textContent='—'; a.className='arrow zero'; a.textContent='—';
+    }else{
+      const ct=1200*Math.log2(fAbs/REF);    // cents pelo módulo
+      const reverse=(fSigned<0);            // está no regime reverso
+      $('rCents').textContent=(ct>=0?'+':'')+ct.toFixed(1)+(reverse?' (rev)':'');
+      if(reverse){ a.className='arrow rev'; a.textContent='◀'; }
+      else if(Math.abs(ct)<0.05){ a.className='arrow zero'; a.textContent='—'; }
+      else if(ct>0){ a.className='arrow up'; a.textContent='▲'; }
+      else { a.className='arrow down'; a.textContent='▼'; }
+    }
+    updateRegimeBanner();
+  }
+  function refreshAll(){ $('velVal').textContent=effectiveKmh().toFixed(0)+' km/h'; updateReadout(); updateToneLive(); }
+
+  /* ---- VELOCIDADE / MULTIPLICADORES ---- */
+  $('vel').addEventListener('input',e=>{ baseVelKmh=parseFloat(e.target.value); refreshAll(); });
+  $('dirToggle').addEventListener('click',()=>{ const s=$('vel'); s.value=(-parseFloat(s.value)).toString(); baseVelKmh=parseFloat(s.value); refreshAll(); });
+  $('resetVel').addEventListener('click',()=>{ const s=$('vel'); s.value=0; baseVelKmh=0; refreshAll(); });
+  function recomputeFactor(){ const a=$('mult10').classList.contains('active')?10:1, b=$('mult30').classList.contains('active')?30:1; speedFactor=a*b; $('multTag').textContent='×'+speedFactor; refreshAll(); }
+  $('mult10').addEventListener('click',()=>{ $('mult10').classList.toggle('active'); recomputeFactor(); });
+  $('mult30').addEventListener('click',()=>{ $('mult30').classList.toggle('active'); recomputeFactor(); });
+
+  /* ---- ANIMAÇÃO ---- */
+  const canvas=$('stage'),ctx2d=canvas.getContext('2d');
+  let fronts=[],lastEmit=0,prevTime=performance.now();
+  function resize(){ canvas.width=canvas.clientWidth; canvas.height=canvas.clientHeight; }
+  window.addEventListener('resize',resize); resize();
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  function animate(now){
+    const dt=(now-prevTime)/1000; prevTime=now;
+    const W=canvas.width,H=canvas.height,cy=H/2;
+    const vsMs=effectiveVs(), visualV=Math.sign(vsMs)*Math.min(Math.abs(vsMs),60), srcVx=-visualV*2.2;
+    if(typeof animate.srcX==='undefined') animate.srcX=W*0.30;
+    animate.srcX=Math.max(W*0.08,Math.min(W*0.78,animate.srcX+srcVx*dt));
+    if((now-lastEmit)/1000>=0.18){ fronts.push({x0:animate.srcX,t0:now}); lastEmit=now; }
+    if(fronts.length>60) fronts.shift();
+    ctx2d.clearRect(0,0,W,H);
+    ctx2d.strokeStyle='#1c2843'; ctx2d.beginPath(); ctx2d.moveTo(0,cy); ctx2d.lineTo(W,cy); ctx2d.stroke();
+    const reg=regime(),appr=isApproaching();
+    const col=(appr&&reg==='eq')?'245,101,101':(appr&&reg==='sup')?'246,135,179':'90,209,197';
+    fronts.forEach(f=>{ const r=((now-f.t0)/1000)*150,a=Math.max(0,1-r/(W*0.9)); if(a<=0)return;
+      ctx2d.beginPath(); ctx2d.strokeStyle=`rgba(${col},${a})`; ctx2d.lineWidth=1.6; ctx2d.arc(f.x0,cy,r,0,Math.PI*2); ctx2d.stroke(); });
+    if(appr&&reg==='sup'){ const M=machNumber(),ang=Math.asin(Math.min(1,1/M));
+      ctx2d.strokeStyle='rgba(246,135,179,.55)'; ctx2d.lineWidth=2; ctx2d.beginPath();
+      ctx2d.moveTo(animate.srcX,cy); ctx2d.lineTo(animate.srcX+260,cy-260*Math.tan(ang));
+      ctx2d.moveTo(animate.srcX,cy); ctx2d.lineTo(animate.srcX+260,cy+260*Math.tan(ang)); ctx2d.stroke(); }
+    ctx2d.fillStyle=css('--obs'); ctx2d.beginPath(); ctx2d.arc(W*0.90,cy,9,0,Math.PI*2); ctx2d.fill();
+    ctx2d.strokeStyle=css('--src'); ctx2d.lineWidth=3; ctx2d.beginPath();
+    ctx2d.moveTo(animate.srcX,cy-22); ctx2d.lineTo(animate.srcX,cy+22); ctx2d.stroke();
+    requestAnimationFrame(animate);
+  }
+
+  recomputeFactor();
+  requestAnimationFrame(animate);
+  requestAnimationFrame(monitorAudio);
+})();
+</script>
+</body>
+</html>

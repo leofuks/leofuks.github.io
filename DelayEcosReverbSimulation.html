@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acústica Virtu-Real | Reflexão, Reverberação e Eco</title>
+<style>
+  :root {
+    --bg: #0f1421; --panel: #1a2236; --accent: #4fd1c5; --accent2: #f6ad55;
+    --text: #e2e8f0; --muted: #94a3b8; --danger: #f56565; --ok: #48bb78;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 20px; line-height: 1.5; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; color: var(--accent); }
+  .sub { color: var(--muted); margin-bottom: 22px; font-size: .9rem; }
+  .panel { background: var(--panel); border-radius: 14px; padding: 22px; margin-bottom: 18px;
+           box-shadow: 0 4px 20px rgba(0,0,0,.35); }
+  .panel h2 { font-size: 1rem; margin-bottom: 14px; color: var(--accent2); letter-spacing: .5px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  button { background: var(--accent); color: #06251f; border: none; padding: 11px 18px;
+           border-radius: 9px; font-weight: 600; cursor: pointer; font-size: .92rem;
+           transition: transform .1s, opacity .2s; }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.rec { background: var(--danger); color: #fff; }
+  button.ghost { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+  .ctrl { margin: 18px 0; }
+  .ctrl label { display: flex; justify-content: space-between; font-size: .88rem; margin-bottom: 8px; }
+  .ctrl label span:last-child { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+  input[type=range] { width: 100%; -webkit-appearance: none; height: 6px; border-radius: 4px;
+                      background: #2d3a52; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px;
+       border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 6px var(--accent); }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%;
+       background: var(--accent); cursor: pointer; }
+  canvas { width: 100%; height: 110px; background: #0a0e18; border-radius: 9px; display: block; }
+  .status { font-size: .85rem; padding: 8px 14px; border-radius: 8px; display: inline-block; }
+  .status.idle { background: #2d3a52; color: var(--muted); }
+  .status.live { background: rgba(245,101,101,.18); color: var(--danger); }
+  .status.ready { background: rgba(72,187,120,.18); color: var(--ok); }
+  .status.saved { background: rgba(79,209,197,.18); color: var(--accent); }
+  audio { width: 100%; margin-top: 12px; }
+  .hint { font-size: .8rem; color: var(--muted); margin-top: 10px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+  .blink { animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 600px){ .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔊 Reflexão, Reverberação e Eco</h1>
+  <p class="sub">Acústica Musical Virtu-Real — experimente como o som se reflete e decai no espaço.</p>
+
+  <!-- ============ MÓDULO DE GRAVAÇÃO ============ -->
+  <div class="panel">
+    <h2>1 · GRAVAÇÃO DO SINAL</h2>
+    <div class="row">
+      <button id="btnRec" class="rec">● Gravar</button>
+      <button id="btnStop" disabled>■ Parar</button>
+      <span id="recStatus" class="status idle"><span class="dot" style="background:var(--muted)"></span>Aguardando</span>
+    </div>
+    <canvas id="liveCanvas"></canvas>
+    <p class="hint">Cante, toque um instrumento ou produza qualquer som. O nível de entrada aparece acima.</p>
+  </div>
+
+  <!-- ============ CONTROLES DO EFEITO ============ -->
+  <div class="panel">
+    <h2>2 · CONTROLES DO EFEITO (tempo real)</h2>
+    <div class="ctrl">
+      <label>Tempo de atraso (delay)
+        <span id="delayVal">300 ms</span></label>
+      <input type="range" id="delay" min="10" max="10000" step="10" value="300">
+    </div>
+    <div class="ctrl">
+      <label>Atenuação por reflexão (amortecimento)
+        <span id="dampVal">-6.0 dB</span></label>
+      <input type="range" id="damp" min="-16" max="0" step="0.5" value="-6">
+    </div>
+    <div class="ctrl">
+      <label>Mix do efeito (seco / molhado)
+        <span id="mixVal">50 %</span></label>
+      <input type="range" id="mix" min="0" max="100" step="1" value="50">
+    </div>
+    <p class="hint">
+      <strong>Delay curto</strong> (&lt; 80&nbsp;ms) → reverberação densa.&nbsp;
+      <strong>Delay longo</strong> (&gt; 150&nbsp;ms) → ecos distintos.&nbsp;
+      Atenuação mais próxima de 0&nbsp;dB → cauda mais longa.
+    </p>
+  </div>
+
+  <!-- ============ REPRODUÇÃO E EXPORTAÇÃO ============ -->
+  <div class="panel">
+    <h2>3 · OUVIR, COMPARAR E SALVAR</h2>
+    <div class="row">
+      <button id="btnPlay" disabled>▶ Tocar com efeito</button>
+      <button id="btnPlayDry" class="ghost" disabled>▶ Original (seco)</button>
+      <button id="btnRender" disabled>💾 Renderizar &amp; Salvar (WAV)</button>
+      <span id="saveStatus" class="status idle">Não salvo</span>
+    </div>
+    <canvas id="fxCanvas"></canvas>
+    <div id="dlArea"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   ACÚSTICA MUSICAL VIRTU-REAL — Simulador de Reflexão / Reverberação / Eco
+   -------------------------------------------------------------------------
+   Conceito físico:
+   Cada reflexão sonora retorna ao ouvinte com um ATRASO (distância percorrida
+   pelo som) e uma ATENUAÇÃO (energia perdida na reflexão e no ar). Repetindo
+   esse processo em realimentação (feedback) obtemos uma série de ecos
+   decrescentes — exatamente o que percebemos como reverberação ou eco.
+
+   Cadeia de áudio:
+     fonte → [dry gain] ─────────────────┐
+              └→ [delay] → [feedback gain] ┤→ (loop de realimentação)
+                     └→ [wet gain] ────────┴→ destino
+   ========================================================================= */
+
+(() => {
+  'use strict';
+
+  // ---------- Estado global ----------
+  let audioCtx = null;          // AudioContext compartilhado
+  let recordedBuffer = null;    // AudioBuffer do som gravado (decodificado)
+  let mediaRecorder = null;     // MediaRecorder para captura
+  let chunks = [];              // pedaços do blob gravado
+  let activeSource = null;      // source em reprodução (para poder parar)
+  let analyser = null, rafId = null;
+
+  // ---------- Elementos DOM ----------
+  const $ = id => document.getElementById(id);
+  const btnRec = $('btnRec'), btnStop = $('btnStop');
+  const btnPlay = $('btnPlay'), btnPlayDry = $('btnPlayDry'), btnRender = $('btnRender');
+  const recStatus = $('recStatus'), saveStatus = $('saveStatus');
+  const delaySl = $('delay'), dampSl = $('damp'), mixSl = $('mix');
+  const delayVal = $('delayVal'), dampVal = $('dampVal'), mixVal = $('mixVal');
+  const liveCanvas = $('liveCanvas'), fxCanvas = $('fxCanvas');
+  const dlArea = $('dlArea');
+
+  // Nós "ao vivo" para reprodução em tempo real (recriados a cada play)
+  let liveNodes = null;
+
+  /* ---------------------------------------------------------------------
+     Utilitários
+  --------------------------------------------------------------------- */
+  // Converte decibéis em ganho linear:  gain = 10^(dB/20)
+  const dbToGain = db => Math.pow(10, db / 20);
+
+  function ensureCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function setRecStatus(text, cls, blink=false) {
+    recStatus.className = 'status ' + cls;
+    recStatus.innerHTML = `<span class="dot ${blink?'blink':''}" style="background:currentColor"></span>${text}`;
+  }
+  function setSaveStatus(text, cls) {
+    saveStatus.className = 'status ' + cls;
+    saveStatus.textContent = text;
+  }
+
+  /* ---------------------------------------------------------------------
+     1) GRAVAÇÃO via MediaRecorder
+  --------------------------------------------------------------------- */
+  btnRec.addEventListener('click', async () => {
+    try {
+      ensureCtx();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+
+      // Visualização do nível de entrada ao vivo
+      const src = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      drawLive();
+
+      chunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        cancelAnimationFrame(rafId);
+        stream.getTracks().forEach(t => t.stop());   // libera o microfone
+        const blob = new Blob(chunks, { type: chunks[0]?.type || 'audio/webm' });
+        const arr = await blob.arrayBuffer();
+        recordedBuffer = await audioCtx.decodeAudioData(arr); // → AudioBuffer
+        enablePlayback();
+        setRecStatus('Gravação pronta', 'ready');
+      };
+
+      mediaRecorder.start();
+      setRecStatus('Gravando…', 'live', true);
+      btnRec.disabled = true; btnStop.disabled = false;
+    } catch (err) {
+      setRecStatus('Erro: microfone negado', 'idle');
+      console.error(err);
+    }
+  });
+
+  btnStop.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    btnRec.disabled = false; btnStop.disabled = true;
+  });
+
+  function enablePlayback() {
+    btnPlay.disabled = false;
+    btnPlayDry.disabled = false;
+    btnRender.disabled = false;
+    setSaveStatus('Não salvo', 'idle');
+  }
+
+  /* ---------------------------------------------------------------------
+     2) Construção da CADEIA DE EFEITO (reutilizável: tempo real e offline)
+        Recebe um contexto (online ou offline) e a fonte de áudio.
+        Retorna os nós cujos parâmetros podem ser ajustados em tempo real.
+  --------------------------------------------------------------------- */
+  function buildFxChain(ctx, source) {
+    const dry = ctx.createGain();        // sinal seco (original)
+    const wet = ctx.createGain();        // sinal molhado (com efeito)
+    const delay = ctx.createDelay(10.0); // delay máx. = 10 s (requisito)
+    const feedback = ctx.createGain();   // realimentação → ecos sucessivos
+    const damp = ctx.createBiquadFilter(); // leve filtro p/ realismo da cauda
+    damp.type = 'lowpass';
+    damp.frequency.value = 4500;
+
+    // Valores iniciais a partir dos sliders
+    const delaySec = parseFloat(delaySl.value) / 1000;
+    const fbGain   = dbToGain(parseFloat(dampSl.value));
+    const mix      = parseFloat(mixSl.value) / 100;
+
+    delay.delayTime.value = delaySec;
+    feedback.gain.value   = fbGain;
+    wet.gain.value        = mix;
+    dry.gain.value        = 1 - mix;
+
+    // Roteamento:
+    source.connect(dry);                 // caminho seco
+    source.connect(delay);               // entra na linha de atraso
+    delay.connect(damp);
+    damp.connect(feedback);
+    feedback.connect(delay);             // loop de realimentação (ecos)
+    damp.connect(wet);                   // saída molhada
+
+    dry.connect(ctx.destination);
+    wet.connect(ctx.destination);
+
+    return { delay, feedback, wet, dry };
+  }
+
+  /* ---------------------------------------------------------------------
+     3) REPRODUÇÃO EM TEMPO REAL (com ajuste dinâmico dos sliders)
+  --------------------------------------------------------------------- */
+  function stopActive() {
+    if (activeSource) { try { activeSource.stop(); } catch(e){} activeSource = null; }
+    liveNodes = null;
+  }
+
+  btnPlay.addEventListener('click', () => {
+    if (!recordedBuffer) return;
+    ensureCtx();
+    stopActive();
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = recordedBuffer;
+    liveNodes = buildFxChain(audioCtx, src);
+
+    // Visualização da saída processada
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    liveNodes.wet.connect(analyser);
+    drawFx();
+
+    src.onended = () => { cancelAnimationFrame(rafId); };
+    src.start();
+    activeSource = src;
+  });
+
+  btnPlayDry.addEventListener('click', () => {
+    if (!recordedBuffer) return;
+    ensureCtx();
+    stopActive();
+    const src = audioCtx.createBufferSource();
+    src.buffer = recordedBuffer;
+    src.connect(audioCtx.destination);
+    src.start();
+    activeSource = src;
+  });
+
+  /* ---------------------------------------------------------------------
+     4) SLIDERS — atualização em TEMPO REAL
+        Se houver reprodução ativa, os parâmetros mudam suavemente.
+  --------------------------------------------------------------------- */
+  function updateLabels() {
+    const ms = parseInt(delaySl.value, 10);
+    delayVal.textContent = ms >= 1000 ? (ms/1000).toFixed(2) + ' s' : ms + ' ms';
+    dampVal.textContent  = parseFloat(dampSl.value).toFixed(1) + ' dB';
+    mixVal.textContent   = mixSl.value + ' %';
+  }
+
+  function applyLive() {
+    if (!liveNodes || !audioCtx) return;
+    const t = audioCtx.currentTime;
+    liveNodes.delay.delayTime.setTargetAtTime(parseFloat(delaySl.value)/1000, t, 0.02);
+    liveNodes.feedback.gain.setTargetAtTime(dbToGain(parseFloat(dampSl.value)), t, 0.02);
+    const mix = parseFloat(mixSl.value)/100;
+    liveNodes.wet.gain.setTargetAtTime(mix, t, 0.02);
+    liveNodes.dry.gain.setTargetAtTime(1 - mix, t, 0.02);
+  }
+
+  [delaySl, dampSl, mixSl].forEach(sl =>
+    sl.addEventListener('input', () => { updateLabels(); applyLive(); }));
+  updateLabels();
+
+  /* ---------------------------------------------------------------------
+     5) RENDERIZAÇÃO OFFLINE + EXPORTAÇÃO WAV (alta resolução)
+        Usa OfflineAudioContext para renderizar o resultado final, depois
+        codifica em WAV PCM 16-bit (compatível e de alta qualidade).
+  --------------------------------------------------------------------- */
+  btnRender.addEventListener('click', async () => {
+    if (!recordedBuffer) return;
+    setSaveStatus('Renderizando…', 'idle');
+
+    // Cauda extra para os ecos decaírem completamente
+    const tail = Math.min(parseFloat(delaySl.value)/1000 * 8, 12);
+    const len = Math.ceil((recordedBuffer.duration + tail) * recordedBuffer.sampleRate);
+
+    const offline = new OfflineAudioContext(
+      recordedBuffer.numberOfChannels,
+      len,
+      recordedBuffer.sampleRate
+    );
+    const src = offline.createBufferSource();
+    src.buffer = recordedBuffer;
+    buildFxChain(offline, src);   // mesma cadeia, parâmetros atuais
+    src.start();
+
+    const rendered = await offline.startRendering();
+    const wavBlob = audioBufferToWav(rendered);
+    const url = URL.createObjectURL(wavBlob);
+
+    dlArea.innerHTML = '';
+    const audio = document.createElement('audio');
+    audio.controls = true; audio.src = url;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'acustica-virtu-real_reverb-eco.wav';
+    a.textContent = '⬇ Baixar arquivo WAV';
+    a.style.cssText = 'display:inline-block;margin-top:10px;color:var(--accent);font-weight:600;';
+    dlArea.append(audio, a);
+
+    setSaveStatus('✔ Pronto para salvar', 'saved');
+    a.addEventListener('click', () => setSaveStatus('✔ Salvo', 'saved'));
+  });
+
+  // ---- Codificador WAV (PCM 16-bit) ----
+  function audioBufferToWav(buffer) {
+    const numCh = buffer.numberOfChannels;
+    const sr = buffer.sampleRate;
+    const samples = buffer.length;
+    const dataSize = samples * numCh * 2;
+    const ab = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(ab);
+
+    const writeStr = (off, str) => { for (let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); };
+
+    writeStr(0, 'RIFF');                 view.setUint32(4, 36 + dataSize, true);
+    writeStr(8, 'WAVE');                 writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);        view.setUint16(20, 1, true);   // PCM
+    view.setUint16(22, numCh, true);     view.setUint32(24, sr, true);
+    view.setUint32(28, sr * numCh * 2, true);
+    view.setUint16(32, numCh * 2, true); view.setUint16(34, 16, true);  // 16 bits
+    writeStr(36, 'data');                view.setUint32(40, dataSize, true);
+
+    // Intercala canais e converte float (-1..1) → PCM 16-bit
+    let offset = 44;
+    const chData = [];
+    for (let c=0;c<numCh;c++) chData.push(buffer.getChannelData(c));
+    for (let i=0;i<samples;i++) {
+      for (let c=0;c<numCh;c++) {
+        let s = Math.max(-1, Math.min(1, chData[c][i]));
+        view.setInt16(offset, s < 0 ? s*0x8000 : s*0x7FFF, true);
+        offset += 2;
+      }
+    }
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  /* ---------------------------------------------------------------------
+     6) VISUALIZAÇÕES (osciloscópio)
+  --------------------------------------------------------------------- */
+  function drawScope(canvas) {
+    const ctx2d = canvas.getContext('2d');
+    const W = canvas.width = canvas.clientWidth;
+    const H = canvas.height = canvas.clientHeight;
+    const data = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(data);
+
+    ctx2d.clearRect(0,0,W,H);
+    ctx2d.lineWidth = 2;
+    ctx2d.strokeStyle = '#4fd1c5';
+    ctx2d.beginPath();
+    const step = W / data.length;
+    for (let i=0;i<data.length;i++) {
+      const y = (data[i]/128.0) * (H/2);
+      i ? ctx2d.lineTo(i*step, y) : ctx2d.moveTo(0, y);
+    }
+    ctx2d.stroke();
+  }
+  function drawLive() { rafId = requestAnimationFrame(drawLive); if (analyser) drawScope(liveCanvas); }
+  function drawFx()   { rafId = requestAnimationFrame(drawFx);   if (analyser) drawScope(fxCanvas); }
+
+})();
+</script>
+</body>
+</html>
