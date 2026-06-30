@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Virtual Trumpet Simulator</title>
+<style>
+  :root { --bg:#16131a; --panel:#221d2b; --accent:#e0a84d; --on:#4dd06a; --off:#d0544d; }
+  * { box-sizing:border-box; -webkit-user-select:none; user-select:none; touch-action:none; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:#eee; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { padding:8px 12px; background:var(--panel); display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:13px; }
+  header label { display:flex; gap:4px; align-items:center; }
+  select,button { background:#312a3d; color:#eee; border:1px solid #443a55; border-radius:6px; padding:5px 8px; font-size:13px; }
+  button.primary { background:var(--accent); color:#1a1320; font-weight:600; cursor:pointer; }
+  button.micon { background:var(--on); color:#0a200f; }
+  button.micoff { background:var(--off); color:#2a0d0c; }
+  .status { display:flex; gap:16px; padding:8px 12px; font-size:13px; background:#1d1825; flex-wrap:wrap; }
+  .status b { color:var(--accent); }
+  #soundLamp { width:14px; height:14px; border-radius:50%; background:#553; display:inline-block; transition:.05s; }
+  #soundLamp.on { background:var(--on); box-shadow:0 0 12px var(--on); }
+  main { flex:1; display:flex; min-height:0; }
+  #info { flex:1; padding:14px; display:flex; flex-direction:column; gap:10px; justify-content:center; }
+  .note { font-size:64px; font-weight:700; color:var(--accent); }
+  .meter { height:18px; background:#2a2333; border-radius:9px; overflow:hidden; }
+  .meter > div { height:100%; width:0; background:var(--on); transition:width .05s; }
+  #valves { flex:1; display:flex; gap:6px; padding:6px; max-width:50vw; }
+  @media(max-width:760px){ main{flex-direction:column} #valves{max-width:none} #info{flex:0} }
+  .valve { flex:1; background:#2c2436; border:2px solid #443a55; border-radius:12px;
+    display:flex; align-items:flex-end; justify-content:center; padding-bottom:18px;
+    font-size:22px; font-weight:700; color:#888; transition:.05s; }
+  .valve.active { background:var(--accent); color:#1a1320; border-color:#fff; }
+  .small { font-size:11px; color:#999; }
+</style>
+</head>
+<body>
+<header>
+  <strong>🎺 Virtual Trumpet</strong>
+  <label>Tuning
+    <select id="tuning"><option value="Bb">B♭</option><option value="C">C</option><option value="D">D</option></select>
+  </label>
+  <label>Display
+    <select id="display"><option value="concert">Concert Pitch</option><option value="instrument">Instrument Pitch</option></select>
+  </label>
+  <label>Wave
+    <select id="wave"><option>triangle</option><option>sine</option><option>sawtooth</option><option>square</option></select>
+  </label>
+  <label>Tol(¢)<input id="tol" type="range" min="20" max="200" value="80" style="width:70px"></label>
+  <label>Vol<input id="vol" type="range" min="0" max="3" step="0.05" value="1.6" style="width:90px"></label>
+  <label><input id="vib" type="checkbox" checked>Vibrato</label>
+  <button id="micBtn" class="micoff">Microphone OFF</button>
+</header>
+
+<div class="status">
+  <span>Sound <span id="soundLamp"></span></span>
+  <span>Detected: <b id="detHz">–</b></span>
+  <span>Partial: <b id="partial">–</b></span>
+  <span>Playing: <b id="tgtHz">–</b></span>
+  <span>Δ: <b id="cents">–</b> ¢</span>
+  <span>Conf: <b id="conf">–</b></span>
+</div>
+
+<main>
+  <div id="info">
+    <div class="small">Fingering position</div>
+    <div class="note" id="posNote">0 — <span id="noteName">—</span></div>
+    <div class="small">Mic level</div>
+    <div class="meter"><div id="lvl"></div></div>
+    <div class="small">Keys: A = left valve · S = middle · D = right.<br>
+      D alone (3rd stripe) = position 8 (same pitch as A+S).<br>
+      Buzz any partial from the pedal tone upward to select the register.</div>
+  </div>
+  <div id="valves">
+    <div class="valve" data-v="0" id="vL">A</div>
+    <div class="valve" data-v="1" id="vM">S</div>
+    <div class="valve" data-v="2" id="vR">D</div>
+  </div>
+</main>
+
+<script>
+/* ============ Tuning / Harmonic Model ============
+   Partials now START AT 1 (pedal/first resonance) so the lowest buzz works. */
+const POSITION_SEMITONES = { 0:0, 1:-1, 2:-2, 3:-3, 4:-4, 5:-5, 6:-6, 8:-3 };
+
+/* Open-fingering harmonic series (sounding/concert MIDI), partials 1..8. */
+const TUNING_PARTIALS = {
+  Bb: [{p:1,m:46},{p:2,m:58},{p:3,m:65},{p:4,m:70},{p:5,m:74},{p:6,m:77},{p:7,m:80},{p:8,m:82}],
+  C:  [{p:1,m:48},{p:2,m:60},{p:3,m:67},{p:4,m:72},{p:5,m:76},{p:6,m:79},{p:7,m:82},{p:8,m:84}],
+  D:  [{p:1,m:50},{p:2,m:62},{p:3,m:69},{p:4,m:74},{p:5,m:78},{p:6,m:81},{p:7,m:84},{p:8,m:86}],
+};
+
+/* Written-note transposition offset (semitones added to sounding pitch for display).
+   Bb trumpet: written = sounding + 2 ; D trumpet: written = sounding - 2 ; C: 0. */
+const DISPLAY_TRANSPOSE = { Bb:2, C:0, D:-2 };
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const midiToHz = m => 440 * Math.pow(2,(m-69)/12);
+const midiToName = m => NOTE_NAMES[((Math.round(m)%12)+12)%12] + (Math.floor(Math.round(m)/12)-1);
+
+/* ============ State ============ */
+const valves=[false,false,false];
+let level=0;
+let curTargetHz=null, curTargetMidi=null, curPartial=null;
+let audioCtx=null, analyser=null, micBuf=null, micStream=null, micSource=null;
+let masterGain=null, compressor=null;
+let synthOsc=null, synthGain=null, lfo=null, lfoGain=null, playing=false;
+let micActive=false, running=false;
+
+/* ============ Fingering Decoder (independent of tuning) ============ */
+function decodePosition(){
+  const a=valves[0], s=valves[1], d=valves[2];
+  if(!a&&!s&&!d) return 0;
+  if(!a&&s&&!d)  return 1;
+  if(a&&!s&&!d)  return 2;
+  if(a&&s&&!d)   return 3;
+  if(!a&&s&&d)   return 4;
+  if(a&&!s&&d)   return 5;
+  if(a&&s&&d)    return 6;
+  if(!a&&!s&&d)  return 8;
+  return 0;
+}
+function getTuning(){ return document.getElementById('tuning').value; }
+
+function currentScale(){
+  const off=POSITION_SEMITONES[decodePosition()]??0;
+  return TUNING_PARTIALS[getTuning()].map(o=>({ p:o.p, midi:o.m+off, hz:midiToHz(o.m+off) }));
+}
+function selectPartial(hz){
+  if(!hz) return null;
+  let best=null, bestAbs=Infinity;
+  for(const n of currentScale()){
+    const c=1200*Math.log2(hz/n.hz);
+    if(Math.abs(c)<bestAbs){ bestAbs=Math.abs(c); best={...n,cents:c}; }
+  }
+  return best;
+}
+/* Display name: apply written-note transpose only in Instrument mode. */
+function displayName(soundingMidi){
+  const mode=document.getElementById('display').value;
+  const off = mode==='instrument' ? DISPLAY_TRANSPOSE[getTuning()] : 0;
+  return midiToName(soundingMidi+off);
+}
+
+/* ============ Input Manager ============ */
+function setValve(i,on){ if(valves[i]!==on){valves[i]=on; refreshUI();} }
+function refreshUI(){
+  [['vL',0],['vM',1],['vR',2]].forEach(([id,i])=>
+    document.getElementById(id).classList.toggle('active',valves[i]));
+  document.getElementById('posNote').firstChild.nodeValue=decodePosition()+' — ';
+}
+const KEYMAP={a:0,s:1,d:2};
+addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if(k in KEYMAP) setValve(KEYMAP[k],true); });
+addEventListener('keyup',  e=>{ const k=e.key.toLowerCase(); if(k in KEYMAP) setValve(KEYMAP[k],false); });
+function valveFromPoint(x,y){ const el=document.elementFromPoint(x,y);
+  return el&&el.classList.contains('valve')?+el.dataset.v:-1; }
+function handleTouches(e){
+  e.preventDefault();
+  const pressed=[false,false,false];
+  for(const t of e.touches){ const v=valveFromPoint(t.clientX,t.clientY); if(v>=0)pressed[v]=true; }
+  for(let i=0;i<3;i++) setValve(i,pressed[i]);
+}
+['touchstart','touchmove','touchend','touchcancel'].forEach(ev=>
+  document.getElementById('valves').addEventListener(ev,handleTouches,{passive:false}));
+
+/* ============ Pitch Detection — YIN (robust at low frequencies) ============ */
+const YIN_THRESHOLD = 0.12;
+function detectPitchYIN(buf, sampleRate){
+  const N = buf.length;
+  let rms=0; for(let i=0;i<N;i++) rms+=buf[i]*buf[i];
+  rms=Math.sqrt(rms/N); level=rms;
+  if(rms<0.008) return {hz:0,conf:0};
+
+  const maxLag = Math.floor(N/2);                 // supports low freq (down to ~sr/N*2)
+  const yin = new Float32Array(maxLag);
+  yin[0]=1;
+  // difference function
+  for(let tau=1; tau<maxLag; tau++){
+    let sum=0;
+    for(let i=0;i<maxLag;i++){ const d=buf[i]-buf[i+tau]; sum+=d*d; }
+    yin[tau]=sum;
+  }
+  // cumulative mean normalized difference
+  let running=0;
+  for(let tau=1; tau<maxLag; tau++){
+    running+=yin[tau];
+    yin[tau]*= tau/ (running||1);
+  }
+  // absolute threshold
+  let tauEst=-1;
+  for(let tau=2; tau<maxLag; tau++){
+    if(yin[tau]<YIN_THRESHOLD){
+      while(tau+1<maxLag && yin[tau+1]<yin[tau]) tau++;
+      tauEst=tau; break;
+    }
+  }
+  if(tauEst===-1){ // fallback: global minimum
+    let min=Infinity;
+    for(let tau=2; tau<maxLag; tau++) if(yin[tau]<min){min=yin[tau]; tauEst=tau;}
+    if(min>0.5) return {hz:0,conf:0};
+  }
+  // parabolic interpolation
+  let betterTau=tauEst;
+  if(tauEst>0 && tauEst<maxLag-1){
+    const s0=yin[tauEst-1], s1=yin[tauEst], s2=yin[tauEst+1];
+    const denom=(2*(2*s1-s2-s0));
+    if(denom) betterTau = tauEst + (s2-s0)/denom;
+  }
+  const hz = sampleRate/betterTau;
+  const conf = 1 - yin[tauEst];                   // closeness to perfect periodicity
+  return (hz>40 && hz<2000) ? {hz, conf} : {hz:0,conf:0};
+}
+
+/* ============ Synthesizer ============ */
+function startSynth(freq){
+  synthOsc=audioCtx.createOscillator();
+  synthGain=audioCtx.createGain();
+  synthOsc.type=document.getElementById('wave').value;
+  synthOsc.frequency.setValueAtTime(freq,audioCtx.currentTime);
+  synthGain.gain.setValueAtTime(0,audioCtx.currentTime);
+  synthGain.gain.linearRampToValueAtTime(0.5,audioCtx.currentTime+0.04);
+  synthGain.gain.linearRampToValueAtTime(0.4,audioCtx.currentTime+0.25);
+  synthOsc.connect(synthGain).connect(compressor);
+  if(document.getElementById('vib').checked){
+    lfo=audioCtx.createOscillator(); lfoGain=audioCtx.createGain();
+    lfo.frequency.value=5.5; lfoGain.gain.value=freq*0.006;
+    lfo.connect(lfoGain).connect(synthOsc.frequency); lfo.start();
+  }
+  synthOsc.start(); playing=true;
+}
+function stopSynth(){
+  if(!playing)return;
+  const t=audioCtx.currentTime;
+  synthGain.gain.cancelScheduledValues(t);
+  synthGain.gain.setValueAtTime(synthGain.gain.value,t);
+  synthGain.gain.linearRampToValueAtTime(0,t+0.08);
+  synthOsc.stop(t+0.1); if(lfo)lfo.stop(t+0.1);
+  playing=false;
+}
+function updateSynthFreq(freq){
+  if(playing) synthOsc.frequency.setTargetAtTime(freq,audioCtx.currentTime,0.03);
+}
+
+/* ============ Real-Time Loop ============ */
+function loop(){
+  if(running && analyser){
+    analyser.getFloatTimeDomainData(micBuf);
+    const {hz,conf}=detectPitchYIN(micBuf,audioCtx.sampleRate);
+    const tol=+document.getElementById('tol').value;
+    let matched=false, sel=null;
+    if(hz>0 && conf>0.85 && level>0.01){
+      sel=selectPartial(hz);
+      if(sel && Math.abs(sel.cents)<tol){
+        matched=true; curTargetHz=sel.hz; curTargetMidi=sel.midi; curPartial=sel.p;
+      }
+    }
+    if(matched){
+      if(!playing) startSynth(curTargetHz); else updateSynthFreq(curTargetHz);
+      document.getElementById('noteName').textContent=displayName(curTargetMidi);
+    } else if(playing){ stopSynth(); }
+
+    document.getElementById('detHz').textContent  = hz?hz.toFixed(1)+' Hz':'–';
+    document.getElementById('partial').textContent= sel?('#'+sel.p):'–';
+    document.getElementById('tgtHz').textContent  = matched?curTargetHz.toFixed(1)+' Hz':'–';
+    document.getElementById('cents').textContent  = sel?sel.cents.toFixed(0):'–';
+    document.getElementById('conf').textContent   = conf.toFixed(2);
+    document.getElementById('lvl').style.width     = Math.min(100,level*400)+'%';
+    document.getElementById('soundLamp').classList.toggle('on',playing);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ============ Audio Graph build ============ */
+function buildGraph(){
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = +document.getElementById('vol').value; // ~1.6x default
+  compressor = audioCtx.createDynamicsCompressor();
+  compressor.threshold.value=-12; compressor.knee.value=24;
+  compressor.ratio.value=4; compressor.attack.value=0.003; compressor.release.value=0.2;
+  compressor.connect(masterGain).connect(audioCtx.destination);
+}
+
+/* ============ Mic Toggle ============ */
+async function micOn(){
+  const btn=document.getElementById('micBtn');
+  try{
+    btn.textContent='Starting…';
+    if(!navigator.mediaDevices?.getUserMedia)
+      throw new Error('getUserMedia unavailable (needs HTTPS or localhost)');
+    if(!audioCtx){ audioCtx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); buildGraph(); }
+    await audioCtx.resume();
+    micStream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    micSource=audioCtx.createMediaStreamSource(micStream);
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=4096;                 // bigger window -> better low-freq resolution
+    micBuf=new Float32Array(analyser.fftSize);
+    micSource.connect(analyser);
+    micActive=true; running=true;
+    btn.textContent='Microphone ON'; btn.className='micon';
+  }catch(err){
+    console.error(err);
+    btn.textContent='Microphone OFF'; btn.className='micoff';
+    alert('Microphone failed: '+err.name+' — '+err.message+
+      '\nServe over HTTPS or http://localhost and allow mic access.');
+  }
+}
+function micOff(){
+  running=false;
+  if(playing) stopSynth();
+  if(micSource){ try{micSource.disconnect();}catch(e){} micSource=null; }
+  if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
+  analyser=null; micActive=false;
+  const btn=document.getElementById('micBtn');
+  btn.textContent='Microphone OFF'; btn.className='micoff';
+  document.getElementById('soundLamp').classList.remove('on');
+}
+document.getElementById('micBtn').addEventListener('click',()=>{ micActive?micOff():micOn(); });
+
+/* ============ Volume live update ============ */
+document.getElementById('vol').addEventListener('input',e=>{
+  if(masterGain) masterGain.gain.setTargetAtTime(+e.target.value,audioCtx.currentTime,0.02);
+});
+
+refreshUI();
+loop();
+</script>
+</body>
+</html>
