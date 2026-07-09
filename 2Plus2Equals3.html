@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>2 + 2 = 3 — Musical Interval Trainer</title>
+  <style>
+    /* ============================================================
+       2 + 2 = 3 — Musical Interval Trainer
+       Acústica Musical Virtu-Real · Leonardo Fuks
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d2e;
+      --surface2: #22263a;
+      --accent:   #7c6af7;
+      --accent2:  #56cfbf;
+      --correct:  #3ecf8e;
+      --wrong:    #f46e6e;
+      --text:     #e8eaf6;
+      --muted:    #8890b0;
+      --border:   #2e3354;
+      --radius:   14px;
+      --shadow:   0 8px 32px rgba(0,0,0,0.45);
+      --font:     'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font); min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1a1d2e 0%, #12153a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px; box-shadow: var(--shadow);
+    }
+    .header-inner {
+      max-width: 900px; margin: 0 auto; display: flex;
+      align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+    }
+    h1 {
+      font-size: 2.6rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; letter-spacing: -1px;
+    }
+    .subtitle { font-size: 1rem; color: var(--accent2); font-weight: 500; margin-top: 2px; }
+    .author   { font-size: 0.78rem; color: var(--muted); margin-top: 3px; }
+    .header-controls { display: flex; gap: 10px; align-items: center; }
+
+    /* ── BUTTONS ─────────────────────────────────────────────── */
+    .btn-lang, .btn-settings {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 8px 16px; border-radius: 8px;
+      cursor: pointer; font-size: 0.9rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .btn-lang:hover, .btn-settings:hover {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #5b52d4);
+      color: #fff; border: none; padding: 12px 30px; border-radius: 10px;
+      cursor: pointer; font-size: 1rem; font-weight: 600; margin-top: 16px;
+      transition: opacity 0.2s, transform 0.1s; display: inline-block;
+    }
+    .btn-primary:hover  { opacity: 0.88; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-export {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--accent2); padding: 5px 14px; border-radius: 8px;
+      cursor: pointer; font-size: 0.85rem; font-weight: 600;
+      transition: background 0.2s;
+    }
+    .btn-export:hover { background: var(--accent2); color: var(--bg); }
+    .btn-play {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--accent2); padding: 6px 12px; border-radius: 8px;
+      cursor: pointer; font-size: 1rem;
+      transition: background 0.2s, transform 0.1s; margin-left: 8px;
+    }
+    .btn-play:hover  { background: var(--accent2); color: var(--bg); transform: scale(1.08); }
+    .btn-play:active { transform: scale(0.97); }
+
+    /* ── SETTINGS PANEL ──────────────────────────────────────── */
+    .settings-panel {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      overflow: hidden; max-height: 0;
+      transition: max-height 0.38s ease, padding 0.3s;
+    }
+    .settings-panel.open { max-height: 700px; padding: 24px 28px; }
+    .settings-inner { max-width: 900px; margin: 0 auto; }
+    .settings-inner h2 { color: var(--accent); margin-bottom: 18px; font-size: 1.2rem; }
+    .setting-group { margin-bottom: 18px; }
+    .setting-group > label {
+      display: block; font-weight: 600; color: var(--accent2);
+      margin-bottom: 8px; font-size: 0.95rem;
+    }
+    .radio-group { display: flex; flex-wrap: wrap; gap: 12px; }
+    .radio-group label {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 0.9rem; transition: border-color 0.2s, background 0.2s;
+    }
+    .radio-group label:hover { border-color: var(--accent); }
+    .radio-group input[type="radio"] { accent-color: var(--accent); }
+    .advanced-options {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+      margin-top: 10px; margin-bottom: 10px;
+    }
+
+    /* ── MAIN ────────────────────────────────────────────────── */
+    main { flex: 1; max-width: 900px; margin: 0 auto; padding: 30px 20px; width: 100%; }
+
+    /* ── SCORE BAR ───────────────────────────────────────────── */
+    .score-bar {
+      display: flex; align-items: center; gap: 22px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 22px;
+      margin-bottom: 26px; font-size: 0.95rem; font-weight: 600; flex-wrap: wrap;
+    }
+    #scoreCorrect  { color: var(--correct); }
+    #scoreWrong    { color: var(--wrong);   }
+    #scoreAccuracy { color: var(--accent2); }
+    .score-bar .btn-export { margin-left: auto; }
+
+    /* ── QUESTION CARD ───────────────────────────────────────── */
+    .question-card {
+      background: linear-gradient(135deg, var(--surface) 0%, #1e2240 100%);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 34px 28px 28px; text-align: center;
+      margin-bottom: 26px; box-shadow: var(--shadow);
+    }
+    .question-label {
+      font-size: 0.95rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 22px;
+    }
+    .interval-display {
+      display: flex; align-items: center;
+      justify-content: center; gap: 16px; flex-wrap: wrap;
+    }
+    .interval-block {
+      display: flex; align-items: center; background: var(--surface2);
+      border: 2px solid var(--border); border-radius: 12px;
+      padding: 14px 22px; transition: border-color 0.2s, box-shadow 0.2s; gap: 6px;
+    }
+    .interval-block:hover {
+      border-color: var(--accent); box-shadow: 0 0 14px rgba(124,106,247,0.22);
+    }
+    .interval-name  { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+    .interval-notes { font-size: 0.78rem; color: var(--muted); display: block; margin-top: 3px; }
+    .operator       { font-size: 2.2rem; font-weight: 800; color: var(--accent); line-height: 1; }
+    .equals         { font-size: 2.2rem; font-weight: 800; color: var(--muted); }
+    .question-mark  {
+      font-size: 2.8rem; font-weight: 900; color: var(--accent2);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .note-hint {
+      margin-top: 18px; font-size: 0.88rem;
+      color: var(--muted); font-style: italic; min-height: 22px;
+    }
+
+    /* ── CHOICES ─────────────────────────────────────────────── */
+    .choices-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .choice-btn {
+      background: var(--surface); border: 2px solid var(--border);
+      color: var(--text); padding: 16px 12px; border-radius: var(--radius);
+      cursor: pointer; font-size: 1rem; font-weight: 600; text-align: center;
+      transition: border-color 0.18s, background 0.18s, transform 0.12s;
+    }
+    .choice-btn:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); }
+    .choice-btn:active:not(:disabled){ transform: translateY(0); }
+    .choice-btn:disabled { cursor: default; }
+    .choice-btn.correct {
+      border-color: var(--correct)!important;
+      background: rgba(62,207,142,0.12)!important; color: var(--correct)!important;
+    }
+    .choice-btn.wrong {
+      border-color: var(--wrong)!important;
+      background: rgba(244,110,110,0.12)!important; color: var(--wrong)!important;
+    }
+
+    /* ── FEEDBACK ────────────────────────────────────────────── */
+    .feedback-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 26px 28px; text-align: center;
+      box-shadow: var(--shadow); animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)}
+    }
+    .feedback-icon { font-size: 2.8rem; margin-bottom: 8px; }
+    .feedback-msg  { font-size: 1.3rem; font-weight: 700; margin-bottom: 10px; }
+    .feedback-msg.ok  { color: var(--correct); }
+    .feedback-msg.err { color: var(--wrong);   }
+    .feedback-explanation {
+      font-size: 0.95rem; color: var(--muted); line-height: 1.6;
+      margin-bottom: 14px; font-style: italic;
+    }
+    .feedback-answer-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; flex-wrap: wrap; font-size: 0.95rem;
+      color: var(--muted); margin-bottom: 4px;
+    }
+    .feedback-answer-row strong { color: var(--accent2); font-size: 1.05rem; }
+
+    /* ── HISTORY ─────────────────────────────────────────────── */
+    .history-section { max-width: 900px; margin: 0 auto 30px; padding: 0 20px; }
+    .btn-history-toggle {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--accent2); padding: 10px 22px; border-radius: 10px;
+      cursor: pointer; font-size: 0.95rem; font-weight: 600;
+      transition: background 0.2s; width: 100%; text-align: left;
+    }
+    .btn-history-toggle:hover { background: var(--surface2); }
+    .history-container {
+      margin-top: 12px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto;
+    }
+    #historyTable { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    #historyTable th, #historyTable td {
+      padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    #historyTable th {
+      background: var(--surface2); color: var(--accent2); font-weight: 700;
+      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    #historyTable td { color: var(--muted); }
+    #historyTable tr:last-child td { border-bottom: none; }
+    #historyTable tr:hover td { background: var(--surface2); color: var(--text); }
+    .result-ok  { color: var(--correct)!important; font-weight: 700; }
+    .result-err { color: var(--wrong)!important;   font-weight: 700; }
+
+    /* ── FOOTER ──────────────────────────────────────────────── */
+    footer {
+      background: var(--surface); border-top: 1px solid var(--border);
+      text-align: center; padding: 16px; font-size: 0.8rem; color: var(--muted);
+    }
+    .hidden { display: none !important; }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.9rem; }
+      .interval-name { font-size: 1rem; }
+      .choices-grid  { grid-template-columns: 1fr 1fr; }
+      .operator, .equals { font-size: 1.6rem; }
+      .question-mark { font-size: 2.1rem; }
+      .interval-block { padding: 10px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="title-block">
+      <h1>2 + 2 = 3</h1>
+      <p class="subtitle" data-i18n="subtitle">Musical Interval Trainer</p>
+      <p class="author">Leonardo Fuks · Acústica Musical Virtu-Real</p>
+    </div>
+    <div class="header-controls">
+      <button id="langToggle"     class="btn-lang">🇧🇷 PT</button>
+      <button id="settingsToggle" class="btn-settings">
+        ⚙️ <span data-i18n="settings">Settings</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- SETTINGS PANEL -->
+<div id="settingsPanel" class="settings-panel">
+  <div class="settings-inner">
+    <h2 data-i18n="settingsTitle">Settings</h2>
+    <div class="setting-group">
+      <label data-i18n="mode">Mode</label>
+      <div class="radio-group">
+        <label><input type="radio" name="mode" value="beginner" checked>
+          <span data-i18n="beginner">Beginner</span></label>
+        <label><input type="radio" name="mode" value="advanced">
+          <span data-i18n="advanced">Advanced</span></label>
+      </div>
+    </div>
+    <div id="advancedOptions" class="advanced-options hidden">
+      <div class="setting-group">
+        <label data-i18n="operation">Operation Type</label>
+        <div class="radio-group">
+          <label><input type="radio" name="operation" value="addition" checked>
+            <span data-i18n="additionOnly">Addition only</span></label>
+          <label><input type="radio" name="operation" value="subtraction">
+            <span data-i18n="subtractionOnly">Subtraction only</span></label>
+          <label><input type="radio" name="operation" value="mixed">
+            <span data-i18n="mixed">Mixed</span></label>
+        </div>
+      </div>
+      <div class="setting-group">
+        <label data-i18n="range">Interval Range</label>
+        <div class="radio-group">
+          <label><input type="radio" name="range" value="oneOctave" checked>
+            <span data-i18n="oneOctave">Within one octave</span></label>
+          <label><input type="radio" name="range" value="twoOctaves">
+            <span data-i18n="twoOctaves">Up to two octaves</span></label>
+        </div>
+      </div>
+    </div>
+    <button id="closeSettings" class="btn-primary" data-i18n="close">Close</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+  <div class="score-bar">
+    <span>✅ <span id="scoreCorrect">0</span> <span data-i18n="correct">Correct</span></span>
+    <span>❌ <span id="scoreWrong">0</span>   <span data-i18n="wrong">Wrong</span></span>
+    <span>🎯 <span id="scoreAccuracy">0</span>%</span>
+    <button id="exportCSV" class="btn-export">📊 CSV</button>
+  </div>
+
+  <div class="question-card">
+    <div class="question-label" data-i18n="questionLabel">What is the result of:</div>
+    <div class="interval-display">
+      <div class="interval-block">
+        <div>
+          <span class="interval-name"  id="interval1Name">—</span>
+          <span class="interval-notes" id="interval1Notes"></span>
+        </div>
+        <button class="btn-play" id="playInterval1">🔊</button>
+      </div>
+      <span class="operator" id="operatorSymbol">+</span>
+      <div class="interval-block">
+        <div>
+          <span class="interval-name"  id="interval2Name">—</span>
+          <span class="interval-notes" id="interval2Notes"></span>
+        </div>
+        <button class="btn-play" id="playInterval2">🔊</button>
+      </div>
+      <span class="equals">=</span>
+      <span class="question-mark">?</span>
+    </div>
+    <div class="note-hint" id="noteHint"></div>
+  </div>
+
+  <div class="choices-grid" id="choicesGrid"></div>
+
+  <div class="feedback-box hidden" id="feedbackBox">
+    <div class="feedback-icon" id="feedbackIcon"></div>
+    <div class="feedback-msg"  id="feedbackMsg"></div>
+    <div class="feedback-explanation" id="feedbackExplanation"></div>
+    <div class="feedback-answer-row">
+      <span data-i18n="correctAnswerIs">Correct answer:</span>
+      <strong id="feedbackCorrectAnswer"></strong>
+      <button class="btn-play" id="playCorrectAnswer">🔊</button>
+    </div>
+    <button id="nextQuestion" class="btn-primary" data-i18n="next">Next Question →</button>
+  </div>
+</main>
+
+<!-- HISTORY -->
+<section class="history-section">
+  <button class="btn-history-toggle" id="historyToggle">
+    📋 <span id="historyToggleLabel" data-i18n="showHistory">Show History</span>
+  </button>
+  <div id="historyContainer" class="history-container hidden">
+    <table id="historyTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th data-i18n="thQuestion">Question</th>
+          <th data-i18n="thUserAnswer">Your Answer</th>
+          <th data-i18n="thCorrect">Correct Answer</th>
+          <th data-i18n="thResult">Result</th>
+          <th data-i18n="thNotes">Notes</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <p>Acústica Musical Virtu-Real · <em>The Musician's Guide to Acoustics</em> · Leonardo Fuks</p>
+</footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+   PRINCÍPIO FUNDAMENTAL — ARITMÉTICA DE INTERVALOS MUSICAIS
+   ─────────────────────────────────────────────────────────────
+   Um intervalo é definido por DOIS componentes independentes:
+
+     1. NÚMERO ORDINAL (n): distância diatônica entre as notas
+        Uníssono=1, Segunda=2, Terça=3, Quarta=4, Quinta=5,
+        Sexta=6, Sétima=7, Oitava=8, Nona=9, Décima=10 ...
+
+     2. QUALIDADE: determinada pelos semitons dentro do número fixo
+        (diminuta, menor, justa, maior, aumentada)
+
+   LEI DA ADIÇÃO:
+     n_resultado = n_A + n_B − 1   ← INVARIÁVEL, independe da qualidade
+     st_resultado = st_A + st_B
+
+   LEI DA SUBTRAÇÃO:
+     n_resultado = |n_A − n_B| + 1
+     st_resultado = |st_A − st_B|
+
+   ─────────────────────────────────────────────────────────────
+   REGRA DAS OPÇÕES DE RESPOSTA (NOVO COMPORTAMENTO):
+   ─────────────────────────────────────────────────────────────
+   Todas as 4 opções apresentadas ao estudante devem ter
+   OBRIGATORIAMENTE o mesmo número ordinal que a resposta correta.
+
+   Exemplo: 5ª + 8ª = 12ª (qualquer qualidade)
+     → TODAS as 4 opções devem ser décimas segundas:
+       ✅ Décima segunda diminuta  (17 st)
+       ✅ Décima segunda justa     (18 st) ← resposta correta
+       ✅ Décima segunda aumentada (19 st)
+       ✅ (4ª opção: outra variação de 12ª se disponível)
+
+   Isso força o estudante a raciocinar sobre QUALIDADE,
+   não sobre número ordinal — que é sempre determinístico.
+   ============================================================ */
+
+
+/* ============================================================
+   1. TABELA CANÔNICA DE INTERVALOS
+   Completa do uníssono à décima quinta (dupla oitava).
+   Todas as qualidades válidas para cada número ordinal.
+   ============================================================ */
+const INTERVALS = [
+  // ── Uníssono ────────────────────────────────────────────
+  {number:1,  quality:"perfect",    semitones:0,  abbr:"1P",
+   nameEn:"Perfect unison",        namePt:"Uníssono justo"},
+  {number:1,  quality:"augmented",  semitones:1,  abbr:"1A",
+   nameEn:"Augmented unison",      namePt:"Uníssono aumentado"},
+  // ── Segundas ────────────────────────────────────────────
+  {number:2,  quality:"diminished", semitones:0,  abbr:"2d",
+   nameEn:"Diminished second",     namePt:"Segunda diminuta"},
+  {number:2,  quality:"minor",      semitones:1,  abbr:"2m",
+   nameEn:"Minor second",          namePt:"Segunda menor"},
+  {number:2,  quality:"major",      semitones:2,  abbr:"2M",
+   nameEn:"Major second",          namePt:"Segunda maior"},
+  {number:2,  quality:"augmented",  semitones:3,  abbr:"2A",
+   nameEn:"Augmented second",      namePt:"Segunda aumentada"},
+  // ── Terças ──────────────────────────────────────────────
+  {number:3,  quality:"diminished", semitones:2,  abbr:"3d",
+   nameEn:"Diminished third",      namePt:"Terça diminuta"},
+  {number:3,  quality:"minor",      semitones:3,  abbr:"3m",
+   nameEn:"Minor third",           namePt:"Terça menor"},
+  {number:3,  quality:"major",      semitones:4,  abbr:"3M",
+   nameEn:"Major third",           namePt:"Terça maior"},
+  {number:3,  quality:"augmented",  semitones:5,  abbr:"3A",
+   nameEn:"Augmented third",       namePt:"Terça aumentada"},
+  // ── Quartas ─────────────────────────────────────────────
+  {number:4,  quality:"diminished", semitones:4,  abbr:"4d",
+   nameEn:"Diminished fourth",     namePt:"Quarta diminuta"},
+  {number:4,  quality:"perfect",    semitones:5,  abbr:"4P",
+   nameEn:"Perfect fourth",        namePt:"Quarta justa"},
+  {number:4,  quality:"augmented",  semitones:6,  abbr:"4A",
+   nameEn:"Augmented fourth",      namePt:"Quarta aumentada"},
+  // ── Quintas ─────────────────────────────────────────────
+  {number:5,  quality:"diminished", semitones:6,  abbr:"5d",
+   nameEn:"Diminished fifth",      namePt:"Quinta diminuta"},
+  {number:5,  quality:"perfect",    semitones:7,  abbr:"5P",
+   nameEn:"Perfect fifth",         namePt:"Quinta justa"},
+  {number:5,  quality:"augmented",  semitones:8,  abbr:"5A",
+   nameEn:"Augmented fifth",       namePt:"Quinta aumentada"},
+  // ── Sextas ──────────────────────────────────────────────
+  {number:6,  quality:"diminished", semitones:7,  abbr:"6d",
+   nameEn:"Diminished sixth",      namePt:"Sexta diminuta"},
+  {number:6,  quality:"minor",      semitones:8,  abbr:"6m",
+   nameEn:"Minor sixth",           namePt:"Sexta menor"},
+  {number:6,  quality:"major",      semitones:9,  abbr:"6M",
+   nameEn:"Major sixth",           namePt:"Sexta maior"},
+  {number:6,  quality:"augmented",  semitones:10, abbr:"6A",
+   nameEn:"Augmented sixth",       namePt:"Sexta aumentada"},
+  // ── Sétimas ─────────────────────────────────────────────
+  {number:7,  quality:"diminished", semitones:9,  abbr:"7d",
+   nameEn:"Diminished seventh",    namePt:"Sétima diminuta"},
+  {number:7,  quality:"minor",      semitones:10, abbr:"7m",
+   nameEn:"Minor seventh",         namePt:"Sétima menor"},
+  {number:7,  quality:"major",      semitones:11, abbr:"7M",
+   nameEn:"Major seventh",         namePt:"Sétima maior"},
+  {number:7,  quality:"augmented",  semitones:12, abbr:"7A",
+   nameEn:"Augmented seventh",     namePt:"Sétima aumentada"},
+  // ── Oitavas ─────────────────────────────────────────────
+  {number:8,  quality:"diminished", semitones:11, abbr:"8d",
+   nameEn:"Diminished octave",     namePt:"Oitava diminuta"},
+  {number:8,  quality:"perfect",    semitones:12, abbr:"8P",
+   nameEn:"Perfect octave",        namePt:"Oitava justa"},
+  {number:8,  quality:"augmented",  semitones:13, abbr:"8A",
+   nameEn:"Augmented octave",      namePt:"Oitava aumentada"},
+  // ── Nonas ───────────────────────────────────────────────
+  {number:9,  quality:"diminished", semitones:12, abbr:"9d",
+   nameEn:"Diminished ninth",      namePt:"Nona diminuta"},
+  {number:9,  quality:"minor",      semitones:13, abbr:"9m",
+   nameEn:"Minor ninth",           namePt:"Nona menor"},
+  {number:9,  quality:"major",      semitones:14, abbr:"9M",
+   nameEn:"Major ninth",           namePt:"Nona maior"},
+  {number:9,  quality:"augmented",  semitones:15, abbr:"9A",
+   nameEn:"Augmented ninth",       namePt:"Nona aumentada"},
+  // ── Décimas ─────────────────────────────────────────────
+  {number:10, quality:"diminished", semitones:13, abbr:"10d",
+   nameEn:"Diminished tenth",      namePt:"Décima diminuta"},
+  {number:10, quality:"minor",      semitones:14, abbr:"10m",
+   nameEn:"Minor tenth",           namePt:"Décima menor"},
+  {number:10, quality:"major",      semitones:15, abbr:"10M",
+   nameEn:"Major tenth",           namePt:"Décima maior"},
+  {number:10, quality:"augmented",  semitones:16, abbr:"10A",
+   nameEn:"Augmented tenth",       namePt:"Décima aumentada"},
+  // ── Décimas primeiras ───────────────────────────────────
+  {number:11, quality:"diminished", semitones:15, abbr:"11d",
+   nameEn:"Diminished eleventh",   namePt:"Décima primeira diminuta"},
+  {number:11, quality:"perfect",    semitones:16, abbr:"11P",
+   nameEn:"Perfect eleventh",      namePt:"Décima primeira justa"},
+  {number:11, quality:"augmented",  semitones:17, abbr:"11A",
+   nameEn:"Augmented eleventh",    namePt:"Décima primeira aumentada"},
+  // ── Décimas segundas ────────────────────────────────────
+  {number:12, quality:"diminished", semitones:17, abbr:"12d",
+   nameEn:"Diminished twelfth",    namePt:"Décima segunda diminuta"},
+  {number:12, quality:"perfect",    semitones:18, abbr:"12P",
+   nameEn:"Perfect twelfth",       namePt:"Décima segunda justa"},
+  {number:12, quality:"augmented",  semitones:19, abbr:"12A",
+   nameEn:"Augmented twelfth",     namePt:"Décima segunda aumentada"},
+  // ── Décimas terceiras ───────────────────────────────────
+  {number:13, quality:"diminished", semitones:18, abbr:"13d",
+   nameEn:"Diminished thirteenth", namePt:"Décima terceira diminuta"},
+  {number:13, quality:"minor",      semitones:19, abbr:"13m",
+   nameEn:"Minor thirteenth",      namePt:"Décima terceira menor"},
+  {number:13, quality:"major",      semitones:20, abbr:"13M",
+   nameEn:"Major thirteenth",      namePt:"Décima terceira maior"},
+  {number:13, quality:"augmented",  semitones:21, abbr:"13A",
+   nameEn:"Augmented thirteenth",  namePt:"Décima terceira aumentada"},
+  // ── Décimas quartas ─────────────────────────────────────
+  {number:14, quality:"diminished", semitones:20, abbr:"14d",
+   nameEn:"Diminished fourteenth", namePt:"Décima quarta diminuta"},
+  {number:14, quality:"minor",      semitones:21, abbr:"14m",
+   nameEn:"Minor fourteenth",      namePt:"Décima quarta menor"},
+  {number:14, quality:"major",      semitones:22, abbr:"14M",
+   nameEn:"Major fourteenth",      namePt:"Décima quarta maior"},
+  {number:14, quality:"augmented",  semitones:23, abbr:"14A",
+   nameEn:"Augmented fourteenth",  namePt:"Décima quarta aumentada"},
+  // ── Décimas quintas (dupla oitava) ──────────────────────
+  {number:15, quality:"diminished", semitones:22, abbr:"15d",
+   nameEn:"Diminished fifteenth",  namePt:"Décima quinta diminuta"},
+  {number:15, quality:"perfect",    semitones:23, abbr:"15P",
+   nameEn:"Perfect fifteenth",     namePt:"Décima quinta justa"},
+  {number:15, quality:"augmented",  semitones:24, abbr:"15A",
+   nameEn:"Augmented fifteenth",   namePt:"Décima quinta aumentada"},
+];
+
+/* ============================================================
+   2. BUSCA CANÔNICA — por (número ordinal + semitons)
+   NUNCA buscar apenas por semitons (causaria enarmonias erradas).
+   ============================================================ */
+
+/**
+ * Retorna todos os intervalos com um dado número ordinal.
+ * @param {number} n - número ordinal (1–15)
+ * @returns {object[]}
+ */
+function getAllByNumber(n) {
+  return INTERVALS.filter(i => i.number === n);
+}
+
+/**
+ * Busca exata por (número ordinal, semitons).
+ * Se não houver match exato, retorna o mais próximo
+ * dentro do mesmo número ordinal.
+ * @param {number} n  - número ordinal
+ * @param {number} st - semitons
+ * @returns {object|null}
+ */
+function findByNumberAndSemitones(n, st) {
+  // 1. Busca exata
+  const exact = INTERVALS.find(i => i.number === n && i.semitones === st);
+  if (exact) return exact;
+
+  // 2. Mesmo número ordinal, semitons mais próximos
+  const sameN = getAllByNumber(n);
+  if (!sameN.length) return null;
+  return sameN.reduce((best, cur) =>
+    Math.abs(cur.semitones - st) < Math.abs(best.semitones - st) ? cur : best
+  );
+}
+
+/* ============================================================
+   3. ARITMÉTICA DE INTERVALOS
+   ─────────────────────────────────────────────────────────────
+   ADIÇÃO:    n_R = n_A + n_B − 1  |  st_R = st_A + st_B
+   SUBTRAÇÃO: n_R = |n_A − n_B| + 1  |  st_R = |st_A − st_B|
+   ============================================================ */
+
+/**
+ * Calcula o intervalo resultado de (iA op iB).
+ * @param {object} iA   - intervalo A
+ * @param {object} iB   - intervalo B
+ * @param {string} op   - "+" ou "-"
+ * @param {number} maxSt - teto de semitons
+ * @returns {object|null}
+ */
+function computeResult(iA, iB, op, maxSt) {
+  let n, st;
+  if (op === "+") {
+    n  = iA.number + iB.number - 1;
+    st = iA.semitones + iB.semitones;
+  } else {
+    n  = Math.abs(iA.number - iB.number) + 1;
+    st = Math.abs(iA.semitones - iB.semitones);
+  }
+  if (st > maxSt || n > 15 || n < 1) return null;
+  return findByNumberAndSemitones(n, st);
+}
+
+/* ============================================================
+   4. GERAÇÃO DE OPÇÕES DE RESPOSTA — REGRA DO NÚMERO FIXO
+   ─────────────────────────────────────────────────────────────
+   REGRA CENTRAL (NOVO COMPORTAMENTO):
+   Todas as 4 opções devem ter o MESMO número ordinal
+   que a resposta correta. A variação é apenas de qualidade.
+
+   Algoritmo:
+   1. Determinar n_correto (número ordinal do resultado)
+   2. Buscar TODOS os intervalos com esse número ordinal
+      na tabela canônica
+   3. A resposta correta já é uma delas
+   4. Selecionar 3 outras qualidades do mesmo número ordinal
+      como distractors
+   5. Se o número ordinal tiver menos de 4 variações
+      disponíveis, completar com o número ordinal adjacente
+      (n±1), mas nunca com semitons idênticos à resposta correta
+   6. Embaralhar e apresentar as 4 opções
+   ============================================================ */
+
+/**
+ * Constrói as 4 opções de resposta garantindo que todas
+ * tenham o mesmo número ordinal que a resposta correta.
+ *
+ * @param {object} correct  - intervalo correto (resultado)
+ * @param {number} maxSt    - teto de semitons permitido
+ * @returns {object[]}      array de exatamente 4 opções embaralhadas
+ */
+function buildChoices(correct, maxSt) {
+  const n   = correct.number; // número ordinal fixo para todas as opções
+  const seen = new Set([correct.abbr]);
+  const choices = [correct];  // começa com a resposta correta
+
+  /* ── PRIORIDADE 1: outras qualidades do mesmo número ordinal ── */
+  const sameN = getAllByNumber(n)
+    .filter(i =>
+      !seen.has(i.abbr) &&       // não duplicar
+      i.semitones !== correct.semitones  // semitons diferentes (qualidade diferente)
+    )
+    .sort(() => Math.random() - 0.5);  // embaralhar para variedade
+
+  for (const iv of sameN) {
+    if (choices.length >= 4) break;
+    seen.add(iv.abbr);
+    choices.push(iv);
+  }
+
+  /* ── PRIORIDADE 2: número ordinal adjacente (n±1) se necessário ─
+     Isso só acontece quando o número ordinal tem poucas variações
+     (ex.: quartas, quintas e oitavas têm apenas 3 qualidades).
+     Nesse caso, buscamos no número adjacente mais próximo,
+     mantendo a consistência pedagógica.                         */
+  if (choices.length < 4) {
+    for (const adjN of [n + 1, n - 1, n + 2, n - 2]) {
+      if (choices.length >= 4) break;
+      if (adjN < 1 || adjN > 15) continue;
+      const adjCandidates = getAllByNumber(adjN)
+        .filter(i =>
+          !seen.has(i.abbr) &&
+          i.semitones !== correct.semitones &&
+          i.semitones <= maxSt + 4
+        )
+        .sort(() => Math.random() - 0.5);
+      for (const iv of adjCandidates) {
+        if (choices.length >= 4) break;
+        seen.add(iv.abbr);
+        choices.push(iv);
+      }
+    }
+  }
+
+  /* ── PRIORIDADE 3: qualquer intervalo restante como último recurso ─
+     Segurança para casos extremos. Nunca apresentar duplicata de st. */
+  if (choices.length < 4) {
+    const fallback = INTERVALS
+      .filter(i =>
+        !seen.has(i.abbr) &&
+        i.semitones !== correct.semitones &&
+        i.semitones <= maxSt + 4
+      )
+      .sort(() => Math.random() - 0.5);
+    for (const iv of fallback) {
+      if (choices.length >= 4) break;
+      seen.add(iv.abbr);
+      choices.push(iv);
+    }
+  }
+
+  // Embaralha as 4 opções finais
+  return choices.sort(() => Math.random() - 0.5);
+}
+
+/* ============================================================
+   5. INTERNACIONALIZAÇÃO (i18n)
+   ============================================================ */
+const I18N = {
+  en: {
+    subtitle:        "Musical Interval Trainer",
+    settings:        "Settings",
+    settingsTitle:   "Settings",
+    mode:            "Mode",
+    beginner:        "Beginner",
+    advanced:        "Advanced",
+    operation:       "Operation Type",
+    additionOnly:    "Addition only",
+    subtractionOnly: "Subtraction only",
+    mixed:           "Mixed",
+    range:           "Interval Range",
+    oneOctave:       "Within one octave",
+    twoOctaves:      "Up to two octaves",
+    close:           "Close",
+    correct:         "Correct",
+    wrong:           "Wrong",
+    questionLabel:   "What is the result of:",
+    next:            "Next Question →",
+    correctAnswerIs: "Correct answer:",
+    showHistory:     "Show History",
+    hideHistory:     "Hide History",
+    thQuestion:      "Question",
+    thUserAnswer:    "Your Answer",
+    thCorrect:       "Correct Answer",
+    thResult:        "Result",
+    thNotes:         "Notes (root → pivot → end)",
+    feedbackCorrect: [
+      "Excellent! 🎉","Very good! 👏","Correct! ✅",
+      "Brilliant! 🌟","Well done! 🎵","Perfect! 💯"
+    ],
+    feedbackWrong: [
+      "Please train more 🎓","Not quite — keep practising! 🎼",
+      "Try again next time 🎯","Study this interval carefully 📖",
+      "Almost! Keep going 💪"
+    ],
+    noteHint:    (nA, nB) => `Root: ${nA}  ·  Pivot: ${nB}`,
+    explanation: (op, iAn, iBn, resn, rA, rP, rE) =>
+      op === "+"
+        ? `${iAn} (${rA}–${rP}) + ${iBn} (${rP}–${rE}) = ${resn} (${rA}–${rE})`
+        : `${iAn} (${rA}–${rP}) − ${iBn} (${rP}–${rE}) = ${resn} (${rA}–${rE})`,
+  },
+  pt: {
+    subtitle:        "Treinador de Intervalos Musicais",
+    settings:        "Configurações",
+    settingsTitle:   "Configurações",
+    mode:            "Modo",
+    beginner:        "Iniciante",
+    advanced:        "Avançado",
+    operation:       "Tipo de Operação",
+    additionOnly:    "Somente adição",
+    subtractionOnly: "Somente subtração",
+    mixed:           "Misto",
+    range:           "Alcance dos Intervalos",
+    oneOctave:       "Dentro de uma oitava",
+    twoOctaves:      "Até duas oitavas",
+    close:           "Fechar",
+    correct:         "Corretas",
+    wrong:           "Erradas",
+    questionLabel:   "Qual é o resultado de:",
+    next:            "Próxima Questão →",
+    correctAnswerIs: "Resposta correta:",
+    showHistory:     "Mostrar Histórico",
+    hideHistory:     "Ocultar Histórico",
+    thQuestion:      "Questão",
+    thUserAnswer:    "Sua Resposta",
+    thCorrect:       "Resposta Correta",
+    thResult:        "Resultado",
+    thNotes:         "Notas (raiz → pivô → fim)",
+    feedbackCorrect: [
+      "Excelente! 🎉","Muito bem! 👏","Correto! ✅",
+      "Brilhante! 🌟","Parabéns! 🎵","Perfeito! 💯"
+    ],
+    feedbackWrong: [
+      "Treine mais 🎓","Não foi dessa vez — continue praticando! 🎼",
+      "Tente na próxima 🎯","Estude este intervalo com atenção 📖",
+      "Quase lá! Continue 💪"
+    ],
+    noteHint:    (nA, nB) => `Raiz: ${nA}  ·  Pivô: ${nB}`,
+    explanation: (op, iAn, iBn, resn, rA, rP, rE) =>
+      op === "+"
+        ? `${iAn} (${rA}–${rP}) + ${iBn} (${rP}–${rE}) = ${resn} (${rA}–${rE})`
+        : `${iAn} (${rA}–${rP}) − ${iBn} (${rP}–${rE}) = ${resn} (${rA}–${rE})`,
+  }
+};
+
+/* ============================================================
+   6. ESTADO DA APLICAÇÃO
+   ============================================================ */
+const state = {
+  lang:        "en",
+  mode:        "beginner",
+  operation:   "addition",
+  range:       "oneOctave",
+  score:       { correct: 0, wrong: 0 },
+  history:     [],
+  question:    null,
+  answered:    false,
+  questionNum: 0,
+};
+
+/* ============================================================
+   7. REFERÊNCIAS DOM
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const dom = {
+  langToggle:          $("langToggle"),
+  settingsToggle:      $("settingsToggle"),
+  settingsPanel:       $("settingsPanel"),
+  closeSettings:       $("closeSettings"),
+  advancedOptions:     $("advancedOptions"),
+  modeRadios:          document.querySelectorAll("input[name='mode']"),
+  operationRadios:     document.querySelectorAll("input[name='operation']"),
+  rangeRadios:         document.querySelectorAll("input[name='range']"),
+  scoreCorrect:        $("scoreCorrect"),
+  scoreWrong:          $("scoreWrong"),
+  scoreAccuracy:       $("scoreAccuracy"),
+  exportCSV:           $("exportCSV"),
+  interval1Name:       $("interval1Name"),
+  interval1Notes:      $("interval1Notes"),
+  interval2Name:       $("interval2Name"),
+  interval2Notes:      $("interval2Notes"),
+  operatorSymbol:      $("operatorSymbol"),
+  playInterval1:       $("playInterval1"),
+  playInterval2:       $("playInterval2"),
+  noteHint:            $("noteHint"),
+  choicesGrid:         $("choicesGrid"),
+  feedbackBox:         $("feedbackBox"),
+  feedbackIcon:        $("feedbackIcon"),
+  feedbackMsg:         $("feedbackMsg"),
+  feedbackExplanation: $("feedbackExplanation"),
+  feedbackCorrectAns:  $("feedbackCorrectAnswer"),
+  playCorrectAnswer:   $("playCorrectAnswer"),
+  nextQuestion:        $("nextQuestion"),
+  historyToggle:       $("historyToggle"),
+  historyToggleLabel:  $("historyToggleLabel"),
+  historyContainer:    $("historyContainer"),
+  historyBody:         $("historyBody"),
+};
+
+/* ============================================================
+   8. HELPERS i18n
+   ============================================================ */
+const t = key => I18N[state.lang][key];
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const val = I18N[state.lang][el.dataset.i18n];
+    if (val && typeof val === "string") el.textContent = val;
+  });
+  dom.langToggle.textContent = state.lang === "en" ? "🇧🇷 PT" : "🇬🇧 EN";
+}
+
+function iName(iv) {
+  return state.lang === "en" ? iv.nameEn : iv.namePt;
+}
+
+/* ============================================================
+   9. WEB AUDIO ENGINE
+   ============================================================ */
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, tStart, dur, vol = 0.38) {
+  const ctx  = getAudioCtx();
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(freq, ctx.currentTime + tStart);
+  const t0 = ctx.currentTime + tStart;
+  gain.gain.setValueAtTime(0,   t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + 0.02);
+  gain.gain.setValueAtTime(vol,          t0 + dur - 0.06);
+  gain.gain.linearRampToValueAtTime(0,   t0 + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur);
+}
+
+function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+function midiToName(midi) {
+  const N = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  return N[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+
+function randomRootMidi() { return 60 + Math.floor(Math.random() * 8); }
+
+function playInterval(rootMidi, semitones, offset = 0) {
+  playTone(midiToFreq(rootMidi),             offset,        0.85);
+  playTone(midiToFreq(rootMidi + semitones), offset + 0.92, 0.85);
+}
+
+/* ============================================================
+   10. GERADOR DE QUESTÕES
+   ============================================================ */
+function getPool() {
+  return state.range === "twoOctaves"
+    ? INTERVALS.filter(i => i.number >= 2 && i.number <= 13 && i.semitones <= 24)
+    : INTERVALS.filter(i => i.number >= 2 && i.number <= 8  && i.semitones >= 1 && i.semitones <= 12);
+}
+
+function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function chooseOp() {
+  const op = state.mode === "beginner" ? "addition" : state.operation;
+  if (op === "mixed")       return Math.random() < 0.5 ? "+" : "-";
+  if (op === "subtraction") return "-";
+  return "+";
+}
+
+function generateQuestion() {
+  const pool  = getPool();
+  const maxSt = state.range === "twoOctaves" ? 24 : 12;
+  const op    = chooseOp();
+  let iA, iB, result, tries = 0;
+
+  do {
+    iA     = pickRandom(pool);
+    iB     = pickRandom(pool);
+    result = computeResult(iA, iB, op, maxSt);
+    tries++;
+    if (tries > 500) {
+      // Fallback seguro: 3M + 4P = 6M
+      iA     = INTERVALS.find(i => i.abbr === "3M");
+      iB     = INTERVALS.find(i => i.abbr === "4P");
+      result = computeResult(iA, iB, "+", maxSt);
+      break;
+    }
+  } while (!result);
+
+  const rootMidi  = randomRootMidi();
+  const pivotMidi = op === "+" ? rootMidi + iA.semitones : rootMidi - iA.semitones;
+  const endMidi   = op === "+" ? pivotMidi + iB.semitones : pivotMidi - iB.semitones;
+
+  return {
+    iA, iB, op, result,
+    rootMidi, pivotMidi, endMidi,
+    rootName:  midiToName(rootMidi),
+    pivotName: midiToName(pivotMidi),
+    endName:   midiToName(endMidi),
+    choices:   buildChoices(result, maxSt),
+  };
+}
+
+/* ============================================================
+   11. RENDERIZAÇÃO
+   ============================================================ */
+function renderQuestion() {
+  const q = state.question;
+  state.answered = false;
+  dom.interval1Name.textContent  = `${iName(q.iA)} (${q.iA.abbr})`;
+  dom.interval2Name.textContent  = `${iName(q.iB)} (${q.iB.abbr})`;
+  dom.interval1Notes.textContent = `${q.rootName} → ${q.pivotName}`;
+  dom.interval2Notes.textContent = `${q.pivotName} → ${q.endName}`;
+  dom.operatorSymbol.textContent = q.op;
+  dom.noteHint.textContent       = t("noteHint")(q.rootName, q.pivotName);
+
+  dom.choicesGrid.innerHTML = "";
+  q.choices.forEach(iv => {
+    const btn = document.createElement("button");
+    btn.className    = "choice-btn";
+    btn.textContent  = `${iName(iv)} (${iv.abbr})`;
+    btn.dataset.abbr = iv.abbr;
+    btn.addEventListener("click", () => handleAnswer(iv, btn));
+    dom.choicesGrid.appendChild(btn);
+  });
+  dom.feedbackBox.classList.add("hidden");
+}
+
+/* ============================================================
+   12. RESPOSTA E FEEDBACK
+   ============================================================ */
+function handleAnswer(chosen) {
+  if (state.answered) return;
+  state.answered = true;
+  state.questionNum++;
+  const q       = state.question;
+  const isRight = chosen.abbr === q.result.abbr;
+  if (isRight) state.score.correct++; else state.score.wrong++;
+  updateScoreBar();
+
+  document.querySelectorAll(".choice-btn").forEach(btn => {
+    btn.disabled = true;
+    if (btn.dataset.abbr === q.result.abbr)    btn.classList.add("correct");
+    else if (btn.dataset.abbr === chosen.abbr) btn.classList.add("wrong");
+  });
+
+  const phrase = pickRandom(isRight ? t("feedbackCorrect") : t("feedbackWrong"));
+  dom.feedbackIcon.textContent = isRight ? "🎉" : "😟";
+  dom.feedbackMsg.textContent  = phrase;
+  dom.feedbackMsg.className    = "feedback-msg " + (isRight ? "ok" : "err");
+  dom.feedbackExplanation.textContent = t("explanation")(
+    q.op, iName(q.iA), iName(q.iB), iName(q.result),
+    q.rootName, q.pivotName, q.endName
+  );
+  dom.feedbackCorrectAns.textContent = `${iName(q.result)} (${q.result.abbr})`;
+  dom.feedbackBox.classList.remove("hidden");
+  recordHistory(q, chosen, isRight);
+}
+
+/* ============================================================
+   13. PLACAR
+   ============================================================ */
+function updateScoreBar() {
+  const total = state.score.correct + state.score.wrong;
+  dom.scoreCorrect.textContent  = state.score.correct;
+  dom.scoreWrong.textContent    = state.score.wrong;
+  dom.scoreAccuracy.textContent = total
+    ? Math.round((state.score.correct / total) * 100) : 0;
+}
+
+/* ============================================================
+   14. HISTÓRICO E CSV
+   ============================================================ */
+function recordHistory(q, chosen, isRight) {
+  const rec = {
+    num:       state.questionNum,
+    question:  `${iName(q.iA)} (${q.iA.abbr}) ${q.op} ${iName(q.iB)} (${q.iB.abbr})`,
+    userAns:   `${iName(chosen)} (${chosen.abbr})`,
+    correct:   `${iName(q.result)} (${q.result.abbr})`,
+    result:    isRight ? "✅" : "❌",
+    notes:     `${q.rootName} → ${q.pivotName} → ${q.endName}`,
+    lang:      state.lang.toUpperCase(),
+    timestamp: new Date().toISOString(),
+    isRight,
+  };
+  state.history.push(rec);
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>${rec.num}</td>
+    <td>${rec.question}</td>
+    <td>${rec.userAns}</td>
+    <td>${rec.correct}</td>
+    <td class="${isRight ? 'result-ok':'result-err'}">${rec.result}</td>
+    <td>${rec.notes}</td>`;
+  dom.historyBody.prepend(tr);
+}
+
+function exportCSV() {
+  if (!state.history.length) {
+    alert(state.lang === "en"
+      ? "No data yet. Answer some questions first!"
+      : "Nenhum dado ainda. Responda algumas questões primeiro!");
+    return;
+  }
+  const headers = ["#","Question","Your Answer","Correct Answer",
+                   "Result","Notes","Lang","Timestamp"];
+  const rows = state.history.map(r =>
+    [r.num,r.question,r.userAns,r.correct,
+     r.isRight?"Correct":"Wrong",r.notes,r.lang,r.timestamp]
+    .map(v=>`"${String(v).replace(/"/g,'""')}"`)
+    .join(",")
+  );
+  const csv  = [headers.join(","),...rows].join("\r\n");
+  const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"),{
+    href:url, download:`2plus2equals3_${new Date().toISOString().slice(0,10)}.csv`
+  });
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   15. EVENT LISTENERS
+   ============================================================ */
+dom.langToggle.addEventListener("click", () => {
+  state.lang = state.lang === "en" ? "pt" : "en";
+  applyI18n();
+  dom.historyToggleLabel.textContent =
+    dom.historyContainer.classList.contains("hidden") ? t("showHistory") : t("hideHistory");
+  if (state.question) renderQuestion();
+});
+dom.settingsToggle.addEventListener("click", () =>
+  dom.settingsPanel.classList.toggle("open"));
+dom.closeSettings.addEventListener("click", () =>
+  dom.settingsPanel.classList.remove("open"));
+dom.modeRadios.forEach(r => r.addEventListener("change", () => {
+  state.mode = r.value;
+  dom.advancedOptions.classList.toggle("hidden", state.mode !== "advanced");
+  newQuestion();
+}));
+dom.operationRadios.forEach(r => r.addEventListener("change", () => {
+  state.operation = r.value;
+}));
+dom.rangeRadios.forEach(r => r.addEventListener("change", () => {
+  state.range = r.value;
+}));
+dom.playInterval1.addEventListener("click", () => {
+  if (!state.question) return;
+  const q = state.question;
+  playInterval(q.rootMidi, q.op === "+" ? q.iA.semitones : -q.iA.semitones);
+});
+dom.playInterval2.addEventListener("click", () => {
+  if (!state.question) return;
+  const q = state.question;
+  playInterval(q.pivotMidi, q.op === "+" ? q.iB.semitones : -q.iB.semitones);
+});
+dom.playCorrectAnswer.addEventListener("click", () => {
+  if (!state.question) return;
+  playInterval(state.question.rootMidi, state.question.result.semitones);
+});
+dom.nextQuestion.addEventListener("click", newQuestion);
+dom.exportCSV.addEventListener("click", exportCSV);
+dom.historyToggle.addEventListener("click", () => {
+  const nowHidden = dom.historyContainer.classList.toggle("hidden");
+  dom.historyToggleLabel.textContent =
+    nowHidden ? t("showHistory") : t("hideHistory");
+});
+
+/* ============================================================
+   16. INICIALIZAÇÃO
+   ============================================================ */
+function newQuestion() {
+  state.question = generateQuestion();
+  renderQuestion();
+}
+function init() {
+  applyI18n();
+  updateScoreBar();
+  newQuestion();
+}
+init(); // 🚀
+</script>
+</body>
+</html>
