@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Musical Bamboo</title>
+<style>
+  :root{
+    --bg:#0f1a12; --panel:#16241a; --accent:#7bd88f; --accent2:#4fa96a;
+    --text:#e6f2e9; --muted:#8fae99; --err:#ff6b6b; --ok:#7bd88f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:18px 22px;background:linear-gradient(90deg,#12281a,#0f1a12);border-bottom:1px solid #24402c}
+  header h1{margin:0;font-size:22px}
+  header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  main{padding:20px;max-width:1100px;margin:0 auto;display:grid;gap:18px}
+  .panel{background:var(--panel);border:1px solid #24402c;border-radius:12px;padding:16px}
+  .panel h2{margin:0 0 12px;font-size:15px;color:var(--accent)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{cursor:pointer;border:none;border-radius:8px;padding:10px 14px;font-size:14px;
+    background:var(--accent2);color:#08130c;font-weight:600;transition:.15s}
+  button:hover{background:var(--accent)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--accent2);color:var(--accent)}
+  input,select{background:#0d1712;border:1px solid #2c4a35;color:var(--text);
+    border-radius:8px;padding:8px 10px;font-size:14px}
+  label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+  #status{font-size:13px;min-height:18px}
+  .status-ok{color:var(--ok)} .status-err{color:var(--err)} .status-info{color:var(--muted)}
+  .warn{background:#3a2a12;border:1px solid #6b4a1c;color:#ffcf7b;padding:10px 12px;
+    border-radius:8px;font-size:13px;margin-top:10px;display:none}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:7px 9px;text-align:left;border-bottom:1px solid #21382a}
+  th{color:var(--accent);font-weight:600}
+  .keyboard{display:flex;gap:6px;flex-wrap:wrap}
+  .key{min-width:64px;padding:14px 8px;text-align:center;border-radius:8px;
+    background:#1d3325;border:1px solid #2c4a35;cursor:pointer;user-select:none;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .key:hover,.key.active{background:var(--accent2);color:#08130c}
+  .key small{display:block;color:var(--muted);font-size:11px}
+  .key:hover small,.key.active small{color:#08130c}
+  .badge{display:inline-block;background:#1d3325;border-radius:20px;padding:3px 10px;font-size:12px}
+  .plant{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;
+    background:#122019;border-radius:8px;margin-bottom:6px}
+  .meter{height:8px;background:#0d1712;border-radius:6px;overflow:hidden;flex:1;max-width:200px}
+  .meter > i{display:block;height:100%;background:var(--accent);width:0%}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎍 Musical Bamboo</h1>
+  <p>Captura, análise de afinação e reprodução de bambus percussivos — Kyoto Project</p>
+</header>
+
+<main>
+  <!-- CONFIG -->
+  <section class="panel">
+    <h2>Configuração</h2>
+    <div class="row">
+      <label>Nome do instrumento
+        <input id="instName" type="text" value="Novo Instrumento">
+      </label>
+      <label>Afinação (A4 Hz)
+        <input id="tuning" type="number" value="440" min="400" max="480" step="1">
+      </label>
+      <label>Freq. mínima (Hz)
+        <input id="fMin" type="number" value="100" min="20" max="1000" step="10">
+      </label>
+      <label>Freq. máxima (Hz)
+        <input id="fMax" type="number" value="2000" min="200" max="8000" step="50">
+      </label>
+    </div>
+  </section>
+
+  <!-- CAPTURE -->
+  <section class="panel">
+    <h2>Captura</h2>
+    <div class="row">
+      <button id="enableMic">🎙️ Habilitar Microfone</button>
+      <button id="captureSeq" disabled>🔴 Capturar Sons</button>
+      <button id="stopSeq" disabled>⏹ Parar a Captura</button>
+      <span class="badge" id="liveFreq">— Hz</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span style="font-size:12px;color:var(--muted)">Nível:</span>
+      <div class="meter"><i id="levelBar"></i></div>
+    </div>
+    <div class="warn" id="secWarn"></div>
+    <p id="status" class="status-info" style="margin-bottom:0"></p>
+  </section>
+
+  <!-- TONES -->
+  <section class="panel">
+    <h2>Tons Capturados (<span id="toneCount">0</span>)</h2>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Nota</th><th>Freq</th><th>Cents</th><th>Batidas</th><th>Disp.</th><th></th></tr>
+      </thead>
+      <tbody id="tonesBody"></tbody>
+    </table>
+  </section>
+
+  <!-- KEYBOARD -->
+  <section class="panel">
+    <h2>Teclado (reprodução)</h2>
+    <div class="keyboard" id="keyboard"></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:0">
+      Toque nas teclas (celular) ou use as teclas físicas A S D F G H J K L ; para tocar.
+    </p>
+  </section>
+
+  <!-- PROFILES -->
+  <section class="panel">
+    <h2>Perfis Salvos</h2>
+    <div class="row">
+      <button id="saveProfile">💾 Salvar Instrumento</button>
+      <button class="ghost" id="loadProfile">📂 Carregar Instrumento</button>
+      <button class="ghost" id="exportCsv">⬇️ Exportar CSV</button>
+      <input id="fileInput" type="file" accept=".json,application/json" hidden>
+    </div>
+    <div id="profilesList" style="margin-top:12px"></div>
+  </section>
+</main>
+
+<script>
+/* ============================================================
+   Musical Bamboo — full application (Android mic fix)
+   ============================================================ */
+
+/* ---------- State ---------- */
+let tones = [];
+let profiles = [];
+let sessionHits = [];
+let recording = false;
+let micEnabled = false;
+let audioCtx = null;
+let analyser = null;
+let timeBuf = null;
+let mediaStream = null;
+
+/* config getters */
+const cfg = {
+  get name(){ return document.getElementById('instName').value.trim() || 'Instrumento'; },
+  set name(v){ document.getElementById('instName').value = v; },
+  get tuning(){ return +document.getElementById('tuning').value || 440; },
+  set tuning(v){ document.getElementById('tuning').value = v; },
+  get fMin(){ return +document.getElementById('fMin').value || 100; },
+  set fMin(v){ document.getElementById('fMin').value = v; },
+  get fMax(){ return +document.getElementById('fMax').value || 2000; },
+  set fMax(v){ document.getElementById('fMax').value = v; },
+};
+
+/* ---------- Utilities ---------- */
+function setStatus(msg, kind='info'){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status-' + kind;
+}
+function showWarn(html){
+  const el=document.getElementById('secWarn');
+  el.innerHTML=html; el.style.display='block';
+}
+function median(arr){
+  if(!arr.length) return NaN;
+  const s=[...arr].sort((a,b)=>a-b), m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function freqToMidiFloat(f){ return 69 + 12*Math.log2(f/cfg.tuning); }
+function midiFloatToFreq(m){ return cfg.tuning * Math.pow(2,(m-69)/12); }
+function freqToNote(f){
+  const m = freqToMidiFloat(f);
+  const rounded = Math.round(m);
+  const cents = Math.round((m - rounded)*100);
+  const name = NOTE_NAMES[((rounded%12)+12)%12];
+  const octave = Math.floor(rounded/12)-1;
+  return { note: name+octave, cents, midi: rounded };
+}
+function noteToFreq(note){
+  const m = note.match(/^([A-G]#?)(-?\d+)$/);
+  if(!m) return null;
+  const idx = NOTE_NAMES.indexOf(m[1]);
+  const midi = idx + (parseInt(m[2],10)+1)*12;
+  return midiFloatToFreq(midi);
+}
+function triggerDownload(filename, text){
+  const blob = new Blob([text], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Secure-context check ---------- */
+function isSecure(){
+  // localhost is treated as secure even on http
+  return window.isSecureContext ||
+    ['localhost','127.0.0.1','::1'].includes(location.hostname);
+}
+function micSupported(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+/* ---------- YIN pitch detection ---------- */
+function yin(buf, sampleRate, fMin, fMax){
+  const threshold = 0.12;
+  const tauMin = Math.floor(sampleRate / fMax);
+  const tauMax = Math.min(Math.floor(sampleRate / fMin), buf.length>>1);
+  const diff = new Float32Array(tauMax);
+  for(let tau=tauMin; tau<tauMax; tau++){
+    let sum=0;
+    for(let i=0;i<tauMax;i++){ const d=buf[i]-buf[i+tau]; sum+=d*d; }
+    diff[tau]=sum;
+  }
+  const cmnd=new Float32Array(tauMax); cmnd[0]=1;
+  let running=0;
+  for(let tau=1;tau<tauMax;tau++){
+    running+=diff[tau];
+    cmnd[tau]= running===0 ? 1 : diff[tau]*tau/running;
+  }
+  let tauEst=-1;
+  for(let tau=tauMin; tau<tauMax; tau++){
+    if(cmnd[tau]<threshold){
+      while(tau+1<tauMax && cmnd[tau+1]<cmnd[tau]) tau++;
+      tauEst=tau; break;
+    }
+  }
+  if(tauEst===-1) return null;
+  const x0=tauEst>0?cmnd[tauEst-1]:cmnd[tauEst];
+  const x2=tauEst+1<tauMax?cmnd[tauEst+1]:cmnd[tauEst];
+  const a=(x0+x2-2*cmnd[tauEst])/2, b=(x2-x0)/2;
+  const betterTau = a? tauEst - b/(2*a) : tauEst;
+  const freq = sampleRate/betterTau;
+  const clarity = 1 - cmnd[tauEst];
+  if(freq<fMin || freq>fMax) return null;
+  return { freq, clarity };
+}
+
+/* ---------- RMS level ---------- */
+function rms(buf){
+  let s=0; for(let i=0;i<buf.length;i++) s+=buf[i]*buf[i];
+  return Math.sqrt(s/buf.length);
+}
+
+/* ---------- Onset detection state ---------- */
+let prevRms=0, inHit=false, hitPeak=null, silenceCount=0;
+const ONSET_THRESHOLD=0.03, RELEASE=0.015;
+
+/* ---------- Live analysis loop ---------- */
+function analyzeLoop(){
+  if(!micEnabled) return;
+  analyser.getFloatTimeDomainData(timeBuf);
+  const level = rms(timeBuf);
+  document.getElementById('levelBar').style.width = Math.min(100, level*400)+'%';
+
+  const pitch = yin(timeBuf, audioCtx.sampleRate, cfg.fMin, cfg.fMax);
+  if(pitch){
+    document.getElementById('liveFreq').textContent =
+      pitch.freq.toFixed(1)+' Hz · '+freqToNote(pitch.freq).note;
+  }
+
+  if(recording){
+    if(!inHit && level>ONSET_THRESHOLD && level>prevRms){
+      inHit=true; hitPeak=null; silenceCount=0;
+    }
+    if(inHit){
+      if(pitch && (!hitPeak || pitch.clarity>hitPeak.clarity)){
+        hitPeak={ freq:pitch.freq, clarity:pitch.clarity };
+      }
+      if(level<RELEASE){
+        silenceCount++;
+        if(silenceCount>3){
+          if(hitPeak && hitPeak.clarity>0.5){
+            sessionHits.push({ freq:hitPeak.freq, clarity:hitPeak.clarity,
+              cents:freqToNote(hitPeak.freq).cents });
+            setStatus(`Batidas capturadas: ${sessionHits.length}`, 'info');
+          }
+          inHit=false; hitPeak=null;
+        }
+      } else silenceCount=0;
+    }
+  }
+  prevRms=level;
+  requestAnimationFrame(analyzeLoop);
+}
+
+/* ---------- Mic (Android-safe) ---------- */
+async function ensureAudioCtx(){
+  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state === 'suspended'){
+    try{ await audioCtx.resume(); }catch(_){}
+  }
+  return audioCtx;
+}
+
+async function enableMic(){
+  // 1) Feature support
+  if(!micSupported()){
+    setStatus('Este navegador não suporta captura de microfone.', 'err');
+    return;
+  }
+  // 2) Secure context — the real cause of "Permission denied" on Android
+  if(!isSecure()){
+    setStatus('Microfone bloqueado: contexto não seguro.', 'err');
+    showWarn(`⚠️ <b>O microfone só funciona em HTTPS.</b><br>
+      Você abriu esta página como <code>${location.protocol}//${location.host||'arquivo local'}</code>.
+      No Android, o Chrome só libera o microfone em páginas <b>https://</b> ou em <code>localhost</code>.<br><br>
+      <b>Soluções:</b><br>
+      • Hospede o arquivo em um servidor com HTTPS (ex.: GitHub Pages, Netlify, Vercel), ou<br>
+      • Rode um servidor local e acesse pelo celular via HTTPS, ou<br>
+      • Use um túnel HTTPS (ex.: <code>ngrok http 8080</code>) e abra o link https no celular.`);
+    return;
+  }
+  // 3) Try to acquire the mic
+  try{
+    await ensureAudioCtx();
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio:{
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false }});
+    const src = audioCtx.createMediaStreamSource(mediaStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    timeBuf = new Float32Array(analyser.fftSize);
+    src.connect(analyser);
+    micEnabled = true;
+    document.getElementById('captureSeq').disabled = false;
+    document.getElementById('secWarn').style.display = 'none';
+    setStatus('Microfone habilitado. Pronto para capturar.', 'ok');
+    analyzeLoop();
+  }catch(e){
+    handleMicError(e);
+  }
+}
+
+function handleMicError(e){
+  const name = e && e.name ? e.name : '';
+  switch(name){
+    case 'NotAllowedError':
+    case 'SecurityError':
+      setStatus('Permissão negada ao microfone.', 'err');
+      showWarn(`🚫 <b>Permissão negada.</b><br>
+        No celular: toque no <b>🔒 cadeado</b> ao lado do endereço → <b>Permissões</b> →
+        ative <b>Microfone</b>, depois recarregue a página.<br>
+        Verifique também em <b>Ajustes do Android → Apps → Chrome → Permissões → Microfone</b>.`);
+      break;
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      setStatus('Nenhum microfone encontrado no dispositivo.', 'err');
+      break;
+    case 'NotReadableError':
+      setStatus('Microfone em uso por outro aplicativo. Feche-o e tente novamente.', 'err');
+      break;
+    default:
+      setStatus('Erro ao acessar o microfone: '+(e.message||name||'desconhecido'), 'err');
+  }
+}
+
+/* ---------- Session control ---------- */
+function startSeq(){
+  if(!micEnabled) return;
+  sessionHits=[]; recording=true; inHit=false; hitPeak=null;
+  document.getElementById('captureSeq').disabled=true;
+  document.getElementById('stopSeq').disabled=false;
+  setStatus('Capturando… bata no bambu várias vezes.', 'info');
+}
+function stopSeq(){
+  if(!recording) return;
+  recording=false;
+  document.getElementById('captureSeq').disabled=false;
+  document.getElementById('stopSeq').disabled=true;
+  const profile = aggregateSession();
+  if(profile){
+    tones.push(profile);
+    renderTones(); renderKeyboard();
+    setStatus(`Fundamental: ${profile.note} @ ${profile.freq} Hz`, 'ok');
+  }else{
+    setStatus('Nenhuma batida válida detectada.', 'err');
+  }
+}
+function aggregateSession(){
+  if(sessionHits.length===0) return null;
+  const midis = sessionHits.map(h=>freqToMidiFloat(h.freq));
+  const medMidi = median(midis);
+  const inliers = sessionHits.filter(h=>Math.abs(freqToMidiFloat(h.freq)-medMidi)*100 <= 60);
+  const usedHits = inliers.length ? inliers : sessionHits;
+  const finalMidi = median(usedHits.map(h=>freqToMidiFloat(h.freq)));
+  const freq = midiFloatToFreq(finalMidi);
+  const {note, cents} = freqToNote(freq);
+  const devs = usedHits.map(h=>Math.abs(freqToMidiFloat(h.freq)-finalMidi)*100);
+  return {
+    note, freq:+freq.toFixed(1), cents,
+    hits:sessionHits.length, used:usedHits.length,
+    spreadCents:+median(devs).toFixed(1),
+    minFreq:+Math.min(...usedHits.map(h=>h.freq)).toFixed(1),
+    maxFreq:+Math.max(...usedHits.map(h=>h.freq)).toFixed(1),
+    samples:usedHits, date:new Date().toISOString()
+  };
+}
+
+/* ---------- Synthesis (playback) ---------- */
+async function playBamboo(freq){
+  await ensureAudioCtx();
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type='sine'; osc2.type='triangle';
+  osc.frequency.value=freq; osc2.frequency.value=freq*2.01;
+  gain.gain.setValueAtTime(0.0001,t);
+  gain.gain.exponentialRampToValueAtTime(0.6,t+0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001,t+1.4);
+  osc.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc2.start(t);
+  osc.stop(t+1.5); osc2.stop(t+1.5);
+}
+
+/* ---------- Rendering ---------- */
+function renderTones(){
+  document.getElementById('toneCount').textContent = tones.length;
+  const body = document.getElementById('tonesBody');
+  body.innerHTML='';
+  tones.forEach((tn,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td>${tn.note}</td><td>${tn.freq} Hz</td>
+      <td>${tn.cents>0?'+':''}${tn.cents}</td><td>${tn.hits??'—'}</td>
+      <td>${tn.spreadCents??'—'}</td>
+      <td><button class="ghost" data-del="${i}" style="padding:4px 8px">✕</button></td>`;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.onclick=()=>{ tones.splice(+btn.dataset.del,1); renderTones(); renderKeyboard(); };
+  });
+}
+function renderKeyboard(){
+  const kb=document.getElementById('keyboard');
+  kb.innerHTML='';
+  const ordered=[...tones].sort((a,b)=>a.freq-b.freq);
+  const physical=['a','s','d','f','g','h','j','k','l',';'];
+  ordered.forEach((tn,i)=>{
+    const key=document.createElement('div');
+    key.className='key';
+    key.dataset.freq=tn.freq;
+    key.innerHTML=`${tn.note}<small>${tn.freq} Hz</small>${
+      physical[i]?`<small>[${physical[i]}]</small>`:''}`;
+    const trigger=(ev)=>{ ev.preventDefault(); playBamboo(tn.freq); flash(key); };
+    key.addEventListener('click', trigger);
+    key.addEventListener('touchstart', trigger, {passive:false});
+    kb.appendChild(key);
+  });
+}
+function flash(el){ el.classList.add('active'); setTimeout(()=>el.classList.remove('active'),150); }
+
+/* physical keyboard */
+document.addEventListener('keydown',e=>{
+  if(e.repeat) return;
+  const physical=['a','s','d','f','g','h','j','k','l',';'];
+  const idx=physical.indexOf(e.key.toLowerCase());
+  if(idx<0) return;
+  const keys=document.querySelectorAll('.key');
+  if(keys[idx]){ playBamboo(+keys[idx].dataset.freq); flash(keys[idx]); }
+});
+
+/* ---------- Profiles: save / list ---------- */
+function currentProfile(){
+  return {
+    name:cfg.name, tuning:cfg.tuning, fMin:cfg.fMin, fMax:cfg.fMax,
+    date:new Date().toISOString(), tones:JSON.parse(JSON.stringify(tones))
+  };
+}
+function saveProfile(){
+  if(tones.length===0){ setStatus('Nenhum tom para salvar.', 'err'); return; }
+  const p=currentProfile();
+  const existing=profiles.findIndex(x=>x.name===p.name);
+  if(existing>=0) profiles[existing]=p; else profiles.push(p);
+  renderProfiles();
+  triggerDownload(p.name.replace(/\s+/g,'_')+'.json', JSON.stringify(p,null,2));
+  setStatus(`Instrumento "${p.name}" salvo (${p.tones.length} tons).`, 'ok');
+}
+function renderProfiles(){
+  const list=document.getElementById('profilesList');
+  list.innerHTML= profiles.length? '' :
+    '<span style="color:var(--muted);font-size:13px">Nenhum perfil em memória.</span>';
+  profiles.forEach((p)=>{
+    const div=document.createElement('div');
+    div.className='plant';
+    div.innerHTML=`<span>🎍 <b>${p.name}</b> — ${p.tones.length} tons
+      <small style="color:var(--muted)">(${new Date(p.date).toLocaleString('pt-BR')})</small></span>`;
+    const btn=document.createElement('button');
+    btn.className='ghost'; btn.textContent='Abrir'; btn.style.padding='4px 10px';
+    btn.onclick=()=>applyProfile(p);
+    div.appendChild(btn);
+    list.appendChild(div);
+  });
+}
+
+/* ---------- LOAD INSTRUMENT ---------- */
+function validateProfile(obj){
+  if(typeof obj!=='object'||obj===null) return 'Arquivo não é um objeto JSON válido.';
+  if(!Array.isArray(obj.tones)) return 'Campo "tones" ausente ou inválido.';
+  for(const t of obj.tones){
+    if(typeof t.note!=='string') return 'Um tom não possui "note" válido.';
+    const f=Number(t.freq);
+    if(!isFinite(f)||f<=0) return 'Um tom não possui "freq" válido.';
+  }
+  return null;
+}
+function applyProfile(p){
+  cfg.name = p.name || 'Instrumento';
+  if(p.tuning) cfg.tuning = p.tuning;
+  if(p.fMin!=null) cfg.fMin = p.fMin;
+  if(p.fMax!=null) cfg.fMax = p.fMax;
+  tones = p.tones.map(t=>{
+    const freq = (isFinite(t.freq)&&t.freq>0) ? +t.freq : noteToFreq(t.note);
+    const info = freqToNote(freq);
+    return {
+      note: t.note || info.note,
+      freq: +Number(freq).toFixed(1),
+      cents: t.cents ?? info.cents,
+      hits: t.hits ?? null,
+      used: t.used ?? null,
+      spreadCents: t.spreadCents ?? null,
+      minFreq: t.minFreq ?? null,
+      maxFreq: t.maxFreq ?? null,
+      samples: Array.isArray(t.samples)? t.samples : []
+    };
+  });
+  renderTones();
+  renderKeyboard();
+  const existing=profiles.findIndex(x=>x.name===p.name);
+  const stored=currentProfile();
+  if(existing>=0) profiles[existing]=stored; else profiles.push(stored);
+  renderProfiles();
+  setStatus(`Instrumento "${cfg.name}" carregado: ${tones.length} tons.`, 'ok');
+}
+function loadInstrument(){ document.getElementById('fileInput').click(); }
+function handleFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    let obj;
+    try{ obj = JSON.parse(e.target.result); }
+    catch(err){ setStatus('Falha ao ler o arquivo: JSON inválido.', 'err'); return; }
+    const problem = validateProfile(obj);
+    if(problem){ setStatus('Arquivo inválido: '+problem, 'err'); return; }
+    applyProfile(obj);
+  };
+  reader.onerror = ()=> setStatus('Erro ao ler o arquivo.', 'err');
+  reader.readAsText(file);
+  evt.target.value='';
+}
+
+/* ---------- CSV export ---------- */
+function exportCsv(){
+  if(tones.length===0){ setStatus('Nenhum tom para exportar.', 'err'); return; }
+  const header='index,note,freq,cents,hits,spreadCents,minFreq,maxFreq\n';
+  const rows=tones.map((t,i)=>[i+1,t.note,t.freq,t.cents,t.hits,t.spreadCents,t.minFreq,t.maxFreq].join(','));
+  triggerDownload(cfg.name.replace(/\s+/g,'_')+'.csv', header+rows.join('\n'));
+  setStatus('CSV exportado.', 'ok');
+}
+
+/* ---------- Wiring ---------- */
+document.getElementById('enableMic').addEventListener('click', enableMic);
+document.getElementById('captureSeq').addEventListener('click', startSeq);
+document.getElementById('stopSeq').addEventListener('click', stopSeq);
+document.getElementById('saveProfile').addEventListener('click', saveProfile);
+document.getElementById('loadProfile').addEventListener('click', loadInstrument);
+document.getElementById('fileInput').addEventListener('change', handleFile);
+document.getElementById('exportCsv').addEventListener('click', exportCsv);
+
+/* init */
+renderTones(); renderKeyboard(); renderProfiles();
+if(!isSecure()){
+  setStatus('Atenção: sem HTTPS o microfone não funcionará no celular.', 'err');
+  showWarn(`⚠️ Esta página não está em <b>HTTPS</b>. A captura de microfone
+    será bloqueada no Android. A reprodução do teclado e o carregamento de
+    instrumentos continuam funcionando normalmente.`);
+}else{
+  setStatus('Habilite o microfone para começar.', 'info');
+}
+</script>
+</body>
+</html>
