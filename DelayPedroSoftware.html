@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Processador de Áudio em Tempo Real — Eco & Reverb</title>
+<style>
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #1e1e2f;
+    color: #eee;
+    max-width: 640px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1 { font-size: 1.4em; text-align: center; }
+  .panel {
+    background: #2a2a3d;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+  }
+  .control {
+    margin-bottom: 18px;
+  }
+  label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95em;
+    margin-bottom: 6px;
+  }
+  input[type=range] {
+    width: 100%;
+  }
+  button {
+    background: #4CAF50;
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 1em;
+    cursor: pointer;
+    width: 100%;
+  }
+  button:disabled { background: #555; cursor: not-allowed; }
+  #status { text-align: center; margin-top: 10px; font-size: 0.9em; color: #aaa; }
+  .warn { color: #ffb84d; font-size: 0.85em; text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🎙️ Processador de Áudio em Tempo Real — Eco & Reverb</h1>
+
+<div class="panel">
+  <button id="startBtn">Iniciar Captura do Microfone</button>
+  <div id="status">Aguardando permissão do microfone…</div>
+  <div class="warn">⚠️ Use fones de ouvido para evitar realimentação (feedback) entre microfone e alto-falantes.</div>
+</div>
+
+<div class="panel">
+  <div class="control">
+    <label>Tempo de Reverberação (duração) <span id="reverbTimeVal">2.0 s</span></label>
+    <input type="range" id="reverbTime" min="0.1" max="6" step="0.1" value="2.0">
+  </div>
+
+  <div class="control">
+    <label>Tempo de Eco (delay) <span id="echoTimeVal">300 ms</span></label>
+    <input type="range" id="echoTime" min="10" max="1000" step="10" value="300">
+  </div>
+
+  <div class="control">
+    <label>Realimentação do Eco (feedback) <span id="echoFeedbackVal">30%</span></label>
+    <input type="range" id="echoFeedback" min="0" max="90" step="1" value="30">
+  </div>
+</div>
+
+<div class="panel">
+  <div class="control">
+    <label>Volume Geral (saída) <span id="masterVolVal">80%</span></label>
+    <input type="range" id="masterVol" min="0" max="100" step="1" value="80">
+  </div>
+
+  <div class="control">
+    <label>Volume do Sinal Original (direto) <span id="dryVolVal">70%</span></label>
+    <input type="range" id="dryVol" min="0" max="100" step="1" value="70">
+  </div>
+
+  <div class="control">
+    <label>Volume do Sinal Processado (eco + reverb) <span id="wetVolVal">50%</span></label>
+    <input type="range" id="wetVol" min="0" max="100" step="1" value="50">
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   VARIÁVEIS GLOBAIS DE ÁUDIO
+   ============================================================ */
+let audioCtx = null;
+let micStream = null;
+let sourceNode = null;
+
+let dryGain = null;      // ganho do sinal direto (limpo)
+let wetGain = null;      // ganho do sinal processado (eco+reverb)
+let masterGain = null;   // ganho geral de saída
+
+let delayNode = null;        // nó de delay para o eco
+let feedbackGain = null;     // realimentação do eco (repetições)
+let convolver = null;        // nó de convolução para o reverb
+
+/* ============================================================
+   GERA UM IMPULSE RESPONSE (IR) SINTÉTICO PARA O REVERB
+   Cria ruído branco com decaimento exponencial — simula uma
+   cauda de reverberação sem precisar carregar arquivos externos.
+   ============================================================ */
+function createImpulseResponse(context, durationSeconds) {
+  const sampleRate = context.sampleRate;
+  const length = Math.max(1, Math.floor(sampleRate * durationSeconds));
+  const impulse = context.createBuffer(2, length, sampleRate);
+
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = impulse.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      // Ruído branco multiplicado por curva de decaimento exponencial
+      const decay = Math.pow(1 - i / length, 2.5);
+      channelData[i] = (Math.random() * 2 - 1) * decay;
+    }
+  }
+  return impulse;
+}
+
+/* Atualiza o buffer de reverb sem precisar recriar toda a cadeia */
+function updateReverb(durationSeconds) {
+  if (!audioCtx || !convolver) return;
+  convolver.buffer = createImpulseResponse(audioCtx, durationSeconds);
+}
+
+/* ============================================================
+   INICIALIZA O GRAFO DE ÁUDIO
+   ============================================================ */
+async function startAudio() {
+  const startBtn = document.getElementById('startBtn');
+  const statusEl = document.getElementById('status');
+
+  try {
+    statusEl.textContent = 'Solicitando acesso ao microfone…';
+
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,   // desativa cancelamento nativo do navegador
+        noiseSuppression: false,
+        autoGainControl: false
+      }
+    });
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Fonte: microfone
+    sourceNode = audioCtx.createMediaStreamSource(micStream);
+
+    // --- Cadeia DIRETA (sinal limpo) ---
+    dryGain = audioCtx.createGain();
+    dryGain.gain.value = parseFloat(document.getElementById('dryVol').value) / 100;
+
+    // --- Cadeia de ECO (delay + feedback) ---
+    delayNode = audioCtx.createDelay(5.0); // até 5s de delay
+    delayNode.delayTime.value = parseFloat(document.getElementById('echoTime').value) / 1000;
+
+    feedbackGain = audioCtx.createGain();
+    feedbackGain.gain.value = parseFloat(document.getElementById('echoFeedback').value) / 100;
+
+    // Loop de realimentação do eco: delay -> feedbackGain -> delay
+    delayNode.connect(feedbackGain);
+    feedbackGain.connect(delayNode);
+
+    // --- Cadeia de REVERB (convolução) ---
+    convolver = audioCtx.createConvolver();
+    convolver.buffer = createImpulseResponse(
+      audioCtx,
+      parseFloat(document.getElementById('reverbTime').value)
+    );
+
+    // Ganho do sinal processado (eco + reverb combinados)
+    wetGain = audioCtx.createGain();
+    wetGain.gain.value = parseFloat(document.getElementById('wetVol').value) / 100;
+
+    // Ganho geral de saída
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = parseFloat(document.getElementById('masterVol').value) / 100;
+
+    /* ---------------- Conexões do grafo ---------------- */
+
+    // Sinal original -> ganho direto -> saída geral
+    sourceNode.connect(dryGain);
+    dryGain.connect(masterGain);
+
+    // Sinal original -> delay (eco) -> ganho processado
+    sourceNode.connect(delayNode);
+    delayNode.connect(wetGain);
+
+    // Sinal original -> reverb (convolver) -> ganho processado
+    sourceNode.connect(convolver);
+    convolver.connect(wetGain);
+
+    // Ganho processado -> saída geral
+    wetGain.connect(masterGain);
+
+    // Saída geral -> alto-falantes
+    masterGain.connect(audioCtx.destination);
+
+    statusEl.textContent = '✅ Áudio em execução — ajuste os controles abaixo.';
+    startBtn.disabled = true;
+    startBtn.textContent = 'Captura em Andamento';
+
+  } catch (err) {
+    statusEl.textContent = '❌ Erro ao acessar o microfone: ' + err.message;
+    console.error(err);
+  }
+}
+
+/* ============================================================
+   LIGAÇÃO DOS CONTROLES (SLIDERS) COM OS PARÂMETROS DE ÁUDIO
+   ============================================================ */
+function bindSlider(id, valueId, formatter, onChange) {
+  const slider = document.getElementById(id);
+  const valueEl = document.getElementById(valueId);
+  slider.addEventListener('input', () => {
+    valueEl.textContent = formatter(slider.value);
+    onChange(parseFloat(slider.value));
+  });
+}
+
+bindSlider('reverbTime', 'reverbTimeVal',
+  v => v + ' s',
+  v => updateReverb(v)
+);
+
+bindSlider('echoTime', 'echoTimeVal',
+  v => v + ' ms',
+  v => { if (delayNode) delayNode.delayTime.value = v / 1000; }
+);
+
+bindSlider('echoFeedback', 'echoFeedbackVal',
+  v => v + '%',
+  v => { if (feedbackGain) feedbackGain.gain.value = v / 100; }
+);
+
+bindSlider('masterVol', 'masterVolVal',
+  v => v + '%',
+  v => { if (masterGain) masterGain.gain.value = v / 100; }
+);
+
+bindSlider('dryVol', 'dryVolVal',
+  v => v + '%',
+  v => { if (dryGain) dryGain.gain.value = v / 100; }
+);
+
+bindSlider('wetVol', 'wetVolVal',
+  v => v + '%',
+  v => { if (wetGain) wetGain.gain.value = v / 100; }
+);
+
+document.getElementById('startBtn').addEventListener('click', startAudio);
+</script>
+
+</body>
+</html>
