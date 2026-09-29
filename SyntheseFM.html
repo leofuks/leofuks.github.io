@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sintetizador FM</title>
+<style>
+  :root{--bg:#14161c;--panel:#1e222b;--acc:#4fd1c5;--acc2:#f6ad55;--txt:#e2e8f0;--mut:#8a94a6}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);
+       user-select:none;-webkit-user-select:none}
+  header{padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#0f1115}
+  h1{font-size:1.3rem;margin:0}
+  button{background:var(--acc);color:#111;border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer}
+  button.off{background:#555;color:#ddd}
+  #status{color:var(--mut);font-size:.9rem}
+  #noteDisp{margin-left:auto;font-size:1.4rem;font-weight:700;color:var(--acc2);min-width:170px;text-align:right}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;padding:14px 20px}
+  .panel{background:var(--panel);border-radius:10px;padding:14px}
+  .panel h2{font-size:1rem;margin:0 0 10px;color:var(--acc)}
+  .ctl{margin:8px 0}
+  .ctl label{display:flex;justify-content:space-between;font-size:.88rem}
+  .ctl label span{color:var(--acc2);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--acc)}
+  select{background:#111;color:var(--txt);border:1px solid #444;border-radius:4px;padding:4px}
+  canvas{width:100%;height:140px;background:#0c0e12;border-radius:6px;display:block}
+  .hint{font-size:.78rem;color:var(--mut);margin-top:6px}
+  #kbWrap{padding:0 20px 20px;overflow-x:auto}
+  #keyboard{position:relative;height:170px;min-width:760px;touch-action:none}
+  .key{position:absolute;top:0;border:1px solid #222;border-radius:0 0 6px 6px;display:flex;
+       align-items:flex-end;justify-content:center;font-size:.7rem;padding-bottom:6px;cursor:pointer}
+  .white{background:#f4f4f4;color:#555;height:100%;z-index:1}
+  .black{background:#222;color:#aaa;height:62%;z-index:2}
+  .key.active{background:var(--acc)!important;color:#111}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎛️ Sintetizador FM</h1>
+  <button id="startBtn">▶ Ativar áudio</button>
+  <span id="status">Áudio inativo — clique para ativar</span>
+  <div id="noteDisp">—</div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Oscilador FM</h2>
+    <div class="ctl">
+      <label>Frequência da portadora <span id="v-carrier"></span></label>
+      <input type="range" id="carrier" min="20" max="2000" step="0.1" value="440">
+      <div class="hint">O teclado define a portadora. Segure o botão abaixo para ouvir a frequência do controle.</div>
+      <button id="droneBtn" class="off" style="margin-top:6px">Segure: tocar a portadora</button>
+    </div>
+    <div class="ctl">
+      <label>Modo do modulador
+        <select id="modMode"><option value="ratio">Razão (× portadora)</option><option value="fixed">Frequência fixa (Hz)</option></select>
+      </label>
+    </div>
+    <div class="ctl" id="ratioCtl">
+      <label>Razão modulador/portadora <span id="v-ratio"></span></label>
+      <input type="range" id="ratio" min="0.125" max="8" step="0.125" value="2">
+    </div>
+    <div class="ctl" id="fixedCtl" style="display:none">
+      <label>Frequência do modulador <span id="v-modFreq"></span></label>
+      <input type="range" id="modFreq" min="0.1" max="2000" step="0.1" value="220">
+    </div>
+    <div class="ctl">
+      <label>Índice de modulação (I) <span id="v-index"></span></label>
+      <input type="range" id="index" min="0" max="20" step="0.01" value="3">
+    </div>
+    <div class="ctl">
+      <label>Volume geral <span id="v-vol"></span></label>
+      <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5">
+    </div>
+    <div class="hint">Desvio de pico = I × f<sub>mod</sub> — <b id="devInfo"></b></div>
+  </section>
+
+  <section class="panel">
+    <h2>Envelope ADSR</h2>
+    <div class="ctl"><label>Ataque <span id="v-attack"></span></label>
+      <input type="range" id="attack" min="0.001" max="3" step="0.001" value="0.02"></div>
+    <div class="ctl"><label>Decaimento <span id="v-decay"></span></label>
+      <input type="range" id="decay" min="0.001" max="3" step="0.001" value="0.3"></div>
+    <div class="ctl"><label>Sustentação <span id="v-sustain"></span></label>
+      <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.6"></div>
+    <div class="ctl"><label>Liberação <span id="v-release"></span></label>
+      <input type="range" id="release" min="0.001" max="5" step="0.001" value="0.8"></div>
+    <canvas id="adsrCv"></canvas>
+  </section>
+
+  <section class="panel">
+    <h2>Portadora × Modulador</h2>
+    <canvas id="waveCv"></canvas>
+    <div class="hint"><span style="color:#f6ad55">■ modulador</span> &nbsp; <span style="color:#4fd1c5">■ sinal FM resultante</span> (curva calculada)</div>
+    <h2 style="margin-top:12px">Osciloscópio (saída real)</h2>
+    <canvas id="scopeCv"></canvas>
+  </section>
+</main>
+
+<div id="kbWrap">
+  <div class="hint" style="margin-bottom:6px">
+    Teclado do computador: <b>Z S X D C V G B H N J M</b> (oitava inferior) · <b>Q 2 W 3 E R 5 T 6 Y 7 U</b> (oitava superior) ·
+    <b>←/→</b> muda a oitava (atual: <span id="octDisp"></span>)
+  </div>
+  <div id="keyboard"></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const midiToFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+const midiName = m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+
+// ---------- Parâmetros ----------
+const P = {};
+const fmt = {
+  carrier: v => v.toFixed(1) + ' Hz', modFreq: v => v.toFixed(1) + ' Hz',
+  ratio: v => v.toFixed(3) + ' ×', index: v => v.toFixed(2),
+  vol: v => Math.round(v * 100) + ' %',
+  attack: v => (v * 1000).toFixed(0) + ' ms', decay: v => (v * 1000).toFixed(0) + ' ms',
+  sustain: v => Math.round(v * 100) + ' %', release: v => (v * 1000).toFixed(0) + ' ms'
+};
+Object.keys(fmt).forEach(k => {
+  const el = $(k);
+  const upd = () => { P[k] = parseFloat(el.value); $('v-' + k).textContent = fmt[k](P[k]); onParam(k); };
+  el.addEventListener('input', upd);
+  P[k] = parseFloat(el.value); $('v-' + k).textContent = fmt[k](P[k]);
+});
+P.modMode = 'ratio';
+$('modMode').addEventListener('change', e => {
+  P.modMode = e.target.value;
+  $('ratioCtl').style.display = P.modMode === 'ratio' ? '' : 'none';
+  $('fixedCtl').style.display = P.modMode === 'fixed' ? '' : 'none';
+  onParam('modMode');
+});
+
+const modFreqFor = fc => P.modMode === 'ratio' ? fc * P.ratio : P.modFreq;
+
+// ---------- Áudio ----------
+let ctx = null, master = null, analyser = null;
+const voices = new Map(); // id -> voice
+
+function initAudio() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = P.vol;
+    const comp = ctx.createDynamicsCompressor();
+    analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+    master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
+  }
+  if (ctx.state !== 'running') ctx.resume();
+  updateStatus();
+}
+function updateStatus() {
+  const on = ctx && ctx.state === 'running';
+  $('status').textContent = on ? 'Áudio ativo (' + ctx.sampleRate + ' Hz)' : 'Áudio inativo — clique para ativar';
+  $('startBtn').textContent = on ? '⏸ Suspender áudio' : '▶ Ativar áudio';
+  $('startBtn').className = on ? 'off' : '';
+}
+$('startBtn').addEventListener('click', () => {
+  if (ctx && ctx.state === 'running') ctx.suspend().then(updateStatus);
+  else { initAudio(); if (ctx) ctx.resume().then(updateStatus); }
+});
+
+function holdValue(param, t) {
+  if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
+  else { const v = param.value; param.cancelScheduledValues(t); param.setValueAtTime(v, t); }
+}
+
+function noteOn(id, fc, label) {
+  initAudio();
+  if (voices.has(id)) noteOff(id, true);
+  const t = ctx.currentTime;
+  const car = ctx.createOscillator(), mod = ctx.createOscillator();
+  const modGain = ctx.createGain(), env = ctx.createGain();
+  const fm = modFreqFor(fc);
+  car.frequency.value = fc; mod.frequency.value = fm;
+  modGain.gain.value = P.index * fm;          // desvio = I · fm
+  mod.connect(modGain); modGain.connect(car.frequency);
+  car.connect(env); env.connect(master);
+  const peak = 0.35;
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(peak, t + P.attack);
+  env.gain.setTargetAtTime(peak * P.sustain, t + P.attack, P.decay / 4);
+  car.start(t); mod.start(t);
+  const v = { car, mod, modGain, env, fc, peak, label, start: t, released: false };
+  voices.set(id, v);
+  refreshNoteDisplay();
+  return v;
+}
+
+function noteOff(id, fast) {
+  const v = voices.get(id);
+  if (!v || v.released) return;
+  v.released = true;
+  const t = ctx.currentTime, rel = fast ? 0.01 : P.release;
+  holdValue(v.env.gain, t);
+  v.env.gain.setTargetAtTime(0, t, rel / 5);
+  const stopT = t + rel + 0.05;
+  v.car.stop(stopT); v.mod.stop(stopT);
+  v.car.onended = () => { v.env.disconnect(); v.modGain.disconnect(); };
+  voices.delete(id);
+  refreshNoteDisplay();
+}
+
+// Atualização em tempo real das vozes ativas
+function onParam(k) {
+  drawADSR(); drawWave(); updateDev();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  if (k === 'vol') master.gain.setTargetAtTime(P.vol, t, 0.02);
+  if (k === 'carrier' && voices.has('drone')) voices.get('drone').fc = P.carrier;
+  if (['carrier', 'ratio', 'modFreq', 'index', 'modMode'].includes(k)) {
+    voices.forEach(v => {
+      const fm = modFreqFor(v.fc);
+      v.car.frequency.setTargetAtTime(v.fc, t, 0.01);
+      v.mod.frequency.setTargetAtTime(fm, t, 0.01);
+      v.modGain.gain.setTargetAtTime(P.index * fm, t, 0.01);
+    });
+  }
+  if (k === 'sustain' || k === 'decay') {
+    voices.forEach(v => {
+      if (t > v.start + P.attack) {
+        holdValue(v.env.gain, t);
+        v.env.gain.setTargetAtTime(v.peak * P.sustain, t, Math.max(P.decay / 4, 0.01));
+      }
+    });
+  }
+  if (k === 'carrier') refreshNoteDisplay();
+}
+
+function refreshNoteDisplay() {
+  const list = [...voices.values()];
+  if (!list.length) { $('noteDisp').textContent = '—'; return; }
+  const last = list[list.length - 1];
+  $('noteDisp').textContent = list.map(v => v.label).join(' ') + ' · ' + last.fc.toFixed(1) + ' Hz';
+  if (last.label !== 'Portadora') {           // reflete no controle
+    $('carrier').value = Math.min(2000, last.fc);
+    P.carrier = last.fc; $('v-carrier').textContent = fmt.carrier(P.carrier);
+    drawWave(); updateDev();
+  }
+}
+function updateDev() {
+  const fm = modFreqFor(P.carrier);
+  $('devInfo').textContent = 'f_mod = ' + fm.toFixed(1) + ' Hz, desvio = ±' + (P.index * fm).toFixed(1) + ' Hz';
+}
+
+// Botão da portadora fixa
+const drone = $('droneBtn');
+const droneOn = e => { e.preventDefault(); drone.className = ''; noteOn('drone', P.carrier, 'Portadora'); };
+const droneOff = () => { drone.className = 'off'; if (ctx) noteOff('drone'); };
+drone.addEventListener('pointerdown', droneOn);
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => drone.addEventListener(ev, droneOff));
+
+// ---------- Teclado (C3–C6) ----------
+const LOW = 48, HIGH = 84;
+const kb = $('keyboard'), keyEls = {};
+const whites = []; for (let m = LOW; m <= HIGH; m++) if (![1,3,6,8,10].includes(m % 12)) whites.push(m);
+const ww = 100 / whites.length;
+let wi = 0;
+for (let m = LOW; m <= HIGH; m++) {
+  const black = [1,3,6,8,10].includes(m % 12);
+  const el = document.createElement('div');
+  el.className = 'key ' + (black ? 'black' : 'white');
+  el.dataset.midi = m;
+  if (black) { el.style.left = (wi * ww - ww * 0.3) + '%'; el.style.width = (ww * 0.6) + '%'; }
+  else { el.style.left = (wi * ww) + '%'; el.style.width = ww + '%'; el.textContent = midiName(m); wi++; }
+  kb.appendChild(el); keyEls[m] = el;
+}
+const press = m => { keyEls[m] && keyEls[m].classList.add('active'); noteOn('k' + m, midiToFreq(m), midiName(m)); };
+const release = m => { keyEls[m] && keyEls[m].classList.remove('active'); if (ctx) noteOff('k' + m); };
+
+// Ponteiro (mouse/toque) com deslizamento entre teclas
+const pointerNote = new Map();
+const keyAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.dataset && el.dataset.midi ? +el.dataset.midi : null; };
+kb.addEventListener('pointerdown', e => {
+  e.preventDefault(); kb.setPointerCapture && kb.releasePointerCapture?.(e.pointerId);
+  const m = keyAt(e.clientX, e.clientY); if (m == null) return;
+  pointerNote.set(e.pointerId, m); press(m);
+});
+kb.addEventListener('pointermove', e => {
+  if (!pointerNote.has(e.pointerId)) return;
+  const m = keyAt(e.clientX, e.clientY), old = pointerNote.get(e.pointerId);
+  if (m !== old) { if (old != null) release(old); if (m != null) press(m); pointerNote.set(e.pointerId, m); }
+});
+const endPtr = e => { const m = pointerNote.get(e.pointerId); if (m != null) release(m); pointerNote.delete(e.pointerId); };
+['pointerup', 'pointercancel'].forEach(ev => window.addEventListener(ev, endPtr));
+kb.addEventListener('pointerleave', endPtr);
+
+// Teclado do computador
+const MAP = { z:0,s:1,x:2,d:3,c:4,v:5,g:6,b:7,h:8,n:9,j:10,m:11,
+              q:12,'2':13,w:14,'3':15,e:16,r:17,'5':18,t:19,'6':20,y:21,'7':22,u:23,i:24 };
+let baseOct = 48; const held = {};
+const octUpd = () => $('octDisp').textContent = midiName(baseOct);
+octUpd();
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT' || e.repeat || e.ctrlKey || e.metaKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft') { baseOct = Math.max(24, baseOct - 12); octUpd(); return; }
+  if (k === 'arrowright') { baseOct = Math.min(84, baseOct + 12); octUpd(); return; }
+  if (k in MAP && !held[k]) { const m = baseOct + MAP[k]; held[k] = m; press(m); }
+});
+window.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (held[k] != null) { release(held[k]); delete held[k]; }
+});
+window.addEventListener('blur', () => { Object.keys(held).forEach(k => { release(held[k]); delete held[k]; }); });
+
+// ---------- Visualizações ----------
+function fitCanvas(cv) {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  if (cv.width !== r.width * d) { cv.width = r.width * d; cv.height = r.height * d; }
+  const g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0);
+  return [g, r.width, r.height];
+}
+function drawADSR() {
+  const [g, w, h] = fitCanvas($('adsrCv')); const pad = 10;
+  g.clearRect(0, 0, w, h);
+  const hold = 0.5, total = P.attack + P.decay + hold + P.release;
+  const X = t => pad + (t / total) * (w - 2 * pad), Y = v => h - pad - v * (h - 2 * pad);
+  const pts = [[0,0],[P.attack,1],[P.attack+P.decay,P.sustain],[P.attack+P.decay+hold,P.sustain],[total,0]];
+  g.fillStyle = 'rgba(79,209,197,.15)'; g.strokeStyle = '#4fd1c5'; g.lineWidth = 2;
+  g.beginPath(); pts.forEach(([t,v],i) => i ? g.lineTo(X(t),Y(v)) : g.moveTo(X(t),Y(v)));
+  g.stroke(); g.lineTo(X(total),Y(0)); g.fill();
+  g.fillStyle = '#8a94a6'; g.font = '11px sans-serif';
+  ['A','D','S','R'].forEach((l,i) => g.fillText(l, (X(pts[i][0]) + X(pts[i+1][0])) / 2 - 3, h - 2));
+}
+function drawWave() {
+  const [g, w, h] = fitCanvas($('waveCv'));
+  g.clearRect(0, 0, w, h);
+  const fc = P.carrier, fm = modFreqFor(fc), dur = 3 / fc, N = Math.floor(w);
+  const plot = (fn, col, amp, lw) => {
+    g.strokeStyle = col; g.lineWidth = lw; g.beginPath();
+    for (let i = 0; i <= N; i++) { const t = i / N * dur, y = h / 2 - fn(t) * amp;
+      i ? g.lineTo(i, y) : g.moveTo(i, y); }
+    g.stroke();
+  };
+  plot(t => Math.sin(2*Math.PI*fm*t), 'rgba(246,173,85,.6)', h * 0.42, 1);
+  plot(t => Math.sin(2*Math.PI*fc*t + P.index*Math.sin(2*Math.PI*fm*t)), '#4fd1c5', h * 0.42, 1.6);
+}
+const scopeBuf = new Float32Array(2048);
+function drawScope() {
+  const [g, w, h] = fitCanvas($('scopeCv'));
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = '#333'; g.beginPath(); g.moveTo(0, h/2); g.lineTo(w, h/2); g.stroke();
+  if (analyser) {
+    analyser.getFloatTimeDomainData(scopeBuf);
+    let s = 0; for (let i = 1; i < 1024; i++) if (scopeBuf[i-1] < 0 && scopeBuf[i] >= 0) { s = i; break; }
+    g.strokeStyle = '#f6ad55'; g.lineWidth = 1.5; g.beginPath();
+    for (let i = 0; i < 1024; i++) { const x = i / 1024 * w, y = h/2 - scopeBuf[s+i] * h * 0.9;
+      i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+  }
+  requestAnimationFrame(drawScope);
+}
+window.addEventListener('resize', () => { drawADSR(); drawWave(); });
+drawADSR(); drawWave(); updateDev(); drawScope();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sintetizador FM + Sampler</title>
+<style>
+  :root{--bg:#14161c;--panel:#1e222b;--acc:#4fd1c5;--acc2:#f6ad55;--acc3:#b794f4;--txt:#e2e8f0;--mut:#8a94a6;--err:#fc8181;--ok:#68d391}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);user-select:none;-webkit-user-select:none}
+  header{padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#0f1115}
+  h1{font-size:1.3rem;margin:0}
+  button{background:var(--acc);color:#111;border:0;border-radius:6px;padding:8px 14px;font-weight:600;cursor:pointer}
+  button.off{background:#555;color:#ddd}
+  button.rec{background:#e53e3e;color:#fff}
+  button.smpb{background:var(--acc3)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  #status,#smpState,#midiState{color:var(--mut);font-size:.85rem}
+  #smpState.on{color:var(--acc3)}
+  #noteDisp{margin-left:auto;font-size:1.4rem;font-weight:700;color:var(--acc2);min-width:170px;text-align:right}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;padding:14px 20px}
+  .panel{background:var(--panel);border-radius:10px;padding:14px}
+  .panel h2{font-size:1rem;margin:0 0 10px;color:var(--acc)}
+  .panel.smp h2{color:var(--acc3)}
+  .ctl{margin:8px 0}
+  .ctl label{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.88rem}
+  .ctl label span{color:var(--acc2);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--acc)}
+  .smp input[type=range]{accent-color:var(--acc3)}
+  select{background:#111;color:var(--txt);border:1px solid #444;border-radius:4px;padding:4px}
+  canvas{width:100%;height:140px;background:#0c0e12;border-radius:6px;display:block}
+  canvas.small{height:90px}
+  .hint{font-size:.78rem;color:var(--mut);margin-top:6px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  #recMsg{font-size:.85rem;margin:8px 0;padding:6px 8px;border-radius:6px;background:#111}
+  #recMsg.info{color:var(--mut)} #recMsg.rec{color:#feb2b2} #recMsg.ok{color:var(--ok)} #recMsg.err{color:var(--err)}
+  #meter{height:8px;background:#111;border-radius:4px;overflow:hidden;margin:6px 0}
+  #meterBar{height:100%;width:0;background:linear-gradient(90deg,#68d391,#f6ad55,#e53e3e)}
+  #mixBox{grid-column:1/-1}
+  #mixLbl{display:flex;justify-content:space-between;font-weight:700;font-size:1rem}
+  #mixLbl .fm{color:var(--acc)} #mixLbl .sm{color:var(--acc3)}
+  #mix{accent-color:var(--acc2)}
+  #kbWrap{padding:0 20px 20px;overflow-x:auto}
+  #keyboard{position:relative;height:170px;min-width:760px;touch-action:none}
+  .key{position:absolute;top:0;border:1px solid #222;border-radius:0 0 6px 6px;display:flex;align-items:flex-end;justify-content:center;font-size:.7rem;padding-bottom:6px;cursor:pointer}
+  .white{background:#f4f4f4;color:#555;height:100%;z-index:1}
+  .black{background:#222;color:#aaa;height:62%;z-index:2}
+  .key.root{box-shadow:inset 0 -8px 0 var(--acc3)}
+  .key.active{background:var(--acc)!important;color:#111}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎛️ Sintetizador FM + Sampler</h1>
+  <button id="startBtn">▶ Ativar áudio</button>
+  <span id="status">Áudio inativo — clique para ativar</span>
+  <span id="smpState">Amostra: nenhuma</span>
+  <button id="midiBtn" class="off">Conectar MIDI</button>
+  <span id="midiState"></span>
+  <div id="noteDisp">—</div>
+</header>
+
+<main>
+  <section class="panel" id="mixBox">
+    <h2>Mistura FM × Amostra</h2>
+    <div id="mixLbl"><span class="sm" id="mixSm"></span><span class="fm" id="mixFm"></span></div>
+    <input type="range" id="mix" min="0" max="100" step="1" value="50">
+    <div class="row hint">
+      <span>Esquerda = 0% FM / 100% amostra · Direita = 100% FM / 0% amostra.</span>
+      <label>Curva: <select id="mixCurve"><option value="power">Potência constante</option><option value="linear">Linear</option></select></label>
+      <span id="mixWarn" style="color:var(--acc2)"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Oscilador FM</h2>
+    <div class="ctl">
+      <label>Frequência da portadora <span id="v-carrier"></span></label>
+      <input type="range" id="carrier" min="20" max="2000" step="0.1" value="440">
+      <div class="hint">O teclado define a portadora. Segure o botão para ouvir a frequência do controle.</div>
+      <button id="droneBtn" class="off" style="margin-top:6px">Segure: tocar a portadora</button>
+    </div>
+    <div class="ctl"><label>Modo do modulador
+      <select id="modMode"><option value="ratio">Razão (× portadora)</option><option value="fixed">Frequência fixa (Hz)</option></select></label></div>
+    <div class="ctl" id="ratioCtl"><label>Razão modulador/portadora <span id="v-ratio"></span></label>
+      <input type="range" id="ratio" min="0.125" max="8" step="0.125" value="2"></div>
+    <div class="ctl" id="fixedCtl" style="display:none"><label>Frequência do modulador <span id="v-modFreq"></span></label>
+      <input type="range" id="modFreq" min="0.1" max="2000" step="0.1" value="220"></div>
+    <div class="ctl"><label>Índice de modulação (I) <span id="v-index"></span></label>
+      <input type="range" id="index" min="0" max="20" step="0.01" value="3"></div>
+    <div class="ctl"><label>Volume geral <span id="v-vol"></span></label>
+      <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5"></div>
+    <div class="hint">Desvio de pico = I × f<sub>mod</sub> — <b id="devInfo"></b></div>
+  </section>
+
+  <section class="panel">
+    <h2>Envelope ADSR (FM)</h2>
+    <div class="ctl"><label>Ataque <span id="v-attack"></span></label><input type="range" id="attack" min="0.001" max="3" step="0.001" value="0.02"></div>
+    <div class="ctl"><label>Decaimento <span id="v-decay"></span></label><input type="range" id="decay" min="0.001" max="3" step="0.001" value="0.3"></div>
+    <div class="ctl"><label>Sustentação <span id="v-sustain"></span></label><input type="range" id="sustain" min="0" max="1" step="0.01" value="0.6"></div>
+    <div class="ctl"><label>Liberação <span id="v-release"></span></label><input type="range" id="release" min="0.001" max="5" step="0.001" value="0.8"></div>
+    <canvas id="adsrCv"></canvas>
+  </section>
+
+  <section class="panel">
+    <h2>Portadora × Modulador</h2>
+    <canvas id="waveCv"></canvas>
+    <div class="hint"><span style="color:#f6ad55">■ modulador</span> &nbsp; <span style="color:#4fd1c5">■ sinal FM</span> (curva calculada)</div>
+    <h2 style="margin-top:12px">Osciloscópio (saída real)</h2>
+    <canvas id="scopeCv"></canvas>
+  </section>
+
+  <section class="panel smp">
+    <h2>🎙️ Sampler — gravação</h2>
+    <div class="row">
+      <button id="recBtn">● Gravar</button>
+      <button id="prevBtn" class="off" disabled>▶ Ouvir amostra</button>
+      <button id="clearBtn" class="off" disabled>Remover</button>
+    </div>
+    <div id="meter"><div id="meterBar"></div></div>
+    <div id="recMsg" class="info">Nenhuma amostra. Clique em “Gravar” (máx. 10 s) e permita o acesso ao microfone.</div>
+    <canvas id="smpCv" class="small"></canvas>
+    <div class="ctl"><label><span style="color:var(--txt)">Cortar silêncio e normalizar</span><input type="checkbox" id="trim" checked></label></div>
+  </section>
+
+  <section class="panel smp">
+    <h2>Sampler — afinação e loop</h2>
+    <div class="ctl"><label>Nota de referência <select id="root"></select></label>
+      <div class="hint">Nessa tecla (marcada em roxo), a amostra toca na altura original. As outras teclas transpõem por semitons.</div></div>
+    <div class="ctl"><label>Afinação fina <span id="v-tune"></span></label><input type="range" id="tune" min="-100" max="100" step="1" value="0"></div>
+    <div class="ctl"><label><span style="color:var(--txt)">Loop enquanto a tecla estiver pressionada</span><input type="checkbox" id="loop"></label></div>
+    <div class="ctl"><label>Início do loop <span id="v-loopStart"></span></label><input type="range" id="loopStart" min="0" max="0.99" step="0.01" value="0"></div>
+    <div class="ctl"><label>Fim do loop <span id="v-loopEnd"></span></label><input type="range" id="loopEnd" min="0.01" max="1" step="0.01" value="1"></div>
+  </section>
+
+  <section class="panel smp">
+    <h2>Envelope ADSR (Amostra)</h2>
+    <div class="ctl"><label>Ataque <span id="v-sAttack"></span></label><input type="range" id="sAttack" min="0.001" max="3" step="0.001" value="0.005"></div>
+    <div class="ctl"><label>Decaimento <span id="v-sDecay"></span></label><input type="range" id="sDecay" min="0.001" max="3" step="0.001" value="0.5"></div>
+    <div class="ctl"><label>Sustentação <span id="v-sSustain"></span></label><input type="range" id="sSustain" min="0" max="1" step="0.01" value="0.8"></div>
+    <div class="ctl"><label>Liberação <span id="v-sRelease"></span></label><input type="range" id="sRelease" min="0.001" max="5" step="0.001" value="0.5"></div>
+    <canvas id="sAdsrCv"></canvas>
+  </section>
+</main>
+
+<div id="kbWrap">
+  <div class="hint" style="margin-bottom:6px">
+    Teclado do computador: <b>Z S X D C V G B H N J M</b> (oitava inferior) · <b>Q 2 W 3 E R 5 T 6 Y 7 U I</b> (oitava superior) ·
+    <b>←/→</b> muda a oitava (atual: <span id="octDisp"></span>)
+  </div>
+  <div id="keyboard"></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const midiToFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+const midiName = m => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+const ms = v => (v * 1000).toFixed(0) + ' ms';
+const pct = v => Math.round(v * 100) + ' %';
+
+// ---------- Parâmetros ----------
+const P = {};
+const fmt = {
+  carrier: v => v.toFixed(1) + ' Hz', modFreq: v => v.toFixed(1) + ' Hz',
+  ratio: v => v.toFixed(3) + ' ×', index: v => v.toFixed(2), vol: pct,
+  attack: ms, decay: ms, sustain: pct, release: ms,
+  sAttack: ms, sDecay: ms, sSustain: pct, sRelease: ms,
+  tune: v => (v > 0 ? '+' : '') + v + ' cents', loopStart: pct, loopEnd: pct
+};
+Object.keys(fmt).forEach(k => {
+  const el = $(k);
+  el.addEventListener('input', () => { P[k] = parseFloat(el.value); $('v-' + k).textContent = fmt[k](P[k]); onParam(k); });
+  P[k] = parseFloat(el.value); $('v-' + k).textContent = fmt[k](P[k]);
+});
+P.modMode = 'ratio';
+$('modMode').addEventListener('change', e => {
+  P.modMode = e.target.value;
+  $('ratioCtl').style.display = P.modMode === 'ratio' ? '' : 'none';
+  $('fixedCtl').style.display = P.modMode === 'fixed' ? '' : 'none';
+  onParam('modMode');
+});
+
+// ---------- Mistura ----------
+P.mix = $('mix').value / 100; P.mixCurve = 'power';
+function mixGains() {
+  const x = P.mix; // fração FM
+  return P.mixCurve === 'linear' ? [x, 1 - x] : [Math.sin(x * Math.PI / 2), Math.cos(x * Math.PI / 2)];
+}
+function showMix() {
+  $('mixFm').textContent = 'FM ' + Math.round(P.mix * 100) + ' %';
+  $('mixSm').textContent = 'Amostra ' + Math.round((1 - P.mix) * 100) + ' %';
+  $('mixWarn').textContent = (!sampleBuf && P.mix < 1) ? '⚠ Sem amostra: a parte amostrada está em silêncio.' : '';
+}
+$('mix').addEventListener('input', e => { P.mix = e.target.value / 100; showMix(); onParam('mix'); });
+$('mixCurve').addEventListener('change', e => { P.mixCurve = e.target.value; onParam('mix'); });
+
+// ---------- Opções do sampler ----------
+const rootSel = $('root');
+for (let m = 36; m <= 96; m++) {
+  const o = document.createElement('option'); o.value = m;
+  o.textContent = midiName(m) + ' (' + midiToFreq(m).toFixed(1) + ' Hz)'; rootSel.appendChild(o);
+}
+rootSel.value = 60; P.root = 60;
+rootSel.addEventListener('change', () => { P.root = +rootSel.value; markRoot(); onParam('root'); });
+P.loop = $('loop').checked;
+$('loop').addEventListener('change', e => { P.loop = e.target.checked; onParam('loop'); });
+
+const modFreqFor = fc => P.modMode === 'ratio' ? fc * P.ratio : P.modFreq;
+const rateFor = fc => (fc / midiToFreq(P.root)) * Math.pow(2, P.tune / 1200);
+function loopPoints() {
+  const d = sampleBuf ? sampleBuf.duration : 0;
+  let a = P.loopStart, b = P.loopEnd;
+  if (b <= a + 0.01) b = Math.min(1, a + 0.01);
+  return [a * d, b * d];
+}
+
+// ---------- Áudio ----------
+let ctx = null, master = null, analyser = null, fmBus = null, smpBus = null;
+let sampleBuf = null;
+const voices = new Map();
+
+function initAudio() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = P.vol;
+    const [gf, gs] = mixGains();
+    fmBus = ctx.createGain(); fmBus.gain.value = gf;
+    smpBus = ctx.createGain(); smpBus.gain.value = gs;
+    fmBus.connect(master); smpBus.connect(master);
+    const comp = ctx.createDynamicsCompressor();
+    analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+    master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
+    ctx.onstatechange = updateStatus;
+  }
+  if (ctx.state !== 'running') ctx.resume().then(updateStatus).catch(() => {});
+  updateStatus();
+}
+function updateStatus() {
+  const on = ctx && ctx.state === 'running';
+  $('status').textContent = on ? 'Áudio ativo (' + ctx.sampleRate + ' Hz)' : 'Áudio inativo — clique para ativar';
+  $('startBtn').textContent = on ? '⏸ Suspender áudio' : '▶ Ativar áudio';
+  $('startBtn').className = on ? 'off' : '';
+}
+$('startBtn').addEventListener('click', () => {
+  if (ctx && ctx.state === 'running') { if (rec) stopRec(); ctx.suspend().then(updateStatus); }
+  else initAudio();
+});
+
+function holdValue(param, t) {
+  if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
+  else { const v = param.value; param.cancelScheduledValues(t); param.setValueAtTime(v, t); }
+}
+function envOn(param, t, peak, a, d, s) {
+  param.setValueAtTime(0, t);
+  param.linearRampToValueAtTime(peak, t + a);
+  param.setTargetAtTime(peak * s, t + a, Math.max(d / 4, 0.001));
+}
+function envOff(param, t, rel) { holdValue(param, t); param.setTargetAtTime(0, t, Math.max(rel / 5, 0.001)); }
+
+function noteOn(id, fc, label, vel) {
+  vel = vel == null ? 1 : vel;
+  initAudio();
+  if (voices.has(id)) noteOff(id, true);
+  const t = ctx.currentTime;
+  // FM
+  const car = ctx.createOscillator(), mod = ctx.createOscillator();
+  const modGain = ctx.createGain(), env = ctx.createGain();
+  const fm = modFreqFor(fc);
+  car.frequency.value = fc; mod.frequency.value = fm;
+  modGain.gain.value = P.index * fm;
+  mod.connect(modGain); modGain.connect(car.frequency);
+  car.connect(env); env.connect(fmBus);
+  const peak = 0.35 * vel;
+  envOn(env.gain, t, peak, P.attack, P.decay, P.sustain);
+  car.start(t); mod.start(t);
+  car.onended = () => { env.disconnect(); modGain.disconnect(); };
+  // Amostra
+  let s = null;
+  if (sampleBuf) {
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = sampleBuf;
+    src.playbackRate.value = rateFor(fc);
+    const [ls, le] = loopPoints();
+    src.loop = P.loop; src.loopStart = ls; src.loopEnd = le;
+    src.connect(g); g.connect(smpBus);
+    const sp = 0.4 * vel;
+    envOn(g.gain, t, sp, P.sAttack, P.sDecay, P.sSustain);
+    src.start(t);
+    src.onended = () => g.disconnect();
+    s = { src, env: g, peak: sp };
+  }
+  voices.set(id, { car, mod, modGain, env, fc, peak, label, start: t, released: false, s });
+  refreshNoteDisplay();
+}
+
+function noteOff(id, fast) {
+  const v = voices.get(id);
+  if (!v || v.released) return;
+  v.released = true;
+  const t = ctx.currentTime;
+  const relF = fast ? 0.01 : P.release;
+  envOff(v.env.gain, t, relF);
+  v.car.stop(t + relF + 0.05); v.mod.stop(t + relF + 0.05);
+  if (v.s) {
+    const relS = fast ? 0.01 : P.sRelease;
+    envOff(v.s.env.gain, t, relS);
+    try { v.s.src.stop(t + relS + 0.05); } catch (e) {}
+  }
+  voices.delete(id);
+  refreshNoteDisplay();
+}
+
+function onParam(k) {
+  drawEnv('adsrCv', P.attack, P.decay, P.sustain, P.release, '#4fd1c5', '79,209,197');
+  drawEnv('sAdsrCv', P.sAttack, P.sDecay, P.sSustain, P.sRelease, '#b794f4', '183,148,244');
+  drawWave(); updateDev();
+  if (k === 'loopStart' || k === 'loopEnd' || k === 'loop') drawSample();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  if (k === 'vol') master.gain.setTargetAtTime(P.vol, t, 0.02);
+  if (k === 'mix') {
+    const [gf, gs] = mixGains();
+    fmBus.gain.setTargetAtTime(gf, t, 0.02);
+    smpBus.gain.setTargetAtTime(gs, t, 0.02);
+  }
+  if (k === 'carrier' && voices.has('drone')) voices.get('drone').fc = P.carrier;
+  if (['carrier', 'ratio', 'modFreq', 'index', 'modMode', 'root', 'tune'].includes(k)) {
+    voices.forEach(v => {
+      const fm = modFreqFor(v.fc);
+      v.car.frequency.setTargetAtTime(v.fc, t, 0.01);
+      v.mod.frequency.setTargetAtTime(fm, t, 0.01);
+      v.modGain.gain.setTargetAtTime(P.index * fm, t, 0.01);
+      if (v.s) v.s.src.playbackRate.setTargetAtTime(rateFor(v.fc), t, 0.01);
+    });
+  }
+  if (['loop', 'loopStart', 'loopEnd'].includes(k)) {
+    const [ls, le] = loopPoints();
+    voices.forEach(v => { if (v.s) { v.s.src.loop = P.loop; v.s.src.loopStart = ls; v.s.src.loopEnd = le; } });
+  }
+  if (k === 'sustain' || k === 'decay') voices.forEach(v => {
+    if (t > v.start + P.attack) { holdValue(v.env.gain, t); v.env.gain.setTargetAtTime(v.peak * P.sustain, t, Math.max(P.decay / 4, 0.01)); }
+  });
+  if (k === 'sSustain' || k === 'sDecay') voices.forEach(v => {
+    if (v.s && t > v.start + P.sAttack) { holdValue(v.s.env.gain, t); v.s.env.gain.setTargetAtTime(v.s.peak * P.sSustain, t, Math.max(P.sDecay / 4, 0.01)); }
+  });
+  if (k === 'carrier') refreshNoteDisplay();
+}
+
+function refreshNoteDisplay() {
+  const list = [...voices.values()];
+  if (!list.length) { $('noteDisp').textContent = '—'; return; }
+  const last = list[list.length - 1];
+  $('noteDisp').textContent = list.map(v => v.label).join(' ') + ' · ' + last.fc.toFixed(1) + ' Hz';
+  if (last.label !== 'Portadora') {
+    $('carrier').value = Math.min(2000, last.fc);
+    P.carrier = last.fc; $('v-carrier').textContent = fmt.carrier(P.carrier);
+    drawWave(); updateDev();
+  }
+}
+function updateDev() {
+  const fm = modFreqFor(P.carrier);
+  $('devInfo').textContent = 'f_mod = ' + fm.toFixed(1) + ' Hz, desvio = ±' + (P.index * fm).toFixed(1) + ' Hz';
+}
+
+const drone = $('droneBtn');
+drone.addEventListener('pointerdown', e => { e.preventDefault(); drone.className = ''; noteOn('drone', P.carrier, 'Portadora'); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => drone.addEventListener(ev, () => { drone.className = 'off'; if (ctx) noteOff('drone'); }));
+
+// ---------- Sampler: gravação (AudioWorklet com fallback) ----------
+const MAX_SEC = 10;
+const WORKLET_SRC = "class RecProc extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true;}}registerProcessor('rec-proc',RecProc);";
+let workletReady = null, rec = null, micAnalyser = null;
+const micBuf = new Float32Array(1024);
+const recBtn = $('recBtn'), clearBtn = $('clearBtn'), prevBtn = $('prevBtn');
+function recMsg(text, cls) { const el = $('recMsg'); el.textContent = text; el.className = cls || 'info'; }
+
+function ensureWorklet() {
+  if (!ctx.audioWorklet || typeof AudioWorkletNode === 'undefined') return Promise.resolve(false);
+  if (!workletReady) {
+    const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+    workletReady = ctx.audioWorklet.addModule(url).then(() => true, () => false);
+  }
+  return workletReady;
+}
+
+async function startRec() {
+  initAudio();
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    recMsg('Microfone indisponível: use HTTPS ou http://localhost (ou o navegador não suporta getUserMedia).', 'err');
+    return;
+  }
+  recBtn.disabled = true;
+  recMsg('Solicitando permissão para o microfone…', 'info');
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (err) {
+    recBtn.disabled = false;
+    const msgs = {
+      NotAllowedError: 'Permissão negada. Libere o microfone pelo ícone de cadeado na barra de endereço.',
+      SecurityError: 'Bloqueado por segurança. Use HTTPS ou localhost.',
+      NotFoundError: 'Nenhum microfone encontrado.',
+      NotReadableError: 'Microfone em uso por outro programa ou com falha.',
+      OverconstrainedError: 'O microfone não atende às configurações pedidas.',
+      AbortError: 'Solicitação interrompida.'
+    };
+    recMsg('Erro: ' + (msgs[err.name] || err.message || err.name), 'err');
+    return;
+  }
+  try {
+    if (ctx.state !== 'running') await ctx.resume();
+    const useWorklet = await ensureWorklet();
+    const src = ctx.createMediaStreamSource(stream);
+    const mute = ctx.createGain(); mute.gain.value = 0;   // evita microfonia
+    micAnalyser = ctx.createAnalyser(); micAnalyser.fftSize = 1024;
+    const r = { stream, src, mute, node: null, chunks: [], len: 0 };
+    const onData = d => {
+      if (rec !== r) return;
+      r.chunks.push(d); r.len += d.length;
+      if (r.len / ctx.sampleRate >= MAX_SEC) stopRec();
+    };
+    if (useWorklet) {
+      r.node = new AudioWorkletNode(ctx, 'rec-proc', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+      r.node.port.onmessage = e => onData(e.data);
+    } else {
+      r.node = ctx.createScriptProcessor(4096, 1, 1);
+      r.node.onaudioprocess = e => onData(new Float32Array(e.inputBuffer.getChannelData(0)));
+    }
+    src.connect(micAnalyser); src.connect(r.node); r.node.connect(mute); mute.connect(ctx.destination);
+    stream.getAudioTracks().forEach(tr => tr.addEventListener('ended', () => {
+      if (rec === r) { stopRec(); recMsg('O microfone foi desconectado. Gravação encerrada.', 'err'); }
+    }));
+    rec = r;
+    recBtn.textContent = '■ Parar'; recBtn.className = 'rec';
+    recMsg('● Gravando… 0.0 s', 'rec');
+  } catch (err) {
+    stream.getTracks().forEach(tr => tr.stop());
+    recMsg('Erro ao iniciar a gravação: ' + (err.message || err.name), 'err');
+  } finally { recBtn.disabled = false; }
+}
+
+function releaseRec(r) {
+  if (r.node.port) r.node.port.onmessage = null;
+  r.node.onaudioprocess = null;
+  try { r.src.disconnect(); r.node.disconnect(); r.mute.disconnect(); } catch (e) {}
+  r.stream.getTracks().forEach(tr => tr.stop());
+  micAnalyser = null;
+}
+
+function stopRec() {
+  if (!rec) return;
+  const r = rec; rec = null;
+  releaseRec(r);
+  recBtn.textContent = '● Gravar'; recBtn.className = '';
+  $('meterBar').style.width = '0';
+  if (!r.len) { recMsg('Nada foi gravado. Tente novamente.', 'err'); return; }
+  let data = new Float32Array(r.len), off = 0;
+  r.chunks.forEach(c => { data.set(c, off); off += c.length; });
+  const sr = ctx.sampleRate;
+  let pk = 0; for (let i = 0; i < data.length; i++) pk = Math.max(pk, Math.abs(data[i]));
+  if (pk < 0.003) { recMsg('Só silêncio foi captado. Verifique o microfone. A amostra anterior foi mantida.', 'err'); return; }
+  if ($('trim').checked) {
+    const th = Math.max(0.01, pk * 0.05);
+    let a = 0, b = data.length - 1;
+    while (a < b && Math.abs(data[a]) < th) a++;
+    while (b > a && Math.abs(data[b]) < th) b--;
+    a = Math.max(0, a - Math.floor(0.01 * sr)); b = Math.min(data.length - 1, b + Math.floor(0.05 * sr));
+    data = data.slice(a, b + 1);
+    if (data.length < sr * 0.03) { recMsg('Amostra curta demais. A anterior foi mantida.', 'err'); return; }
+    const g = 0.9 / pk; for (let i = 0; i < data.length; i++) data[i] *= g;
+  }
+  const fade = Math.min(Math.floor(0.005 * sr), data.length >> 1);
+  for (let i = 0; i < fade; i++) { const f = i / fade; data[i] *= f; data[data.length - 1 - i] *= f; }
+  const buf = ctx.createBuffer(1, data.length, sr);
+  buf.getChannelData(0).set(data);
+  sampleBuf = buf;                                 // substitui a amostra anterior
+  clearBtn.disabled = prevBtn.disabled = false; clearBtn.className = ''; prevBtn.className = 'smpb';
+  recMsg('✔ Amostra ativa: ' + buf.duration.toFixed(2) + ' s. Toque no teclado (referência ' + midiName(P.root) + ').', 'ok');
+  updateSmpState(); drawSample(); showMix();
+}
+
+function updateSmpState() {
+  const el = $('smpState');
+  el.textContent = sampleBuf ? 'Amostra: ' + sampleBuf.duration.toFixed(2) + ' s ✔' : 'Amostra: nenhuma';
+  el.className = sampleBuf ? 'on' : '';
+}
+
+recBtn.addEventListener('click', () => { rec ? stopRec() : startRec(); });
+let preview = null;
+prevBtn.addEventListener('click', () => {
+  if (!sampleBuf) return;
+  initAudio();
+  if (preview) { try { preview.stop(); } catch (e) {} }
+  preview = ctx.createBufferSource(); preview.buffer = sampleBuf;
+  const g = ctx.createGain(); g.gain.value = 0.4;
+  preview.connect(g); g.connect(master);             // ignora a mistura para audição direta
+  preview.onended = () => g.disconnect();
+  preview.start();
+});
+clearBtn.addEventListener('click', () => {
+  sampleBuf = null; clearBtn.disabled = prevBtn.disabled = true; clearBtn.className = prevBtn.className = 'off';
+  recMsg('Amostra removida. Grave uma nova para usar o sampler.', 'info');
+  updateSmpState(); drawSample(); showMix();
+});
+window.addEventListener('pagehide', () => { if (rec) { releaseRec(rec); rec = null; } });
+
+// ---------- Teclado (C3–C6) ----------
+const LOW = 48, HIGH = 84;
+const kb = $('keyboard'), keyEls = {};
+const isBlack = m => [1,3,6,8,10].includes(m % 12);
+const whitesN = (() => { let n = 0; for (let m = LOW; m <= HIGH; m++) if (!isBlack(m)) n++; return n; })();
+const ww = 100 / whitesN;
+let wi = 0;
+for (let m = LOW; m <= HIGH; m++) {
+  const el = document.createElement('div');
+  el.className = 'key ' + (isBlack(m) ? 'black' : 'white');
+  el.dataset.midi = m;
+  if (isBlack(m)) { el.style.left = (wi * ww - ww * 0.3) + '%'; el.style.width = (ww * 0.6) + '%'; }
+  else { el.style.left = (wi * ww) + '%'; el.style.width = ww + '%'; el.textContent = midiName(m); wi++; }
+  kb.appendChild(el); keyEls[m] = el;
+}
+function markRoot() { Object.keys(keyEls).forEach(m => keyEls[m].classList.toggle('root', +m === P.root)); }
+markRoot();
+const press = (m, vel) => { keyEls[m] && keyEls[m].classList.add('active'); noteOn('k' + m, midiToFreq(m), midiName(m), vel); };
+const release = m => { keyEls[m] && keyEls[m].classList.remove('active'); if (ctx) noteOff('k' + m); };
+
+const pointerNote = new Map();
+const keyAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.dataset && el.dataset.midi ? +el.dataset.midi : null; };
+kb.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (kb.hasPointerCapture && kb.hasPointerCapture(e.pointerId)) kb.releasePointerCapture(e.pointerId);
+  const m = keyAt(e.clientX, e.clientY); if (m == null) return;
+  pointerNote.set(e.pointerId, m); press(m);
+});
+kb.addEventListener('pointermove', e => {
+  if (!pointerNote.has(e.pointerId)) return;
+  const m = keyAt(e.clientX, e.clientY), old = pointerNote.get(e.pointerId);
+  if (m !== old) { if (old != null) release(old); if (m != null) press(m); pointerNote.set(e.pointerId, m); }
+});
+const endPtr = e => { const m = pointerNote.get(e.pointerId); if (m != null) release(m); pointerNote.delete(e.pointerId); };
+['pointerup', 'pointercancel'].forEach(ev => window.addEventListener(ev, endPtr));
+kb.addEventListener('pointerleave', endPtr);
+
+const MAP = { z:0,s:1,x:2,d:3,c:4,v:5,g:6,b:7,h:8,n:9,j:10,m:11,
+              q:12,'2':13,w:14,'3':15,e:16,r:17,'5':18,t:19,'6':20,y:21,'7':22,u:23,i:24 };
+let baseOct = 48; const held = {};
+const octUpd = () => $('octDisp').textContent = midiName(baseOct);
+octUpd();
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'arrowright') {
+    if (e.target.tagName === 'INPUT') return;
+    baseOct = k === 'arrowleft' ? Math.max(24, baseOct - 12) : Math.min(84, baseOct + 12);
+    octUpd(); return;
+  }
+  if (k in MAP && held[k] == null) { const m = baseOct + MAP[k]; held[k] = m; press(m); }
+});
+window.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (held[k] != null) { release(held[k]); delete held[k]; } });
+window.addEventListener('blur', () => { Object.keys(held).forEach(k => { release(held[k]); delete held[k]; }); });
+
+// ---------- Entrada MIDI opcional (Web MIDI API) ----------
+$('midiBtn').addEventListener('click', async () => {
+  initAudio();
+  if (!navigator.requestMIDIAccess) { $('midiState').textContent = 'Web MIDI não suportado neste navegador.'; return; }
+  try {
+    const acc = await navigator.requestMIDIAccess();
+    const bind = () => {
+      let n = 0;
+      acc.inputs.forEach(inp => { n++; inp.onmidimessage = ev => {
+        const [st, note, vel] = ev.data, cmd = st & 0xf0;
+        if (cmd === 0x90 && vel > 0) press(note, vel / 127);
+        else if (cmd === 0x80 || (cmd === 0x90 && vel === 0)) release(note);
+      }; });
+      $('midiState').textContent = n ? 'MIDI: ' + n + ' entrada(s)' : 'MIDI: nenhum dispositivo';
+    };
+    bind(); acc.onstatechange = bind;
+    $('midiBtn').className = '';
+  } catch (e) { $('midiState').textContent = 'MIDI negado ou indisponível.'; }
+});
+
+// ---------- Visualizações ----------
+function fitCanvas(cv) {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  const W = Math.round(r.width * d), H = Math.round(r.height * d);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0);
+  return [g, r.width, r.height];
+}
+function drawEnv(id, A, D, S, R, col, rgb) {
+  const [g, w, h] = fitCanvas($(id)); const pad = 10;
+  g.clearRect(0, 0, w, h);
+  const hold = 0.5, total = A + D + hold + R;
+  const X = t => pad + (t / total) * (w - 2 * pad), Y = v => h - pad - v * (h - 2 * pad);
+  const pts = [[0,0],[A,1],[A+D,S],[A+D+hold,S],[total,0]];
+  g.fillStyle = 'rgba(' + rgb + ',.15)'; g.strokeStyle = col; g.lineWidth = 2;
+  g.beginPath(); pts.forEach(([t,v],i) => i ? g.lineTo(X(t),Y(v)) : g.moveTo(X(t),Y(v)));
+  g.stroke(); g.lineTo(X(total),Y(0)); g.fill();
+  g.fillStyle = '#8a94a6'; g.font = '11px sans-serif';
+  ['A','D','S','R'].forEach((l,i) => g.fillText(l, (X(pts[i][0]) + X(pts[i+1][0])) / 2 - 3, h - 2));
+}
+function drawWave() {
+  const [g, w, h] = fitCanvas($('waveCv'));
+  g.clearRect(0, 0, w, h);
+  const fc = P.carrier, fm = modFreqFor(fc), dur = 3 / fc, N = Math.floor(w);
+  const plot = (fn, col, lw) => {
+    g.strokeStyle = col; g.lineWidth = lw; g.beginPath();
+    for (let i = 0; i <= N; i++) { const t = i / N * dur, y = h / 2 - fn(t) * h * 0.42; i ? g.lineTo(i, y) : g.moveTo(i, y); }
+    g.stroke();
+  };
+  plot(t => Math.sin(2*Math.PI*fm*t), 'rgba(246,173,85,.6)', 1);
+  plot(t => Math.sin(2*Math.PI*fc*t + P.index*Math.sin(2*Math.PI*fm*t)), '#4fd1c5', 1.6);
+}
+function drawSample() {
+  const [g, w, h] = fitCanvas($('smpCv'));
+  g.clearRect(0, 0, w, h);
+  if (!sampleBuf) { g.fillStyle = '#555'; g.font = '12px sans-serif'; g.fillText('(sem amostra)', 10, h / 2 + 4); return; }
+  if (P.loop) {
+    const [ls, le] = loopPoints(), d = sampleBuf.duration;
+    g.fillStyle = 'rgba(183,148,244,.15)'; g.fillRect(ls / d * w, 0, (le - ls) / d * w, h);
+  }
+  const data = sampleBuf.getChannelData(0), step = Math.max(1, Math.floor(data.length / w));
+  g.strokeStyle = '#b794f4'; g.lineWidth = 1; g.beginPath();
+  for (let x = 0; x < w; x++) {
+    let mn = 1, mx = -1;
+    for (let i = x * step; i < Math.min(data.length, (x + 1) * step); i++) { if (data[i] < mn) mn = data[i]; if (data[i] > mx) mx = data[i]; }
+    if (mn > mx) break;
+    g.moveTo(x + .5, h / 2 - mx * h * 0.45); g.lineTo(x + .5, h / 2 - mn * h * 0.45);
+  }
+  g.stroke();
+  g.fillStyle = '#8a94a6'; g.font = '11px sans-serif';
+  g.fillText(sampleBuf.duration.toFixed(2) + ' s · ' + sampleBuf.sampleRate + ' Hz', 6, 12);
+}
+const scopeBuf = new Float32Array(2048);
+function frame() {
+  const [g, w, h] = fitCanvas($('scopeCv'));
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = '#333'; g.beginPath(); g.moveTo(0, h/2); g.lineTo(w, h/2); g.stroke();
+  if (analyser) {
+    analyser.getFloatTimeDomainData(scopeBuf);
+    let s = 0; for (let i = 1; i < 1024; i++) if (scopeBuf[i-1] < 0 && scopeBuf[i] >= 0) { s = i; break; }
+    g.strokeStyle = '#f6ad55'; g.lineWidth = 1.5; g.beginPath();
+    for (let i = 0; i < 1024; i++) { const x = i / 1024 * w, y = h/2 - scopeBuf[s+i] * h * 0.9; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+  }
+  if (rec && micAnalyser) {   // medidor e tempo de gravação
+    micAnalyser.getFloatTimeDomainData(micBuf);
+    let pk = 0; for (let i = 0; i < micBuf.length; i++) pk = Math.max(pk, Math.abs(micBuf[i]));
+    $('meterBar').style.width = Math.min(100, pk * 100) + '%';
+    recMsg('● Gravando… ' + (rec.len / ctx.sampleRate).toFixed(1) + ' s / ' + MAX_SEC + ' s — clique em “Parar”.', 'rec');
+  }
+  requestAnimationFrame(frame);
+}
+window.addEventListener('resize', () => { onParam('resize'); drawSample(); });
+showMix(); onParam('init'); drawSample(); frame();
+})();
+</script>
+</body>
+</html>
