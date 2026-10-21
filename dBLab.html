@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laboratório de Decibéis — Acústica da Boa Vizinhança</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1b2a; color: #e6edf3; line-height: 1.5;
+  padding: 1rem;
+}
+.wrap { max-width: 920px; margin: 0 auto; }
+header {
+  text-align: center; padding: 1.2rem;
+  background: linear-gradient(135deg, #1c3a5e, #2c5f8d);
+  border-radius: 12px; margin-bottom: 1rem;
+}
+header h1 { font-size: 1.5rem; }
+header p { opacity: 0.85; font-size: 0.9rem; }
+.card {
+  background: #16283d; border: 1px solid #24405e;
+  border-radius: 12px; padding: 1.2rem; margin-bottom: 1rem;
+}
+.card h2 { font-size: 1.1rem; color: #6db3f2; margin-bottom: 0.8rem; }
+label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; opacity: 0.85; }
+select, input[type=range] {
+  width: 100%; padding: 0.4rem; border-radius: 6px;
+  border: 1px solid #35577c; background: #0f1b2a; color: #e6edf3;
+}
+input[type=range] { accent-color: #6db3f2; padding: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.row > div { flex: 1; min-width: 130px; }
+.btns { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0; }
+button {
+  padding: 0.55rem 0.9rem; border: none; border-radius: 6px;
+  cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #fff;
+  transition: transform 0.1s, filter 0.15s;
+}
+button:hover { filter: brightness(1.15); }
+button:active { transform: scale(0.96); }
+.b-play { background: #2e8b57; }
+.b-stop { background: #b03a3a; }
+.b-rec  { background: #c0392b; }
+.b-neutral { background: #35577c; }
+.b-pos { background: #1c6e8c; }
+.b-neg { background: #6e4a1c; }
+.b-inc { background: #2c5f8d; min-width: 54px; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.big-readout {
+  text-align: center; margin: 0.6rem 0;
+  background: #0f1b2a; border-radius: 10px; padding: 0.8rem;
+}
+.big-readout .num { font-size: 2.4rem; font-weight: 800; color: #6db3f2; }
+.big-readout .lbl { font-size: 0.8rem; opacity: 0.7; }
+
+.weight-grid {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.wcell {
+  background: #0f1b2a; border-radius: 8px; padding: 0.7rem; text-align: center;
+  border: 1px solid #24405e;
+}
+.wcell .v { font-size: 1.4rem; font-weight: 700; color: #7ee787; }
+.wcell .k { font-size: 0.75rem; opacity: 0.7; }
+
+canvas {
+  width: 100%; background: #0a1420; border-radius: 10px;
+  border: 1px solid #24405e; cursor: crosshair; touch-action: none;
+  display: block; margin-top: 0.5rem;
+}
+.hint { font-size: 0.78rem; opacity: 0.6; margin-top: 0.4rem; }
+.pan-btns { display: flex; gap: 0.5rem; }
+.pan-btns button { flex: 1; }
+.pan-active { outline: 2px solid #6db3f2; }
+footer { text-align: center; font-size: 0.8rem; opacity: 0.6; padding: 1rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>🔊 Laboratório de Decibéis</h1>
+  <p>Experimente ganho, ponderações A/B/C, estéreo e atenuação por distância</p>
+</header>
+
+<!-- FONTE SONORA -->
+<div class="card">
+  <h2>1. Fonte Sonora</h2>
+  <div class="row">
+    <div>
+      <label>Tipo de som</label>
+      <select id="waveType">
+        <option value="sine">Senoidal</option>
+        <option value="sawtooth">Dente de serra</option>
+        <option value="triangle">Triangular</option>
+        <option value="square">Onda quadrada</option>
+        <option value="recorded">Som gravado (microfone)</option>
+      </select>
+    </div>
+    <div>
+      <label>Frequência: <span id="freqVal">440</span> Hz</label>
+      <input type="range" id="freq" min="50" max="8000" value="440">
+    </div>
+  </div>
+  <div class="btns">
+    <button class="b-rec" id="recBtn">● Gravar (5s)</button>
+    <button class="b-neutral" id="recStop" disabled>■ Parar gravação</button>
+    <span id="recStatus" class="hint" style="align-self:center;"></span>
+  </div>
+  <div class="btns">
+    <button class="b-play" id="playBtn">▶ Reproduzir</button>
+    <button class="b-stop" id="stopBtn">■ Parar</button>
+  </div>
+</div>
+
+<!-- GANHO -->
+<div class="card">
+  <h2>2. Variação de Ganho (dB)</h2>
+  <div class="big-readout">
+    <div class="num"><span id="gainVal">0.0</span> dB</div>
+    <div class="lbl">variação acumulada desde a execução inicial</div>
+  </div>
+  <div class="btns" style="justify-content:center;">
+    <button class="b-neg b-inc" data-d="-10">−10</button>
+    <button class="b-neg b-inc" data-d="-5">−5</button>
+    <button class="b-neg b-inc" data-d="-3">−3</button>
+    <button class="b-neg b-inc" data-d="-2">−2</button>
+    <button class="b-neg b-inc" data-d="-1">−1</button>
+    <button class="b-neg b-inc" data-d="-0.5">−0,5</button>
+    <button class="b-pos b-inc" data-d="0.5">+0,5</button>
+    <button class="b-pos b-inc" data-d="1">+1</button>
+    <button class="b-pos b-inc" data-d="2">+2</button>
+    <button class="b-pos b-inc" data-d="3">+3</button>
+    <button class="b-pos b-inc" data-d="5">+5</button>
+    <button class="b-pos b-inc" data-d="10">+10</button>
+  </div>
+  <div class="btns" style="justify-content:center;">
+    <button class="b-neutral" id="resetGain">↺ Zerar variação</button>
+  </div>
+</div>
+
+<!-- PONDERAÇÕES -->
+<div class="card">
+  <h2>3. Ponderações — dB / dB(A) / dB(B) / dB(C)</h2>
+  <p class="hint">Nível de referência do laboratório: <strong>94 dB SPL</strong> a 1,5 m (calibração didática). O valor abaixo combina ganho e distância.</p>
+  <div class="weight-grid">
+    <div class="wcell"><div class="v" id="dbZ">94.0</div><div class="k">dB (Z, linear)</div></div>
+    <div class="wcell"><div class="v" id="dbA">94.0</div><div class="k">dB(A)</div></div>
+    <div class="wcell"><div class="v" id="dbB">94.0</div><div class="k">dB(B)</div></div>
+    <div class="wcell"><div class="v" id="dbC">94.0</div><div class="k">dB(C)</div></div>
+  </div>
+  <p class="hint">As ponderações dependem da frequência selecionada (para tons puros). O filtro A atenua muito os graves; C é quase plano; B é intermediário.</p>
+</div>
+
+<!-- ESTÉREO -->
+<div class="card">
+  <h2>4. Panorâmica (estéreo)</h2>
+  <div class="pan-btns">
+    <button class="b-neutral pan-active" data-pan="-1">Mono Esquerdo</button>
+    <button class="b-neutral" data-pan="0">Estéreo (centro)</button>
+    <button class="b-neutral" data-pan="1">Mono Direito</button>
+  </div>
+</div>
+
+<!-- DISTÂNCIA -->
+<div class="card">
+  <h2>5. Simulação de Distância (campo aberto)</h2>
+  <div class="big-readout">
+    <div class="num"><span id="distVal">1.50</span> m</div>
+    <div class="lbl">atenuação por distância: <span id="distDb">0.0</span> dB</div>
+  </div>
+  <canvas id="field" width="880" height="220"></canvas>
+  <p class="hint">Arraste o ouvinte (ponto azul) com o mouse ou o dedo. Referência = 1,5 m. Regra: cada dobro da distância → −6 dB; cada metade → +6 dB.</p>
+</div>
+
+<footer>
+  <strong>Projeto Acústica da Boa Vizinhança</strong> — Autor: <strong>Leonardo Fuks</strong><br>
+  Laboratório didático de níveis de pressão sonora. Use fones em volume moderado.
+</footer>
+
+</div>
+
+<script>
+/* ==========================================================
+   Laboratório de Decibéis
+   Projeto Acústica da Boa Vizinhança — Autor: Leonardo Fuks
+   ========================================================== */
+
+// ---------- Audio Context ----------
+let ctx = null;
+function ac(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended') ctx.resume(); return ctx; }
+
+// ---------- Estado ----------
+const REF_DB = 94;          // nível de referência a 1,5 m
+const REF_DIST = 1.5;       // metros
+const BASE_GAIN_DB = -12;   // ganho de saída para 94 dB (nível de escuta confortável)
+let gainOffset = 0;         // variação acumulada em dB
+let panPos = 0;             // -1 esq, 0 centro, 1 dir
+let distance = REF_DIST;    // metros
+let recordedBuffer = null;
+
+// ---------- Cadeia de áudio ----------
+let node = null;      // oscillator ou bufferSource
+let gainNode = null;
+let pannerNode = null;
+
+// ---------- Ponderações (dB relativos, IEC 61672 / 60651) ----------
+function aWeight(f){
+  const f2=f*f;
+  const ra=(Math.pow(12194,2)*f2*f2)/((f2+Math.pow(20.6,2))*Math.sqrt((f2+Math.pow(107.7,2))*(f2+Math.pow(737.9,2)))*(f2+Math.pow(12194,2)));
+  return 20*Math.log10(ra)+2.00;
+}
+function cWeight(f){
+  const f2=f*f;
+  const rc=(Math.pow(12194,2)*f2)/((f2+Math.pow(20.6,2))*(f2+Math.pow(12194,2)));
+  return 20*Math.log10(rc)+0.06;
+}
+function bWeight(f){
+  const f2=f*f;
+  const rb=(Math.pow(12194,2)*f*f2)/((f2+Math.pow(20.6,2))*Math.sqrt(f2+Math.pow(158.5,2))*(f2+Math.pow(12194,2)));
+  return 20*Math.log10(rb)+0.17;
+}
+
+// ---------- Utilitário ----------
+function dbToGain(db){ return Math.pow(10, db/20); }
+
+// ---------- Distância → atenuação ----------
+function distanceAttenuation(d){
+  return -20*Math.log10(d/REF_DIST); // -6 dB por dobro
+}
+
+// ---------- Atualiza leituras ----------
+function updateReadouts(){
+  document.getElementById('gainVal').textContent = gainOffset.toFixed(1);
+  const distAtt = distanceAttenuation(distance);
+  document.getElementById('distVal').textContent = distance.toFixed(2);
+  document.getElementById('distDb').textContent = distAtt.toFixed(1);
+
+  const spl = REF_DB + gainOffset + distAtt;   // dB linear (Z)
+  const f = +document.getElementById('freq').value;
+  document.getElementById('dbZ').textContent = spl.toFixed(1);
+  document.getElementById('dbA').textContent = (spl + aWeight(f)).toFixed(1);
+  document.getElementById('dbB').textContent = (spl + bWeight(f)).toFixed(1);
+  document.getElementById('dbC').textContent = (spl + cWeight(f)).toFixed(1);
+
+  applyGain();
+}
+
+// ---------- Aplica ganho real na saída ----------
+function applyGain(){
+  if(gainNode){
+    const totalDb = BASE_GAIN_DB + gainOffset + distanceAttenuation(distance);
+    gainNode.gain.linearRampToValueAtTime(dbToGain(totalDb), ac().currentTime + 0.05);
+  }
+}
+
+// ---------- Reprodução ----------
+function stopSound(){
+  if(node){ try{node.stop();}catch(e){} try{node.disconnect();}catch(e){} node=null; }
+  if(gainNode){ try{gainNode.disconnect();}catch(e){} gainNode=null; }
+  if(pannerNode){ try{pannerNode.disconnect();}catch(e){} pannerNode=null; }
+}
+
+function playSound(){
+  stopSound();
+  const c = ac();
+  const type = document.getElementById('waveType').value;
+  const freq = +document.getElementById('freq').value;
+
+  gainNode = c.createGain();
+  gainNode.gain.value = 0;
+  pannerNode = c.createStereoPanner();
+  pannerNode.pan.value = panPos;
+
+  if(type === 'recorded'){
+    if(!recordedBuffer){ alert('Grave um som primeiro no item 1.'); return; }
+    node = c.createBufferSource();
+    node.buffer = recordedBuffer;
+    node.loop = true;
+  } else {
+    node = c.createOscillator();
+    node.type = type;
+    node.frequency.value = freq;
+  }
+
+  node.connect(gainNode);
+  gainNode.connect(pannerNode);
+  pannerNode.connect(c.destination);
+  node.start();
+
+  const totalDb = BASE_GAIN_DB + gainOffset + distanceAttenuation(distance);
+  gainNode.gain.linearRampToValueAtTime(dbToGain(totalDb), c.currentTime + 0.05);
+}
+
+document.getElementById('playBtn').onclick = playSound;
+document.getElementById('stopBtn').onclick = stopSound;
+
+// ---------- Frequência ----------
+document.getElementById('freq').oninput = (e)=>{
+  document.getElementById('freqVal').textContent = e.target.value;
+  if(node && node.frequency) node.frequency.value = +e.target.value;
+  updateReadouts();
+};
+
+// ---------- Botões de ganho ----------
+document.querySelectorAll('.b-inc').forEach(b=>{
+  b.onclick = ()=>{ gainOffset += parseFloat(b.dataset.d); updateReadouts(); };
+});
+document.getElementById('resetGain').onclick = ()=>{ gainOffset=0; updateReadouts(); };
+
+// ---------- Panorâmica ----------
+document.querySelectorAll('[data-pan]').forEach(b=>{
+  b.onclick = ()=>{
+    panPos = +b.dataset.pan;
+    document.querySelectorAll('[data-pan]').forEach(x=>x.classList.remove('pan-active'));
+    b.classList.add('pan-active');
+    if(pannerNode) pannerNode.pan.linearRampToValueAtTime(panPos, ac().currentTime + 0.05);
+  };
+});
+
+// ---------- Gravação de microfone ----------
+let mediaRecorder=null, chunks=[], micStream=null, recTimeout=null;
+document.getElementById('recBtn').onclick = async ()=>{
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder = new MediaRecorder(micStream);
+    chunks=[];
+    mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) chunks.push(e.data); };
+    mediaRecorder.onstop = async ()=>{
+      const blob = new Blob(chunks,{type:'audio/webm'});
+      const buf = await blob.arrayBuffer();
+      recordedBuffer = await ac().decodeAudioData(buf);
+      document.getElementById('recStatus').textContent = '✔ Som gravado pronto.';
+      document.getElementById('waveType').value = 'recorded';
+    };
+    mediaRecorder.start();
+    document.getElementById('recBtn').disabled = true;
+    document.getElementById('recStop').disabled = false;
+    document.getElementById('recStatus').textContent = 'Gravando...';
+    recTimeout = setTimeout(stopRec, 5000);
+  }catch(err){ alert('Erro no microfone: '+err.message); }
+};
+function stopRec(){
+  if(recTimeout){ clearTimeout(recTimeout); recTimeout=null; }
+  if(mediaRecorder && mediaRecorder.state==='recording') mediaRecorder.stop();
+  if(micStream) micStream.getTracks().forEach(t=>t.stop());
+  document.getElementById('recBtn').disabled=false;
+  document.getElementById('recStop').disabled=true;
+}
+document.getElementById('recStop').onclick = stopRec;
+
+// ---------- Canvas de distância ----------
+const canvas = document.getElementById('field');
+const g = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const srcX = 70, srcY = H/2;      // posição da fonte
+const pxPerMeter = 120;           // 1,5 m fica bem no início
+let listenerX = srcX + REF_DIST*pxPerMeter;
+let listenerY = H/2;
+
+function pxToMeters(x,y){
+  const dx = x - srcX, dy = y - srcY;
+  const px = Math.sqrt(dx*dx + dy*dy);
+  return Math.max(0.2, px / pxPerMeter);
+}
+
+function drawField(){
+  g.clearRect(0,0,W,H);
+  // círculos de referência (1.5, 3, 6 m)
+  [1.5,3,6].forEach(m=>{
+    g.beginPath();
+    g.arc(srcX, srcY, m*pxPerMeter, 0, Math.PI*2);
+    g.strokeStyle = 'rgba(109,179,242,0.18)';
+    g.stroke();
+    g.fillStyle='rgba(230,237,243,0.4)';
+    g.font='11px sans-serif';
+    g.fillText(m+' m', srcX + m*pxPerMeter - 12, srcY - 4);
+  });
+  // linha fonte-ouvinte
+  g.beginPath();
+  g.moveTo(srcX,srcY); g.lineTo(listenerX,listenerY);
+  g.strokeStyle='rgba(126,231,135,0.5)'; g.lineWidth=2; g.stroke(); g.lineWidth=1;
+  // fonte
+  g.beginPath(); g.arc(srcX,srcY,12,0,Math.PI*2);
+  g.fillStyle='#e74c3c'; g.fill();
+  g.fillStyle='#fff'; g.font='11px sans-serif'; g.fillText('Fonte', srcX-16, srcY+26);
+  // ouvinte
+  g.beginPath(); g.arc(listenerX,listenerY,11,0,Math.PI*2);
+  g.fillStyle='#6db3f2'; g.fill();
+  g.fillStyle='#fff'; g.fillText('Ouvinte', listenerX-20, listenerY+26);
+}
+
+function setListener(x,y){
+  listenerX = Math.max(srcX+10, Math.min(W-10, x));
+  listenerY = Math.max(10, Math.min(H-10, y));
+  distance = pxToMeters(listenerX, listenerY);
+  drawField();
+  updateReadouts();
+}
+
+let dragging=false;
+function canvasPos(evt){
+  const r = canvas.getBoundingClientRect();
+  const cx = (evt.touches?evt.touches[0].clientX:evt.clientX) - r.left;
+  const cy = (evt.touches?evt.touches[0].clientY:evt.clientY) - r.top;
+  return { x: cx*(W/r.width), y: cy*(H/r.height) };
+}
+canvas.addEventListener('mousedown', e=>{ dragging=true; const p=canvasPos(e); setListener(p.x,p.y); });
+canvas.addEventListener('mousemove', e=>{ if(dragging){ const p=canvasPos(e); setListener(p.x,p.y);} });
+window.addEventListener('mouseup', ()=> dragging=false);
+canvas.addEventListener('touchstart', e=>{ e.preventDefault(); dragging=true; const p=canvasPos(e); setListener(p.x,p.y); });
+canvas.addEventListener('touchmove', e=>{ e.preventDefault(); if(dragging){ const p=canvasPos(e); setListener(p.x,p.y);} });
+window.addEventListener('touchend', ()=> dragging=false);
+
+// ---------- Init ----------
+drawField();
+updateReadouts();
+console.log('Laboratório de Decibéis — Leonardo Fuks / Acústica da Boa Vizinhança');
+</script>
+</body>
+</html>

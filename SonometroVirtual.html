@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medidor Sonoro Didático</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+  :root{
+    --bg:#101418; --card:#1a2026; --txt:#e6e9ec; --muted:#9aa5ad;
+    --accent:#3b6ea5; --green:#3f8f5f; --yellow:#b8912a;
+    --orange:#b5651d; --red:#a53f3f; --border:#2a333a; --raw:#4f7faa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;
+    background:var(--bg);color:var(--txt);line-height:1.5}
+  header{padding:20px 16px;text-align:center;border-bottom:1px solid var(--border)}
+  h1{margin:0 0 6px;font-size:1.4rem;font-weight:600;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:.92rem;max-width:720px;margin:0 auto}
+  main{max-width:960px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:6px;
+    padding:16px;margin-bottom:16px}
+  .aviso{background:#2a2316;border-color:#5a4a20;color:#d9c48c;font-size:.88rem}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  button{font-size:.95rem;font-weight:600;padding:11px 18px;border-radius:4px;
+    border:1px solid transparent;cursor:pointer;transition:.15s;color:#fff;
+    text-transform:uppercase;letter-spacing:.4px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .btn-start{background:var(--green)} .btn-stop{background:var(--red)}
+  .btn-reset{background:#3d4752}
+  button:not(:disabled):hover{filter:brightness(1.12)}
+  .status{text-align:center;margin-top:12px;color:var(--muted);font-size:.92rem}
+  .status.err{color:#d98c8c}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .metric{background:#12171c;border:1px solid var(--border);border-radius:4px;
+    padding:14px;text-align:center}
+  .metric .label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .metric .value{font-size:1.7rem;font-weight:700;margin-top:4px}
+  .metric .unit{font-size:.82rem;color:var(--muted)}
+  #inst .value{transition:color .2s}
+  canvas{background:#0c1014;border-radius:4px}
+  details{margin-top:8px}
+  summary{cursor:pointer;font-weight:600;padding:6px 0;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"▸ "; color:var(--muted)}
+  details[open] summary::before{content:"▾ "}
+  label{display:block;margin:8px 0 4px;font-size:.88rem}
+  input[type=number]{background:#0c1014;color:var(--txt);border:1px solid var(--border);
+    border-radius:4px;padding:8px;width:120px;font-size:.95rem}
+  .legend-scale{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:.78rem;align-items:center}
+  .chip{padding:3px 8px;border-radius:3px;color:#fff;font-weight:600;border:1px solid rgba(0,0,0,.2)}
+  .summary-final{display:none}
+  h2{font-size:1.05rem;margin:0 0 8px;font-weight:600}
+  .muted{color:var(--muted);font-size:.88rem}
+  ul{margin:6px 0;padding-left:20px}
+  a{color:var(--accent)}
+  .princ{background:#12171c;border:1px solid var(--border);border-radius:4px;
+    padding:10px;margin-top:10px;font-size:.85rem}
+  .princ b{color:var(--txt)}
+  .sw-green{color:var(--green)} .sw-red{color:var(--red)}
+  .sw-raw{color:var(--raw)} .sw-smooth{color:#c9ad66}
+</style>
+</head>
+<body>
+<header>
+  <h1>Sonômetro — Medidor Sonoro Didático</h1>
+  <p class="sub">Estimativa do nível sonoro em <strong>dBA</strong> a partir do microfone do
+  dispositivo. Ferramenta educativa e exploratória — todo o processamento ocorre localmente,
+  sem gravar ou enviar áudio.</p>
+</header>
+
+<main>
+  <!-- Aviso permanente -->
+  <div class="card aviso" role="note">
+    <strong>Aviso:</strong> os valores exibidos são estimativas didáticas obtidas pelo microfone
+    do dispositivo. Esta ferramenta <strong>não</strong> substitui um Sonômetro calibrado,
+    medições normativas, avaliações técnicas ou perícias acústicas.
+  </div>
+
+  <!-- Controles -->
+  <div class="card">
+    <div class="controls">
+      <button id="startBtn" class="btn-start" aria-label="Iniciar medição">Iniciar medição</button>
+      <button id="stopBtn" class="btn-stop" disabled aria-label="Parar medição">Parar</button>
+      <button id="resetBtn" class="btn-reset" disabled aria-label="Reiniciar sessão">Reiniciar</button>
+    </div>
+    <div id="status" class="status" role="status" aria-live="polite">Aguardando início</div>
+  </div>
+
+  <!-- Indicadores -->
+  <div class="card">
+    <div class="grid">
+      <div class="metric" id="inst">
+        <div class="label">Nível instantâneo</div>
+        <div class="value">--<span class="unit"> dBA</span></div>
+      </div>
+      <div class="metric">
+        <div class="label">LAeq parcial</div>
+        <div class="value" id="laeq">--<span class="unit"> dBA</span></div>
+      </div>
+      <div class="metric">
+        <div class="label">LAmax parcial</div>
+        <div class="value" id="lamax">--<span class="unit"> dBA</span></div>
+      </div>
+      <div class="metric">
+        <div class="label">Duração</div>
+        <div class="value" id="dur">00:00</div>
+      </div>
+    </div>
+    <div class="legend-scale" aria-hidden="true">
+      <span class="chip" style="background:var(--green)">Baixo</span>
+      <span class="chip" style="background:var(--yellow)">Médio</span>
+      <span class="chip" style="background:var(--orange)">Elevado</span>
+      <span class="chip" style="background:var(--red)">Muito elevado</span>
+      <span class="muted">Escala visual educativa, não normativa.</span>
+    </div>
+  </div>
+
+  <!-- Gráfico -->
+  <div class="card">
+    <canvas id="chart" height="240"

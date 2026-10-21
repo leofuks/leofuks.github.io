@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Room Acoustics Simulator — Acústica da Boa Vizinhança</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,'Segoe UI',Roboto,sans-serif;background:#0f1b2a;color:#e6edf3;padding:1rem}
+.wrap{max-width:1150px;margin:0 auto}
+header{text-align:center;padding:1rem;background:linear-gradient(135deg,#1c3a5e,#2c5f8d);border-radius:12px;margin-bottom:1rem}
+header h1{font-size:1.5rem}
+header p{opacity:.85;font-size:.9rem}
+.layout{display:grid;grid-template-columns:1fr 340px;gap:1rem}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.card{background:#16283d;border:1px solid #24405e;border-radius:12px;padding:1rem;margin-bottom:1rem}
+.card h2{font-size:1.05rem;color:#6db3f2;margin-bottom:.7rem}
+label{display:block;font-size:.82rem;margin-bottom:.3rem;opacity:.85}
+input[type=range]{width:100%;accent-color:#6db3f2}
+canvas{width:100%;background:#0a1420;border-radius:10px;border:1px solid #24405e;touch-action:none;cursor:crosshair;display:block}
+.btns{display:flex;flex-wrap:wrap;gap:.5rem;margin:.6rem 0}
+button{padding:.55rem .9rem;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:.88rem;color:#fff;transition:filter .15s}
+button:hover{filter:brightness(1.15)}
+.b-play{background:#2e8b57}.b-stop{background:#b03a3a}.b-imp{background:#c0392b}.b-neutral{background:#35577c}
+input[type=file]{font-size:.8rem;color:#9fb3c8}
+.mat-list{display:flex;flex-direction:column;gap:.4rem;max-height:280px;overflow-y:auto}
+.mat{display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:6px;background:#0f1b2a;border:1px solid #24405e;cursor:pointer;font-size:.82rem}
+.mat.sel{outline:2px solid #6db3f2}
+.swatch{width:18px;height:18px;border-radius:4px;flex-shrink:0}
+.mat .a{margin-left:auto;opacity:.6;font-size:.72rem}
+.surf-tabs{display:flex;gap:.4rem;margin-bottom:.6rem}
+.surf-tabs button{flex:1;background:#35577c}
+.surf-tabs button.active{background:#2c5f8d;outline:2px solid #6db3f2}
+.readout{background:#0f1b2a;border-radius:10px;padding:.8rem;text-align:center;margin:.6rem 0}
+.readout .num{font-size:2rem;font-weight:800;color:#7ee787}
+.readout .lbl{font-size:.78rem;opacity:.7}
+.formula{background:#0a1420;border:1px solid #24405e;border-radius:8px;padding:.7rem;font-size:.82rem;line-height:1.6}
+.formula code{color:#f0c674}
+.hint{font-size:.76rem;opacity:.6;margin-top:.4rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;font-size:.8rem}
+.grid2 div{background:#0f1b2a;border-radius:6px;padding:.5rem;text-align:center}
+.grid2 .v{font-size:1.2rem;font-weight:700;color:#6db3f2}
+footer{text-align:center;font-size:.8rem;opacity:.6;padding:1rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>🏛️ Room Acoustics Simulator</h1>
+  <p>Desenhe a sala, aplique revestimentos e ouça a reverberação (Sabine) em tempo real</p>
+</header>
+
+<div class="layout">
+
+  <!-- COLUNA ESQUERDA -->
+  <div>
+    <div class="card">
+      <h2>Planta da Sala (vista superior)</h2>
+      <canvas id="room" width="760" height="480"></canvas>
+      <p class="hint">Arraste as <strong>bordas/cantos</strong> para mudar largura e comprimento. Clique numa <strong>parede</strong> (ou no botão TETO) e depois num material para aplicá-lo. O músico 🎵 fica no centro.</p>
+      <div style="margin-top:.7rem">
+        <label>Altura da sala (pé-direito): <span id="hVal">2.70</span> m</label>
+        <input type="range" id="height" min="1.8" max="4" step="0.05" value="2.70">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Fonte Sonora & Escuta</h2>
+      <div class="btns">
+        <label class="b-neutral" style="padding:.55rem .9rem;border-radius:6px;cursor:pointer">
+          📁 Carregar áudio (WAV/MP3)
+          <input type="file" id="audioFile" accept="audio/*" style="display:none">
+        </label>
+        <button class="b-play" id="playBtn">▶ Tocar (com reverb)</button>
+        <button class="b-stop" id="stopBtn">■ Parar</button>
+        <button class="b-imp" id="impBtn">💥 Impulso (clap)</button>
+      </div>
+      <label>Volume: <span id="volVal">80</span>%</label>
+      <input type="range" id="vol" min="0" max="100" value="80">
+      <label style="margin-top:.6rem">Mix seco/molhado (reverb): <span id="wetVal">60</span>%</label>
+      <input type="range" id="wet" min="0" max="100" value="60">
+      <p class="hint">O impulso permite uma auralização rápida da "cauda" reverberante da sala.</p>
+    </div>
+  </div>
+
+  <!-- COLUNA DIREITA -->
+  <div>
+    <div class="card">
+      <h2>Resultados Acústicos</h2>
+      <div class="readout">
+        <div class="num"><span id="trVal">0.00</span> s</div>
+        <div class="lbl">Tempo de Reverberação (RT60 · Sabine)</div>
+      </div>
+      <div class="grid2">
+        <div><div class="v" id="volVal2">0</div><div class="lbl">Volume (m³)</div></div>
+        <div><div class="v" id="surfVal">0</div><div class="lbl">Superfície (m²)</div></div>
+        <div><div class="v" id="absVal">0</div><div class="lbl">Absorção A (m²·sab)</div></div>
+        <div><div class="v" id="dimVal">0×0</div><div class="lbl">L × C (m)</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Aplicar em:</h2>
+      <div class="surf-tabs">
+        <button data-surf="floor">Piso</button>
+        <button data-surf="ceiling">Teto</button>
+      </div>
+      <p class="hint" style="margin-top:0">Ou clique diretamente numa parede na planta (N,S,L,O).</p>
+      <div style="margin:.5rem 0;font-size:.82rem">Selecionado: <strong id="selSurf">— nenhuma —</strong></div>
+    </div>
+
+    <div class="card">
+      <h2>Materiais (coef. absorção α)</h2>
+      <div class="mat-list" id="matList"></div>
+    </div>
+
+    <div class="card">
+      <h2>Fórmula de Sabine</h2>
+      <div class="formula">
+        <code>RT60 = 0,161 · V / A</code><br>
+        onde:<br>
+        • <code>V</code> = volume da sala (m³)<br>
+        • <code>A = Σ (Sᵢ · αᵢ)</code> = absorção total<br>
+        • <code>Sᵢ</code> = área de cada superfície<br>
+        • <code>αᵢ</code> = coef. de absorção do material
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>Projeto Acústica da Boa Vizinhança</strong> — Autor: <strong>Leonardo Fuks</strong><br>
+  Simulador didático de reverberação por Sabine. Use fones em volume moderado.
+</footer>
+
+</div>
+
+<script>
+/* ==========================================================
+   Room Acoustics Simulator
+   Projeto Acústica da Boa Vizinhança — Autor: Leonardo Fuks
+   ========================================================== */
+
+// ---------- 10 Materiais (coef. absorção médio ~500-1kHz) ----------
+const MATERIALS = [
+  {name:'Vidro',                  a:0.05, color:'#8ecae6'},
+  {name:'Concreto liso',          a:0.02, color:'#adb5bd'},
+  {name:'Reboco / gesso pintado', a:0.05, color:'#dee2e6'},
+  {name:'Placa de gesso (drywall)',a:0.10, color:'#e9c46a'},
+  {name:'Madeira (compensado)',   a:0.15, color:'#b5651d'},
+  {name:'Cortina pesada',         a:0.35, color:'#6a4c93'},
+  {name:'Carpete grosso',         a:0.40, color:'#9b5de5'},
+  {name:'Painel de tecido/lã',    a:0.55, color:'#43aa8b'},
+  {name:'Espuma acústica média',  a:0.75, color:'#f3722c'},
+  {name:'Espuma absorvente alta', a:0.90, color:'#f94144'},
+];
+
+// Superfícies da sala: 4 paredes + piso + teto
+const SURFACES = ['north','south','east','west','floor','ceiling'];
+const SURFACE_LABELS = {north:'Parede Norte',south:'Parede Sul',east:'Parede Leste',west:'Parede Oeste',floor:'Piso',ceiling:'Teto'};
+
+// Estado: material aplicado em cada superfície (índice do array)
+let assign = {north:2,south:2,east:2,west:2,floor:6,ceiling:3};
+
+// Dimensões (metros)
+let roomW = 5.0;   // largura (leste-oeste)
+let roomL = 4.0;   // comprimento (norte-sul)
+let roomH = 2.70;  // altura
+
+let selectedSurface = null;
+
+// ---------- Canvas ----------
+const canvas = document.getElementById('room');
+const g = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+const WALL_T = 22;           // espessura visual da parede
+const PX_PER_M = 60;         // escala base
+
+function roomPxRect(){
+  const w = roomW*PX_PER_M, h = roomL*PX_PER_M;
+  const x = (CW - w)/2, y = (CH - h)/2;
+  return {x,y,w,h};
+}
+
+function draw(){
+  g.clearRect(0,0,CW,CH);
+  const r = roomPxRect();
+
+  // interior
+  g.fillStyle = '#12263a';
+  g.fillRect(r.x, r.y, r.w, r.h);
+
+  // paredes (cada uma colorida pelo material)
+  const walls = {
+    north:{x:r.x, y:r.y-WALL_T, w:r.w, h:WALL_T},
+    south:{x:r.x, y:r.y+r.h,   w:r.w, h:WALL_T},
+    west: {x:r.x-WALL_T, y:r.y, w:WALL_T, h:r.h},
+    east: {x:r.x+r.w,    y:r.y, w:WALL_T, h:r.h},
+  };
+  for(const k in walls){
+    const wl = walls[k];
+    g.fillStyle = MATERIALS[assign[k]].color;
+    g.fillRect(wl.x, wl.y, wl.w, wl.h);
+    if(selectedSurface===k){ g.strokeStyle='#fff'; g.lineWidth=3; g.strokeRect(wl.x,wl.y,wl.w,wl.h); g.lineWidth=1; }
+  }
+
+  // rótulos das paredes
+  g.fillStyle='rgba(230,237,243,.7)'; g.font='11px sans-serif'; g.textAlign='center';
+  g.fillText('N ('+MATERIALS[assign.north].name+')', r.x+r.w/2, r.y-WALL_T-6);
+  g.fillText('S ('+MATERIALS[assign.south].name+')', r.x+r.w/2, r.y+r.h+WALL_T+14);
+  g.save(); g.translate(r.x-WALL_T-8, r.y+r.h/2); g.rotate(-Math.PI/2);
+  g.fillText('O ('+MATERIALS[assign.west].name+')',0,0); g.restore();
+  g.save(); g.translate(r.x+r.w+WALL_T+8, r.y+r.h/2); g.rotate(Math.PI/2);
+  g.fillText('L ('+MATERIALS[assign.east].name+')',0,0); g.restore();
+
+  // piso/teto info (indicador central)
+  g.fillStyle='rgba(230,237,243,.4)'; g.font='10px sans-serif';
+  g.fillText('Piso: '+MATERIALS[assign.floor].name+'  |  Teto: '+MATERIALS[assign.ceiling].name, r.x+r.w/2, r.y+r.h/2+40);
+
+  // músico no centro
+  g.beginPath(); g.arc(r.x+r.w/2, r.y+r.h/2, 14, 0, Math.PI*2);
+  g.fillStyle='#6db3f2'; g.fill();
+  g.fillStyle='#fff'; g.font='14px sans-serif'; g.fillText('🎵', r.x+r.w/2, r.y+r.h/2+5);
+
+  // cotas
+  g.fillStyle='#7ee787'; g.font='12px sans-serif';
+  g.fillText(roomW.toFixed(2)+' m', r.x+r.w/2, r.y+r.h+40);
+  g.save(); g.translate(r.x-40, r.y+r.h/2); g.rotate(-Math.PI/2);
+  g.fillText(roomL.toFixed(2)+' m',0,0); g.restore();
+
+  // alças de redimensionamento (cantos)
+  g.fillStyle='#f0c674';
+  [[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h]].forEach(p=>{
+    g.beginPath(); g.arc(p[0],p[1],7,0,Math.PI*2); g.fill();
+  });
+  g.textAlign='left';
+}
+
+// ---------- Cálculo Sabine ----------
+function surfaceAreas(){
+  const wallNS = roomW*roomH; // norte e sul
+  const wallEW = roomL*roomH; // leste e oeste
+  const floorCeil = roomW*roomL;
+  return {
+    north:wallNS, south:wallNS, east:wallEW, west:wallEW,
+    floor:floorCeil, ceiling:floorCeil
+  };
+}
+
+function computeAcoustics(){
+  const V = roomW*roomL*roomH;
+  const areas = surfaceAreas();
+  let A = 0, S = 0;
+  SURFACES.forEach(s=>{
+    const area = areas[s];
+    A += area * MATERIALS[assign[s]].a;
+    S += area;
+  });
+  const RT = A>0 ? 0.161*V/A : 0;
+  return {V,S,A,RT};
+}
+
+function updateReadouts(){
+  const {V,S,A,RT} = computeAcoustics();
+  document.getElementById('trVal').textContent = RT.toFixed(2);
+  document.getElementById('volVal2').textContent = V.toFixed(1);
+  document.getElementById('surfVal').textContent = S.toFixed(1);
+  document.getElementById('absVal').textContent = A.toFixed(1);
+  document.getElementById('dimVal').textContent = roomW.toFixed(1)+'×'+roomL.toFixed(1);
+  rebuildReverb(RT);
+}
+
+// ---------- Lista de materiais ----------
+const matList = document.getElementById('matList');
+let selectedMaterial = null;
+MATERIALS.forEach((m,i)=>{
+  const el = document.createElement('div');
+  el.className='mat';
+  el.innerHTML=`<span class="swatch" style="background:${m.color}"></span>${m.name}<span class="a">α=${m.a.toFixed(2)}</span>`;
+  el.onclick=()=>{
+    selectedMaterial=i;
+    document.querySelectorAll('.mat').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    if(selectedSurface!==null){ assign[selectedSurface]=i; draw(); updateReadouts(); }
+  };
+  matList.appendChild(el);
+});
+
+// ---------- Seleção de superfície (tabs + clique no canvas) ----------
+document.querySelectorAll('.surf-tabs button').forEach(b=>{
+  b.onclick=()=>{
+    selectedSurface=b.dataset.surf;
+    document.querySelectorAll('.surf-tabs button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('selSurf').textContent=SURFACE_LABELS[selectedSurface];
+    draw();
+  };
+});
+
+function selectSurface(s){
+  selectedSurface=s;
+  document.querySelectorAll('.surf-tabs button').forEach(x=>x.classList.remove('active'));
+  document.getElementById('selSurf').textContent=SURFACE_LABELS[s];
+  draw();
+}
+
+// ---------- Interação canvas (arrastar cantos / clicar paredes) ----------
+let dragCorner=null;
+function cPos(e){
+  const rect=canvas.getBoundingClientRect();
+  const cx=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const cy=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+  return {x:cx*(CW/rect.width), y:cy*(CH/rect.height)};
+}
+function hitCorner(p){
+  const r=roomPxRect();
+  const corners=[['nw',r.x,r.y],['ne',r.x+r.w,r.y],['sw',r.x,r.y+r.h],['se',r.x+r.w,r.y+r.h]];
+  for(const c of corners){ if(Math.hypot(p.x-c[1],p.y-c[2])<14) return c[0]; }
+  return null;
+}
+function hitWall(p){
+  const r=roomPxRect();
+  if(p.y<r.y && p.y>r.y-WALL_T-6 && p.x>r.x && p.x<r.x+r.w) return 'north';
+  if(p.y>r.y+r.h && p.y<r.y+r.h+WALL_T+6 && p.x>r.x && p.x<r.x+r.w) return 'south';
+  if(p.x<r.x && p.x>r.x-WALL_T-6 && p.y>r.y && p.y<r.y+r.h) return 'west';
+  if(p.x>r.x+r.w && p.x<r.x+r.w+WALL_T+6 && p.y>r.y && p.y<r.y+r.h) return 'east';
+  return null;
+}
+function onDown(e){
+  const p=cPos(e);
+  const c=hitCorner(p);
+  if(c){ dragCorner=c; return; }
+  const w=hitWall(p);
+  if(w){ selectSurface(w); if(selectedMaterial!==null){ assign[w]=selectedMaterial; draw(); updateReadouts(); } }
+}
+function onMove(e){
+  if(!dragCorner) return;
+  e.preventDefault();
+  const p=cPos(e);
+  const cx=CW/2, cy=CH/2;
+  roomW=Math.max(2, Math.min(9, 2*Math.abs(p.x-cx)/PX_PER_M));
+  roomL=Math.max(2, Math.min(9, 2*Math.abs(p.y-cy)/PX_PER_M));
+  draw(); updateReadouts();
+}
+function onUp(){ dragCorner=null; }
+canvas.addEventListener('mousedown',onDown);
+canvas.addEventListener('mousemove',onMove);
+window.addEventListener('mouseup',onUp);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();onDown(e);});
+canvas.addEventListener('touchmove',onMove,{passive:false});
+window.addEventListener('touchend',onUp);
+
+// ---------- Altura ----------
+document.getElementById('height').oninput=e=>{
+  roomH=+e.target.value;
+  document.getElementById('hVal').textContent=roomH.toFixed(2);
+  draw(); updateReadouts();
+};
+
+// ==========================================================
+// ÁUDIO — reverb sintético baseado no RT60
+// ==========================================================
+let actx=null;
+function ac(){ if(!actx) actx=new(window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended')actx.resume(); return actx; }
+
+let convolver=null, dryGain=null, wetGain=null, masterGain=null;
+let sourceBuffer=null, currentSource=null;
+let currentRT=0.5;
+
+function buildImpulseResponse(rt){
+  const c=ac();
+  const dur=Math.max(0.1, rt);
+  const len=Math.floor(c.sampleRate*dur);
+  const ir=c.createBuffer(2,len,c.sampleRate);
+  for(let ch=0;ch<2;ch++){
+    const d=ir.getChannelData(ch);
+    const decay=Math.log(1000)/len; // e^{-decay*len} = 1/1000  (-60 dB)
+    for(let i=0;i<len;i++){
+      d[i]=(Math.random()*2-1)*Math.exp(-decay*i);
+    }
+  }
+  return ir;
+}
+
+function ensureGraph(){
+  const c=ac();
+  if(!masterGain){
+    masterGain=c.createGain();
+    dryGain=c.createGain();
+    wetGain=c.createGain();
+    convolver=c.createConvolver();
+    dryGain.connect(masterGain);
+    convolver.connect(wetGain);
+    wetGain.connect(masterGain);
+    masterGain.connect(c.destination);
+    setVolumes();
+  }
+}
+
+function rebuildReverb(rt){
+  currentRT=rt||0.3;
+  if(convolver){ convolver.buffer=buildImpulseResponse(currentRT); }
+}
+
+function setVolumes(){
+  if(!masterGain) return;
+  const vol=+document.getElementById('vol').value/100;
+  const wet=+document.getElementById('wet').value/100;
+  masterGain.gain.value=vol;
+  wetGain.gain.value=wet;
+  dryGain.gain.value=1-wet*0.6;
+}
+
+document.getElementById('vol').oninput=e=>{document.getElementById('volVal').textContent=e.target.value;setVolumes();};
+document.getElementById('wet').oninput=e=>{document.getElementById('wetVal').textContent=e.target.value;setVolumes();};
+
+// carregar arquivo
+document.getElementById('audioFile').onchange=async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const buf=await file.arrayBuffer();
+  sourceBuffer=await ac().decodeAudioData(buf);
+  alert('Áudio carregado: "'+file.name+'". Clique em Tocar.');
+};
+
+function stopSound(){
+  if(currentSource){ try{currentSource.stop();}catch(e){} try{currentSource.disconnect();}catch(e){} currentSource=null; }
+}
+
+document.getElementById('playBtn').onclick=()=>{
+  if(!sourceBuffer){ alert('Carregue um arquivo de áudio primeiro.'); return; }
+  ensureGraph(); rebuildReverb(currentRT); setVolumes();
+  stopSound();
+  const c=ac();
+  const s=c.createBufferSource();
+  s.buffer=sourceBuffer; s.loop=true;
+  s.connect(dryGain); s.connect(convolver);
+  s.start();
+  currentSource=s;
+};
+document.getElementById('stopBtn').onclick=stopSound;
+
+// impulso (clap sintético)
+document.getElementById('impBtn').onclick=()=>{
+  ensureGraph(); rebuildReverb(currentRT); setVolumes();
+  const c=ac();
+  const len=Math.floor(c.sampleRate*0.02);
+  const b=c.createBuffer(1,len,c.sampleRate);
+  const d=b.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(len*0.15));
+  const s=c.createBufferSource(); s.buffer=b;
+  s.connect(dryGain); s.connect(convolver);
+  s.start();
+};
+
+// ---------- Init ----------
+draw();
+updateReadouts();
+console.log('Room Acoustics Simulator — Leonardo Fuks / Acústica da Boa Vizinhança');
+</script>
+</body>
+</html>

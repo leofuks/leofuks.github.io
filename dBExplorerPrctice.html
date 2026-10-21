@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acústica da Boa Vizinhança — Explorando Decibéis</title>
+
+<!-- ==========================================================
+     Projeto: Acústica da Boa Vizinhança
+     Autor:   Leonardo Fuks
+     Conteúdo educativo sobre decibéis para músicos
+     ========================================================== -->
+
+<style>
+/* ====================== ESTILOS ====================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', 'Roboto', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #eef2f7 0%, #d9e4f0 100%);
+  color: #2c3e50;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #2c5f8d 0%, #3a7ca5 100%);
+  color: white;
+  padding: 2rem 1rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.app-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+.subtitle { font-size: 1.05rem; opacity: 0.9; }
+
+#warning-banner {
+  background: #fff8dc;
+  border-left: 5px solid #f39c12;
+  padding: 1rem 1.5rem;
+  margin: 1rem auto;
+  max-width: 1100px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  position: relative;
+}
+#close-warning {
+  position: absolute; right: 1rem; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  font-size: 1.2rem; cursor: pointer; color: #999;
+}
+
+.tabs {
+  max-width: 1100px; margin: 0 auto; padding: 0 1rem;
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  border-bottom: 2px solid #cbd5e0;
+}
+.tab-btn {
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #4a5568;
+  transition: all 0.2s;
+}
+.tab-btn:hover { background: #e6f0fa; }
+.tab-btn.active { background: #2c5f8d; color: white; font-weight: 600; }
+
+main { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+
+.tab-content {
+  display: none;
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  animation: fadeIn 0.4s ease;
+}
+.tab-content.active { display: block; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+h2 { color: #2c5f8d; margin-bottom: 0.5rem; font-size: 1.6rem; }
+h3 { color: #3a7ca5; margin: 1.5rem 0 1rem; font-size: 1.2rem; }
+.lead { font-size: 1.05rem; color: #555; margin-bottom: 1.5rem; }
+
+.control-panel {
+  background: #f7fafc;
+  padding: 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+}
+.control-group { margin-bottom: 1rem; }
+.control-group label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #4a5568;
+}
+
+select, input[type="range"] {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+input[type="range"] { padding: 0; accent-color: #2c5f8d; }
+
+.buttons {
+  display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0;
+}
+button {
+  padding: 0.7rem 1.3rem;
+  border: none; border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem; font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-primary { background: #2c5f8d; color: white; }
+.btn-primary:hover { background: #1e4868; }
+.btn-secondary { background: #95a5a6; color: white; }
+.btn-secondary:hover { background: #7f8c8d; }
+.btn-danger { background: #e74c3c; color: white; }
+.btn-danger:hover { background: #c0392b; }
+.btn-increment { background: #27ae60; color: white; }
+.btn-increment:hover { background: #1e8449; }
+.btn-listen {
+  padding: 0.4rem 0.8rem;
+  background: #3a7ca5; color: white;
+  font-size: 0.85rem; margin: 0.2rem;
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.meter-container { margin: 1rem 0; }
+.vu-meter {
+  width: 100%; height: 30px;
+  background: #e0e0e0;
+  border-radius: 15px;
+  overflow: hidden;
+  border: 1px solid #ccc;
+}
+.vu-bar {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #27ae60 0%, #f1c40f 70%, #e74c3c 100%);
+  transition: width 0.1s ease;
+  border-radius: 15px;
+}
+
+.counter-display {
+  display: inline-block; text-align: center;
+  margin: 1rem 1.5rem 1rem 0;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  min-width: 140px;
+}
+.big-number {
+  display: block;
+  font-size: 2.5rem; font-weight: 700;
+  color: #2c5f8d;
+}
+.counter-label { font-size: 0.85rem; color: #718096; }
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem; margin: 1.5rem 0;
+}
+.comp-card {
+  background: white;
+  padding: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  border: 2px solid #e2e8f0;
+}
+.comp-card h4 { color: #3a7ca5; margin-bottom: 0.5rem; }
+
+.info-box {
+  background: #e8f4f8;
+  border-left: 4px solid #3a7ca5;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+.norms-table {
+  width: 100%; border-collapse: collapse;
+  margin: 1rem 0;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+.norms-table th {
+  background: #2c5f8d; color: white;
+  padding: 0.75rem; text-align: left;
+}
+.norms-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.norms-table tr:hover { background: #f7fafc; }
+
+.dynamic-result {
+  background: linear-gradient(135deg, #fef5e7 0%, #fae8c8 100%);
+  border: 2px solid #f39c12;
+  padding: 1.25rem;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  text-align: center;
+  font-weight: 500;
+  margin: 1rem 0;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 1.5rem 0;
+}
+
+.app-footer {
+  background: #2c3e50;
+  color: white;
+  text-align: center;
+  padding: 2rem 1rem;
+  margin-top: 3rem;
+}
+.app-footer p { margin: 0.3rem 0; }
+.footer-small { font-size: 0.85rem; opacity: 0.8; }
+
+@media (max-width: 600px) {
+  .tab-btn { font-size: 0.85rem; padding: 0.5rem 0.8rem; }
+  .big-number { font-size: 1.8rem; }
+  .app-header h1 { font-size: 1.5rem; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- ====================== CABEÇALHO ====================== -->
+<header class="app-header">
+  <h1>🎵 Acústica da Boa Vizinhança</h1>
+  <p class="subtitle">Explorando Decibéis na Prática — uma jornada sonora para músicos</p>
+</header>
+
+<div id="warning-banner">
+  ⚠️ <strong>Aviso:</strong> Os níveis em dB são relativos ao seu sistema de áudio. 
+  Use fones em volume moderado. Para medições reais, utilize um decibelímetro profissional.
+  <button id="close-warning">✕</button>
+</div>
+
+<!-- ====================== NAVEGAÇÃO ====================== -->
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="tab1">1. Sons Básicos</button>
+  <button class="tab-btn" data-tab="tab2">2. Soma de Fontes</button>
+  <button class="tab-btn" data-tab="tab3">3. dB Linear vs dBA</button>
+  <button class="tab-btn" data-tab="tab4">4. JND</button>
+  <button class="tab-btn" data-tab="tab5">5. Normas e Limites</button>
+  <button class="tab-btn" data-tab="tab6">6. Gravador & Dinâmicas</button>
+</nav>
+
+<main>
+
+<!-- ====================== MÓDULO 1 ====================== -->
+<section id="tab1" class="tab-content active">
+  <h2>🔊 Gerador de Sons Básicos</h2>
+  <p class="lead">Explore diferentes tipos de sinais sonoros e familiarize-se com o que cada um representa.</p>
+  
+  <div class="control-panel">
+    <div class="control-group">
+      <label>Tipo de som:</label>
+      <select id="wave-type">
+        <option value="sine">Senóide pura (tom puro)</option>
+        <option value="square">Onda quadrada</option>
+        <option value="triangle">Onda triangular</option>
+        <option value="sawtooth">Onda dente-de-serra</option>
+        <option value="complex">Som complexo (harmônicas)</option>
+        <option value="white">Ruído branco</option>
+        <option value="pink">Ruído rosa</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>Frequência: <span id="freq-value">440</span> Hz</label>
+      <input type="range" id="freq-slider" min="20" max="8000" value="440" step="1">
+    </div>
+    <div class="control-group">
+      <label>Nível: <span id="level-value">-20</span> dB</label>
+      <input type="range" id="level-slider" min="-60" max="0" value="-20" step="1">
+    </div>
+    <div class="buttons">
+      <button id="play-basic" class="btn-primary">▶ Tocar</button>
+      <button id="stop-basic" class="btn-secondary">■ Parar</button>
+    </div>
+    <div class="meter-container">
+      <label>Medidor de nível:</label>
+      <div class="vu-meter"><div id="vu-bar-1" class="vu-bar"></div></div>
+    </div>
+  </div>
+  
+  <div class="info-box">
+    💡 <strong>Dica:</strong> Tons puros (senóides) são raros na natureza. A maioria dos sons musicais 
+    é complexa, composta por várias frequências (harmônicas). Já o ruído rosa é o sinal que mais 
+    se aproxima da percepção natural de "todas as frequências juntas".
+  </div>
+</section>
+
+<!-- ====================== MÓDULO 2 ====================== -->
+<section id="tab2" class="tab-content">
+  <h2>➕ Soma de Fontes Não Coerentes</h2>
+  <p class="lead">Descubra a famosa regra dos <strong>+3 dB</strong>: ao dobrar o número de fontes sonoras 
+  independentes, o nível sobe apenas 3 dB!</p>
+  
+  <div class="control-panel">
+    <div class="counter-display">
+      <span class="big-number" id="source-count">0</span>
+      <span class="counter-label">fonte(s) ativa(s)</span>
+    </div>
+    <div class="counter-display">
+      <span class="big-number" id="db-result">0.0</span>
+      <span class="counter-label">dB resultantes</span>
+    </div>
+    <div class="buttons">
+      <button id="add-source" class="btn-primary">+1 fonte</button>
+      <button id="remove-source" class="btn-secondary">−1 fonte</button>
+      <button id="double-source" class="btn-primary">× Dobrar</button>
+      <button id="half-source" class="btn-secondary">÷ Metade</button>
+      <button id="stop-sources" class="btn-danger">■ Parar Tudo</button>
+    </div>
+    <hr>
+    <h3>🎻 Cenário do Músico</h3>
+    <div class="buttons">
+      <button id="apply-mute" class="btn-primary">Aplicar sordina (−6 dB)</button>
+      <button id="remove-mute" class="btn-secondary">Remover sordina</button>
+    </div>
+    <div class="control-group">
+      <label>Protetor auditivo: <span id="protector-value">0</span> dB de atenuação</label>
+      <input type="range" id="protector-slider" min="0" max="25" value="0" step="1">
+    </div>
+    <div class="meter-container">
+      <label>Medidor de nível:</label>
+      <div class="vu-meter"><div id="vu-bar-2" class="vu-bar"></div></div>
+    </div>
+  </div>
+  
+  <div class="info-box" id="sources-info">
+    💡 Adicione fontes e observe que o aumento percebido é muito menor do que se imagina!
+  </div>
+</section>
+
+<!-- ====================== MÓDULO 3 ====================== -->
+<section id="tab3" class="tab-content">
+  <h2>🎚️ dB Linear vs dB(A)</h2>
+  <p class="lead">O filtro A imita a sensibilidade do ouvido humano, atenuando graves e agudos extremos.</p>
+  
+  <div class="control-panel">
+    <div class="control-group">
+      <label>Frequência: <span id="freq-a-value">1000</span> Hz</label>
+      <input type="range" id="freq-a-slider" min="20" max="16000" value="1000" step="1">
+    </div>
+    <div class="buttons">
+      <button id="play-linear" class="btn-primary">▶ dB Linear (sem filtro)</button>
+      <button id="play-aweighted" class="btn-primary">▶ dB(A) (com filtro)</button>
+      <button id="stop-filter" class="btn-secondary">■ Parar</button>
+    </div>
+    <div class="comparison-grid">
+      <div class="comp-card">
+        <h4>dB Linear</h4>
+        <span class="big-number" id="db-linear">70.0</span>
+        <small>dB SPL relativo</small>
+      </div>
+      <div class="comp-card">
+        <h4>dB(A)</h4>
+        <span class="big-number" id="db-aweighted">70.0</span>
+        <small>dB(A)</small>
+      </div>
+      <div class="comp-card">
+        <h4>Atenuação A</h4>
+        <span class="big-number" id="db-diff">0.0</span>
+        <small>dB de diferença</small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="info-box">
+    💡 Em <strong>100 Hz</strong>, o filtro A atenua cerca de 19 dB. Em <strong>1000 Hz</strong>, 
+    é a referência (0 dB). Em <strong>10 kHz</strong>, atenua cerca de 2,5 dB.
+  </div>
+</section>
+
+<!-- ====================== MÓDULO 4 ====================== -->
+<section id="tab4" class="tab-content">
+  <h2>👂 Limiar da Percepção (JND)</h2>
+  <p class="lead">Qual o menor aumento de volume que seu ouvido consegue perceber? Teste agora!</p>
+  
+  <div class="control-panel">
+    <div class="buttons">
+      <button id="play-reference" class="btn-primary">▶ Som de referência</button>
+      <button id="stop-jnd" class="btn-secondary">■ Parar</button>
+    </div>
+    <h3>Adicione incrementos:</h3>
+    <div class="buttons">
+      <button class="btn-increment" data-inc="1">+1 dB</button>
+      <button class="btn-increment" data-inc="2">+2 dB</button>
+      <button class="btn-increment" data-inc="3">+3 dB</button>
+      <button class="btn-increment" data-inc="6">+6 dB</button>
+      <button class="btn-increment" data-inc="-1">−1 dB</button>
+      <button class="btn-increment" data-inc="-3">−3 dB</button>
+      <button id="reset-jnd" class="btn-danger">Resetar</button>
+    </div>
+    <div class="counter-display">
+      <span class="big-number" id="jnd-current">0</span>
+      <span class="counter-label">dB em relação à referência</span>
+    </div>
+    <hr>
+    <h3>🎲 Teste cego A/B</h3>
+    <p>O sistema tocará dois sons. Diga se você percebeu diferença.</p>
+    <div class="buttons">
+      <button id="start-blind" class="btn-primary">Iniciar teste cego</button>
+      <button id="answer-different" class="btn-secondary" disabled>Diferentes</button>
+      <button id="answer-same" class="btn-secondary" disabled>Iguais</button>
+    </div>
+    <div id="blind-result" class="info-box" style="display:none;"></div>
+  </div>
+  
+  <div class="info-box">
+    💡 Em condições ideais, o ouvido percebe variações de cerca de <strong>1 dB</strong>. 
+    Em ambientes ruidosos, o limiar sobe para <strong>3 dB ou mais</strong>. 
+    Um aumento de <strong>10 dB</strong> é percebido como o "dobro" do volume.
+  </div>
+</section>
+
+<!-- ====================== MÓDULO 5 ====================== -->
+<section id="tab5" class="tab-content">
+  <h2>📋 Normas e Limites Legais</h2>
+  <p class="lead">Conheça os limites de ruído estabelecidos pelas normas brasileiras (NBR 10151) e ISO 1996.</p>
+  
+  <table class="norms-table">
+    <thead>
+      <tr>
+        <th>Tipo de Área</th><th>Diurno</th><th>Noturno</th><th>Norma</th><th>Ouvir</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Hospitalar / Educacional</td><td>50 dB(A)</td><td>45 dB(A)</td><td>NBR 10151</td>
+        <td>
+          <button class="btn-listen" data-level="50">▶ 50</button>
+          <button class="btn-listen" data-level="45">▶ 45</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Residencial urbana</td><td>55 dB(A)</td><td>50 dB(A)</td><td>NBR 10151</td>
+        <td>
+          <button class="btn-listen" data-level="55">▶ 55</button>
+          <button class="btn-listen" data-level="50">▶ 50</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Área mista (residencial)</td><td>60 dB(A)</td><td>55 dB(A)</td><td>NBR 10151</td>
+        <td>
+          <button class="btn-listen" data-level="60">▶ 60</button>
+          <button class="btn-listen" data-level="55">▶ 55</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Área mista (recreação)</td><td>65 dB(A)</td><td>55 dB(A)</td><td>NBR 10151</td>
+        <td>
+          <button class="btn-listen" data-level="65">▶ 65</button>
+          <button class="btn-listen" data-level="55">▶ 55</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Predominantemente industrial</td><td>70 dB(A)</td><td>60 dB(A)</td><td>NBR 10151</td>
+        <td>
+          <button class="btn-listen" data-level="70">▶ 70</button>
+          <button class="btn-listen" data-level="60">▶ 60</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Rural / sítios</td><td>40 dB(A)</td><td>35 dB(A)</td><td>ISO 1996</td>
+        <td>
+          <button class="btn-listen" data-level="40">▶ 40</button>
+          <button class="btn-listen" data-level="35">▶ 35</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <button id="stop-norms" class="btn-secondary">■ Parar reprodução</button>
+  
+  <div class="info-box">
+    💡 <strong>Atenção músico:</strong> em zonas rurais, o ruído de fundo é muito baixo, então mesmo 
+    sons "moderados" podem ser percebidos como incômodos pela vizinhança. O silêncio do campo 
+    pode ser um desafio acústico!
+  </div>
+</section>
+
+<!-- ====================== MÓDULO 6 ====================== -->
+<section id="tab6" class="tab-content">
+  <h2>🎙️ Gravador & Classificação de Dinâmicas</h2>
+  <p class="lead">Grave seu instrumento ou voz e descubra em que dinâmica musical você está tocando: 
+  pianíssimo, forte, fortíssimo...</p>
+  
+  <div class="control-panel">
+    <div class="buttons">
+      <button id="record-btn" class="btn-primary">● Gravar (10s)</button>
+      <button id="stop-record" class="btn-secondary" disabled>■ Parar</button>
+      <button id="play-record" class="btn-primary" disabled>▶ Reproduzir</button>
+      <button id="clear-record" class="btn-danger" disabled>🗑 Apagar</button>
+    </div>
+    <div class="control-group">
+      <label>Ganho de reprodução: <span id="gain-value">0</span> dB</label>
+      <input type="range" id="gain-slider" min="-20" max="20" value="0" step="1">
+    </div>
+    <div class="meter-container">
+      <label>Nível em tempo real (durante gravação):</label>
+      <div class="vu-meter"><div id="vu-bar-6" class="vu-bar"></div></div>
+    </div>
+    <div class="counter-display">
+      <span class="big-number" id="rms-value">—</span>
+      <span class="counter-label">dBFS (RMS médio)</span>
+    </div>
+    <div class="dynamic-result" id="dynamic-result">
+      Grave algo para descobrir sua dinâmica musical!
+    </div>
+  </div>
+  
+  <table class="norms-table">
+    <thead>
+      <tr><th>Nível RMS aproximado</th><th>Dinâmica musical</th><th>Símbolo</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>&lt; −40 dBFS</td><td>Pianíssimo</td><td><em>pp</em></td></tr>
+      <tr><td>−40 a −30 dBFS</td><td>Piano</td><td><em>p</em></td></tr>
+      <tr><td>−30 a −24 dBFS</td><td>Mezzo-piano</td><td><em>mp</em></td></tr>
+      <tr><td>−24 a −18 dBFS</td><td>Mezzo-forte</td><td><em>mf</em></td></tr>
+      <tr><td>−18 a −10 dBFS</td><td>Forte</td><td><em>f</em></td></tr>
+      <tr><td>&gt; −10 dBFS</td><td>Fortíssimo</td><td><em>ff</em></td></tr>
+    </tbody>
+  </table>
+  
+  <div class="info-box">
+    💡 Tente gravar a mesma nota em diferentes dinâmicas (pp, mf, ff) e compare os valores. 
+    Você verá na prática quantos dB separam cada nuance musical!
+  </div>
+</section>
+
+</main>
+
+<!-- ====================== RODAPÉ ====================== -->
+<footer class="app-footer">
+  <p><strong>Projeto Acústica da Boa Vizinhança</strong></p>
+  <p>Autor: <strong>Leonardo Fuks</strong></p>
+  <p class="footer-small">Plataforma informativa, educativa e tecnológica sobre questões acústicas 
+  relacionadas à moradia do músico.</p>
+  <p class="footer-small">© 2026 — Material educativo de uso livre para fins didáticos.</p>
+</footer>
+
+<script>
+/* ==========================================================
+   Acústica da Boa Vizinhança — Explorando Decibéis
+   Autor: Leonardo Fuks
+   Projeto: Acústica da Boa Vizinhança
+   ========================================================== */
+
+// ----------- Audio Context -----------
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// ----------- Utilitários -----------
+function dbToGain(db) { return Math.pow(10, db / 20); }
+function gainToDb(g) { return 20 * Math.log10(Math.max(g, 1e-10)); }
+
+// ----------- Banner + Tabs -----------
+document.getElementById('close-warning').onclick = () => {
+  document.getElementById('warning-banner').style.display = 'none';
+};
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ----------- Geradores de Ruído -----------
+function createPinkNoise(ctx) {
+  const bufferSize = 4096;
+  const node = ctx.createScriptProcessor(bufferSize, 1, 1);
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  node.onaudioprocess = (e) => {
+    const out = e.outputBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.96900 * b2 + white * 0.1538520;
+      b3 = 0.86650 * b3 + white * 0.3104856;
+      b4 = 0.55000 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.0168980;
+      out[i] = (b0+b1+b2+b3+b4+b5+b6+white*0.5362) * 0.11;
+      b6 = white * 0.115926;
+    }
+  };
+  return node;
+}
+
+function createWhiteNoise(ctx) {
+  const bufferSize = 2 * ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const node = ctx.createBufferSource();
+  node.buffer = buffer;
+  node.loop = true;
+  return node;
+}
+
+// ==========================================================
+// MÓDULO 1: SONS BÁSICOS
+// ==========================================================
+let basicNodes = { osc: null, noise: null, gain: null, analyser: null };
+
+function stopBasic() {
+  if (basicNodes.osc) { try { basicNodes.osc.stop(); } catch(e){} try{basicNodes.osc.disconnect();}catch(e){} basicNodes.osc = null; }
+  if (basicNodes.noise) { try { basicNodes.noise.disconnect(); } catch(e){} basicNodes.noise = null; }
+  if (basicNodes.gain) { try{basicNodes.gain.disconnect();}catch(e){} basicNodes.gain = null; }
+  if (basicNodes.analyser) { try{basicNodes.analyser.disconnect();}catch(e){} basicNodes.analyser = null; }
+  document.getElementById('vu-bar-1').style.width = '0%';
+}
+
+document.getElementById('freq-slider').oninput = (e) => {
+  document.getElementById('freq-value').textContent = e.target.value;
+  if (basicNodes.osc) basicNodes.osc.frequency.value = +e.target.value;
+};
+
+document.getElementById('level-slider').oninput = (e) => {
+  document.getElementById('level-value').textContent = e.target.value;
+  if (basicNodes.gain) {
+    basicNodes.gain.gain.linearRampToValueAtTime(dbToGain(+e.target.value), getCtx().currentTime + 0.05);
+  }
+};
+
+document.getElementById('play-basic').onclick = () => {
+  stopBasic();
+  const ctx = getCtx();
+  const type = document.getElementById('wave-type').value;
+  const freq = +document.getElementById('freq-slider').value;
+  const level = +document.getElementById('level-slider').value;
+
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 1024;
+
+  if (type === 'white') {
+    const n = createWhiteNoise(ctx);
+    n.connect(gain); n.start();
+    basicNodes.noise = n;
+  } else if (type === 'pink') {
+    const n = createPinkNoise(ctx);
+    n.connect(gain);
+    basicNodes.noise = n;
+  } else if (type === 'complex') {
+    const real = new Float32Array([0, 1, 0.5, 0.3, 0.2, 0.15, 0.1]);
+    const imag = new Float32Array(real.length);
+    const wave = ctx.createPeriodicWave(real, imag);
+    const osc = ctx.createOscillator();
+    osc.setPeriodicWave(wave);
+    osc.frequency.value = freq;
+    osc.connect(gain); osc.start();
+    basicNodes.osc = osc;
+  } else {
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.connect(gain); osc.start();
+    basicNodes.osc = osc;
+  }
+
+  gain.connect(analyser);
+  analyser.connect(ctx.destination);
+  gain.gain.linearRampToValueAtTime(dbToGain(level), ctx.currentTime + 0.05);
+
+  basicNodes.gain = gain;
+  basicNodes.analyser = analyser;
+  animateMeter(analyser, 'vu-bar-1', () => basicNodes.analyser === analyser);
+};
+
+document.getElementById('stop-basic').onclick = stopBasic;
+
+// ==========================================================
+// MÓDULO 2: SOMA DE FONTES
+// ==========================================================
+let sources = [];
+let masterGain2 = null;
+let analyser2 = null;
+let muteOffset = 0;
+let protectorOffset = 0;
+
+function updateSourcesDisplay() {
+  const n = sources.length;
+  document.getElementById('source-count').textContent = n;
+  const dbAdd = n > 0 ? 10 * Math.log10(n) : 0;
+  const total = dbAdd - muteOffset - protectorOffset;
+  document.getElementById('db-result').textContent = total.toFixed(1);
+  document.getElementById('sources-info').innerHTML =
+    `💡 Você está ouvindo <strong>${n}</strong> ruído(s) rosa não correlacionados. 
+     Aumento de <strong>${dbAdd.toFixed(1)} dB</strong> em relação a 1 fonte.<br>
+     Sordina: −${muteOffset} dB | Protetor auditivo: −${protectorOffset} dB.`;
+  if (masterGain2) {
+    const baseDb = -30;
+    masterGain2.gain.linearRampToValueAtTime(
+      dbToGain(baseDb + total),
+      getCtx().currentTime + 0.05
+    );
+  }
+}
+
+function ensureMasterGain2() {
+  const ctx = getCtx();
+  if (!masterGain2) {
+    masterGain2 = ctx.createGain();
+    masterGain2.gain.value = 0;
+    analyser2 = ctx.createAnalyser();
+    analyser2.fftSize = 1024;
+    masterGain2.connect(analyser2);
+    analyser2.connect(ctx.destination);
+    animateMeter(analyser2, 'vu-bar-2', () => masterGain2 !== null);
+  }
+}
+
+function addSource() {
+  const ctx = getCtx();
+  ensureMasterGain2();
+  const n = createPinkNoise(ctx);
+  n.connect(masterGain2);
+  sources.push(n);
+  updateSourcesDisplay();
+}
+
+function removeSource() {
+  if (sources.length === 0) return;
+  const n = sources.pop();
+  try { n.disconnect(); } catch(e){}
+  updateSourcesDisplay();
+}
+
+document.getElementById('add-source').onclick = addSource;
+document.getElementById('remove-source').onclick = removeSource;
+document.getElementById('double-source').onclick = () => {
+  const target = Math.max(sources.length * 2, 1);
+  while (sources.length < target) addSource();
+};
+document.getElementById('half-source').onclick = () => {
+  const target = Math.floor(sources.length / 2);
+  while (sources.length > target) removeSource();
+};
+document.getElementById('stop-sources').onclick = () => {
+  while (sources.length > 0) removeSource();
+  if (masterGain2) { try{masterGain2.disconnect();}catch(e){} masterGain2 = null; }
+  if (analyser2) { try{analyser2.disconnect();}catch(e){} analyser2 = null; }
+  muteOffset = 0; protectorOffset = 0;
+  document.getElementById('protector-slider').value = 0;
+  document.getElementById('protector-value').textContent = '0';
+  document.getElementById('vu-bar-2').style.width = '0%';
+  updateSourcesDisplay();
+};
+document.getElementById('apply-mute').onclick = () => { muteOffset = 6; updateSourcesDisplay(); };
+document.getElementById('remove-mute').onclick = () => { muteOffset = 0; updateSourcesDisplay(); };
+document.getElementById('protector-slider').oninput = (e) => {
+  protectorOffset = +e.target.value;
+  document.getElementById('protector-value').textContent = protectorOffset;
+  updateSourcesDisplay();
+};
+
+// ==========================================================
+// MÓDULO 3: dB Linear vs dBA
+// ==========================================================
+let filterNodes = { osc: null, gain: null };
+
+function aWeighting(f) {
+  const f2 = f * f;
+  const num = Math.pow(12194, 2) * f2 * f2;
+  const den = (f2 + Math.pow(20.6, 2)) *
+              Math.sqrt((f2 + Math.pow(107.7, 2)) * (f2 + Math.pow(737.9, 2))) *
+              (f2 + Math.pow(12194, 2));
+  const Ra = num / den;
+  return 20 * Math.log10(Ra) + 2.00;
+}
+
+function updateFilterDisplay() {
+  const f = +document.getElementById('freq-a-slider').value;
+  document.getElementById('freq-a-value').textContent = f;
+  const baseDb = 70;
+  const att = aWeighting(f);
+  const aDb = baseDb + att;
+  document.getElementById('db-linear').textContent = baseDb.toFixed(1);
+  document.getElementById('db-aweighted').textContent = aDb.toFixed(1);
+  document.getElementById('db-diff').textContent = att.toFixed(1);
+}
+document.getElementById('freq-a-slider').oninput = updateFilterDisplay;
+updateFilterDisplay();
+
+function stopFilter() {
+  if (filterNodes.osc) { try{filterNodes.osc.stop();}catch(e){} try{filterNodes.osc.disconnect();}catch(e){} filterNodes.osc = null; }
+  if (filterNodes.gain) { try{filterNodes.gain.disconnect();}catch(e){} filterNodes.gain = null; }
+}
+
+function playFilter(applyA) {
+  stopFilter();
+  const ctx = getCtx();
+  const f = +document.getElementById('freq-a-slider').value;
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = f;
+  const gain = ctx.createGain();
+  const baseLevel = -20;
+  const att = applyA ? aWeighting(f) : 0;
+  gain.gain.value = 0;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  gain.gain.linearRampToValueAtTime(dbToGain(baseLevel + att), ctx.currentTime + 0.05);
+  filterNodes.osc = osc;
+  filterNodes.gain = gain;
+}
+document.getElementById('play-linear').onclick = () => playFilter(false);
+document.getElementById('play-aweighted').onclick = () => playFilter(true);
+document.getElementById('stop-filter').onclick = stopFilter;
+
+// ==========================================================
+// MÓDULO 4: JND
+// ==========================================================
+let jndNodes = { noise: null, gain: null };
+let jndIncrement = 0;
+const JND_BASE_DB = -25;
+
+function updateJndGain() {
+  if (jndNodes.gain) {
+    jndNodes.gain.gain.linearRampToValueAtTime(
+      dbToGain(JND_BASE_DB + jndIncrement),
+      getCtx().currentTime + 0.05
+    );
+  }
+  document.getElementById('jnd-current').textContent = jndIncrement;
+}
+
+document.getElementById('play-reference').onclick = () => {
+  if (jndNodes.noise) return;
+  const ctx = getCtx();
+  const n = createPinkNoise(ctx);
+  const g = ctx.createGain();
+  g.gain.value = dbToGain(JND_BASE_DB);
+  n.connect(g); g.connect(ctx.destination);
+  jndNodes.noise = n; jndNodes.gain = g;
+  jndIncrement = 0;
+  updateJndGain();
+};
+
+document.getElementById('stop-jnd').onclick = () => {
+  if (jndNodes.noise) { try{jndNodes.noise.disconnect();}catch(e){} jndNodes.noise = null; }
+  if (jndNodes.gain) { try{jndNodes.gain.disconnect();}catch(e){} jndNodes.gain = null; }
+  jndIncrement = 0;
+  document.getElementById('jnd-current').textContent = '0';
+};
+
+document.querySelectorAll('.btn-increment').forEach(btn => {
+  btn.onclick = () => {
+    jndIncrement += +btn.dataset.inc;
+    updateJndGain();
+  };
+});
+
+document.getElementById('reset-jnd').onclick = () => {
+  jndIncrement = 0;
+  updateJndGain();
+};
+
+// Teste cego A/B
+let blindAnswer = null;
+document.getElementById('start-blind').onclick = async () => {
+  const ctx = getCtx();
+  const isDifferent = Math.random() < 0.7;
+  blindAnswer = isDifferent;
+  const diff = isDifferent ? (Math.random() < 0.5 ? 2 : 3) : 0;
+
+  const n = createPinkNoise(ctx);
+  const g = ctx.createGain();
+  g.gain.value = dbToGain(-25);
+  n.connect(g); g.connect(ctx.destination);
+
+  const btn = document.getElementById('start-blind');
+  btn.disabled = true;
+  btn.textContent = 'Tocando som A...';
+
+  await new Promise(r => setTimeout(r, 1800));
+  g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
+  await new Promise(r => setTimeout(r, 600));
+  btn.textContent = 'Tocando som B...';
+  g.gain.linearRampToValueAtTime(dbToGain(-25 + diff), ctx.currentTime + 0.1);
+  await new Promise(r => setTimeout(r, 1800));
+  g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
+  await new Promise(r => setTimeout(r, 300));
+  try { n.disconnect(); g.disconnect(); } catch(e){}
+
+  btn.disabled = false;
+  btn.textContent = 'Iniciar teste cego';
+  document.getElementById('answer-different').disabled = false;
+  document.getElementById('answer-same').disabled = false;
+  const res = document.getElementById('blind-result');
+  res.style.display = 'block';
+  res.innerHTML = `🎧 Você percebeu diferença entre os dois sons?<br>
+                   <small>(Diferença real aplicada: ${diff} dB)</small>`;
+};
+
+function evaluateBlind(userSaysDifferent) {
+  const correct = userSaysDifferent === blindAnswer;
+  const res = document.getElementById('blind-result');
+  res.innerHTML = correct
+    ? '✅ <strong>Acertou!</strong> Seu ouvido percebeu corretamente.'
+    : '❌ <strong>Errou.</strong> Diferenças pequenas em dB são realmente sutis — não desanime!';
+  document.getElementById('answer-different').disabled = true;
+  document.getElementById('answer-same').disabled = true;
+}
+document.getElementById('answer-different').onclick = () => evaluateBlind(true);
+document.getElementById('answer-same').onclick = () => evaluateBlind(false);
+
+// ==========================================================
+// MÓDULO 5: NORMAS
+// ==========================================================
+let normsNodes = { noise: null, gain: null };
+
+function stopNorms() {
+  if (normsNodes.noise) { try{normsNodes.noise.disconnect();}catch(e){} normsNodes.noise = null; }
+  if (normsNodes.gain) { try{normsNodes.gain.disconnect();}catch(e){} normsNodes.gain = null; }
+}
+
+document.querySelectorAll('.btn-listen').forEach(btn => {
+  btn.onclick = () => {
+    stopNorms();
+    const ctx = getCtx();
+    const level = +btn.dataset.level;
+    // Mapeamento educativo: 35 dB(A) -> -50 dBFS ; 70 dB(A) -> -15 dBFS
+    const dbfs = -50 + ((level - 35) / 35) * 35;
+    const n = createPinkNoise(ctx);
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    n.connect(g); g.connect(ctx.destination);
+    g.gain.linearRampToValueAtTime(dbToGain(dbfs), ctx.currentTime + 0.05);
+    normsNodes.noise = n; normsNodes.gain = g;
+  };
+});
+document.getElementById('stop-norms').onclick = stopNorms;
+
+// ==========================================================
+// MÓDULO 6: GRAVADOR
+// ==========================================================
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordedBuffer = null;
+let micStream = null;
+let micAnalyser = null;
+let playbackGain = 0;
+let recordTimeout = null;
+
+document.getElementById('gain-slider').oninput = (e) => {
+  playbackGain = +e.target.value;
+  document.getElementById('gain-value').textContent = playbackGain;
+};
+
+document.getElementById('record-btn').onclick = async () => {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = getCtx();
+    const src = ctx.createMediaStreamSource(micStream);
+    micAnalyser = ctx.createAnalyser();
+    micAnalyser.fftSize = 2048;
+    src.connect(micAnalyser);
+
+    mediaRecorder = new MediaRecorder(micStream);
+    recordedChunks = [];
+
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+      const arrayBuffer = await blob.arrayBuffer();
+      try {
+        recordedBuffer = await ctx.decodeAudioData(arrayBuffer);
+      } catch (err) {
+        alert('Erro ao decodificar áudio: ' + err.message);
+        return;
+      }
+      
+      const data = recordedBuffer.getChannelData(0);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length);
+      const dbfs = gainToDb(rms);
+      
+      document.getElementById('rms-value').textContent = dbfs.toFixed(1);
+      document.getElementById('dynamic-result').innerHTML = 
+        `🎵 Dinâmica detectada: <strong>${classifyDynamic(dbfs)}</strong>`;
+      
+      document.getElementById('play-record').disabled = false;
+      document.getElementById('clear-record').disabled = false;
+    };
+
+    mediaRecorder.start();
+    animateMicMeter();
+    document.getElementById('record-btn').disabled = true;
+    document.getElementById('stop-record').disabled = false;
+
+    recordTimeout = setTimeout(() => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+    }, 10000);
+
+  } catch (err) {
+    alert('Erro ao acessar microfone: ' + err.message);
+  }
+};
+
+function stopRecording() {
+  if (recordTimeout) { clearTimeout(recordTimeout); recordTimeout = null; }
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  document.getElementById('record-btn').disabled = false;
+  document.getElementById('stop-record').disabled = true;
+  document.getElementById('vu-bar-6').style.width = '0%';
+}
+document.getElementById('stop-record').onclick = stopRecording;
+
+document.getElementById('play-record').onclick = () => {
+  if (!recordedBuffer) return;
+  const ctx = getCtx();
+  const src = ctx.createBufferSource();
+  src.buffer = recordedBuffer;
+  const g = ctx.createGain();
+  g.gain.value = dbToGain(playbackGain);
+  src.connect(g); g.connect(ctx.destination);
+  src.start();
+};
+
+document.getElementById('clear-record').onclick = () => {
+  recordedBuffer = null;
+  document.getElementById('rms-value').textContent = '—';
+  document.getElementById('dynamic-result').textContent = 'Grave algo para descobrir sua dinâmica musical!';
+  document.getElementById('play-record').disabled = true;
+  document.getElementById('clear-record').disabled = true;
+};
+
+function classifyDynamic(dbfs) {
+  if (dbfs < -40) return 'Pianíssimo (pp)';
+  if (dbfs < -30) return 'Piano (p)';
+  if (dbfs < -24) return 'Mezzo-piano (mp)';
+  if (dbfs < -18) return 'Mezzo-forte (mf)';
+  if (dbfs < -10) return 'Forte (f)';
+  return 'Fortíssimo (ff)';
+}
+
+function animateMicMeter() {
+  if (!micAnalyser) return;
+  const data = new Float32Array(micAnalyser.fftSize);
+  function loop() {
+    if (!micAnalyser || !mediaRecorder || mediaRecorder.state !== 'recording') {
+      document.getElementById('vu-bar-6').style.width = '0%';
+      return;
+    }
+    micAnalyser.getFloatTimeDomainData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+    const rms = Math.sqrt(sum / data.length);
+    const dbfs = gainToDb(rms);
+    const percent = Math.max(0, Math.min(100, (dbfs + 60) * (100/60)));
+    document.getElementById('vu-bar-6').style.width = percent + '%';
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+// ==========================================================
+// MEDIDOR VU GENÉRICO
+// ==========================================================
+function animateMeter(analyser, barId, keepGoing) {
+  const bar = document.getElementById(barId);
+  const data = new Float32Array(analyser.fftSize);
+  function loop() {
+    if (!keepGoing()) {
+      bar.style.width = '0%';
+      return;
+    }
+    try {
+      analyser.getFloatTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length);
+      const dbfs = gainToDb(rms);
+      const percent = Math.max(0, Math.min(100, (dbfs + 60) * (100/60)));
+      bar.style.width = percent + '%';
+      requestAnimationFrame(loop);
+    } catch(e) {
+      bar.style.width = '0%';
+    }
+  }
+  loop();
+}
+
+// ==========================================================
+// Inicialização
+// ==========================================================
+updateSourcesDisplay();
+console.log('🎵 Acústica da Boa Vizinhança — Autor: Leonardo Fuks');
+console.log('Projeto educativo sobre acústica para músicos.');
+</script>
+
+</body>
+</html>
