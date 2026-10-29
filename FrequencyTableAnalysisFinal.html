@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vocal Pitch Recorder</title>
+<style>
+  :root{--bg:#0f1720;--card:#18232f;--fg:#e6edf3;--mut:#8b9bab;--acc:#3fb6a8;--err:#e5534b;--warn:#d29922;--blue:#58a6ff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+  main{max-width:1060px;margin:0 auto;padding:20px 14px 48px}
+  h1{margin:0 0 4px;font-size:1.5rem}
+  p.sub{margin:0 0 16px;color:var(--mut)}
+  .card{background:var(--card);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .card h2{margin:0 0 8px;font-size:1.05rem}
+  ol,ul{margin:6px 0;padding-left:20px;color:var(--mut)}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .controls+.controls{margin-top:10px}
+  button{font:inherit;padding:12px 16px;border:0;border-radius:8px;cursor:pointer;background:var(--acc);color:#04201c;font-weight:600;touch-action:manipulation}
+  button.stop{background:var(--err);color:#fff}
+  button.warn{background:var(--warn);color:#241a00}
+  button.next{background:var(--blue);color:#04121f}
+  button.sec{background:#2b3a49;color:var(--fg)}
+  button.play{padding:6px 10px;font-size:.85rem;background:#2b3a49;color:var(--fg)}
+  button.oct{padding:3px 8px;font-size:.85rem;background:#2b3a49;color:var(--fg);min-width:26px}
+  button.del{padding:5px 9px;font-size:.85rem;background:#3b1d1d;color:#ffb4ae}
+  .notecell{white-space:nowrap}
+  .notecell span{display:inline-block;min-width:34px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  label.chk{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:.9rem}
+  .tune{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;color:var(--mut);font-size:.9rem}
+  .tune input[type=range]{flex:1;min-width:160px;accent-color:var(--acc)}
+  .tune input[type=number]{width:84px;padding:6px;border-radius:6px;border:1px solid #2b3a49;background:#0f1720;color:var(--fg);font:inherit}
+  .status{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;background:#223040;font-weight:600}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--mut)}
+  .st-waiting .dot{background:var(--warn)}
+  .st-recording .dot{background:var(--err);animation:pulse 1s infinite}
+  .st-processing .dot{background:var(--blue)}
+  .st-paused .dot{background:var(--acc)}
+  @keyframes pulse{50%{opacity:.3}}
+  .meter{height:10px;background:#223040;border-radius:5px;overflow:hidden;margin-top:10px}
+  .meter>div{height:100%;width:0;background:var(--acc)}
+  #level>div{background:var(--blue)}
+  #live{margin-top:8px;color:var(--mut);font-variant-numeric:tabular-nums}
+  #nowPlaying{margin-top:6px;font-weight:600;color:var(--acc);min-height:1.2em}
+  #msg{margin-top:10px;padding:10px 12px;border-radius:8px;display:none;white-space:pre-line}
+  #msg.error{display:block;background:#3b1d1d;color:#ffb4ae}
+  #msg.info{display:block;background:#1d2f3b;color:#b6dcff}
+  #diag{white-space:pre-wrap;color:var(--mut);font-size:.8rem;margin:8px 0 0}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.9rem}
+  th,td{padding:8px 6px;text-align:right;border-bottom:1px solid #2b3a49}
+  th:first-child,td:first-child,th:nth-child(3),td:nth-child(3),th:nth-child(8),td:nth-child(8),th:last-child,td:last-child{text-align:center}
+  th{color:var(--mut);font-weight:600}
+  tr.invalid td{color:var(--mut);font-style:italic}
+  tr.playing td{background:#1f3a35}
+  tr.playing td:first-child{box-shadow:inset 4px 0 0 var(--acc)}
+  .tablewrap{overflow-x:auto}
+  #summary{display:none}#summary.show{display:block}
+  .big{font-size:1.25rem;font-weight:700}
+  .speech{font-size:.85rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Vocal Pitch Recorder</h1>
+  <p class="sub">Average fundamental frequency of individual vocalizations of up to 4 s each (12-TET, adjustable A4 reference).</p>
+
+  <section class="card">
+    <h2>How to use</h2>
+    <ol>
+      <li>Open this page from an <b>https://</b> address in <b>Chrome (Android)</b> or <b>Safari (iPhone)</b>, not inside WhatsApp, Instagram or a file viewer.</li>
+      <li>Tap <b>Start acquisition</b> and allow the microphone. Measurement #1 starts after a short countdown and lasts up to 4 s.</li>
+      <li>Tap <b>Stop measurement</b> to end it early. The audio recorded so far is analyzed.</li>
+      <li>Pause as long as you like, then tap <b>Next measurement</b>. Tap <b>End acquisition</b> when you are done.</li>
+      <li>Tap <b>▶ Play</b> on any result to hear a sawtooth tone at that frequency (not available while recording).</li>
+      <li>Use <b>− / +</b> next to a note to move it down or up one octave, and <b>✕</b> to remove a result before saving.</li>
+      <li><b>Export CSV</b> saves the results. <b>Open CSV</b> loads a saved file so you can view and play it again.</li>
+      <li>Set the <b>A4 reference</b> (415–460 Hz). Notes and deviations (−50 to +50 cents) update immediately.</li>
+      <li>If the mic is blocked: Android → lock icon → Permissions → Microphone → Allow. iPhone → <b>aA</b> → Website Settings → Microphone → Allow. Also allow the browser in your phone's privacy settings, then reload.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <div class="controls">
+      <button id="testBtn" class="sec">Test microphone</button>
+      <button id="startBtn">Start acquisition</button>
+      <button id="measStopBtn" class="warn" disabled>Stop measurement</button>
+      <button id="nextBtn" class="next" disabled>Next measurement</button>
+      <button id="stopBtn" class="stop" disabled>End acquisition</button>
+    </div>
+    <div class="controls">
+      <button id="csvBtn" class="sec" disabled>Export CSV</button>
+      <button id="openBtn" class="sec">Open CSV</button>
+      <input type="file" id="fileIn" accept=".csv,text/csv,text/plain" hidden>
+      <button id="clearBtn" class="sec" disabled>Clear</button>
+      <span id="status" class="status"><span class="dot"></span><span id="statusText">Idle</span></span>
+    </div>
+    <div class="tune">
+      <label for="a4Range"><b>A4 reference</b></label>
+      <input type="range" id="a4Range" min="415" max="460" step="0.5" value="440">
+      <input type="number" id="a4Num" min="415" max="460" step="0.1" value="440"> Hz
+      <button id="a4Reset" class="sec" style="padding:6px 10px">440</button>
+    </div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="voiceChk"> Voice commands ("finish" / "stop acquisition" end the session). On phones they can take over the microphone, so leave this off if recording fails.</label>
+    <div class="meter" id="level"><div></div></div>
+    <div class="meter"><div id="progress"></div></div>
+    <div id="live">—</div>
+    <div id="nowPlaying"></div>
+    <div id="speechInfo" class="speech"></div>
+    <div id="msg"></div>
+    <pre id="diag"></pre>
+  </section>
+
+  <section class="card" id="summary"><h2>Summary</h2><div id="summaryBody"></div></section>
+
+  <section class="card">
+    <h2>Measurements</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>Avg F0 (Hz)</th><th>Closest note (octave)</th><th>Note freq (Hz)</th><th>Deviation from note (cents)</th><th>Valid frames</th><th>Duration (s)</th><th>Tone</th><th>Remove</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const CFG={windowSec:4,gapSec:1.2,frameSize:4096,hopMs:30,minF0:60,maxF0:1100,
+  yinThreshold:0.15,minRms:0.008,minConfidence:0.8,outlierCents:300,minValidFrames:10,
+  toneSec:2,toneGain:0.18,a4Min:415,a4Max:460,a4Default:440,octMinHz:16,octMaxHz:8000};
+const NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const EMPTY_ROW=`<tr id="emptyRow"><td colspan="9" style="text-align:center;color:var(--mut)">No measurements yet.</td></tr>`;
+
+let A4=CFG.a4Default;
+let audioCtx=null,stream=null,source=null,analyser=null,hpf=null;
+let timers=[],rafId=null,levelRaf=null,recognition=null,recognitionWanted=false;
+let running=false,testing=false,results=[],measureCount=0;
+let phase="idle";
+let win=null;
+let playCtx=null,tone=null,playingIndex=null;
+
+const $=id=>document.getElementById(id);
+const startBtn=$("startBtn"),stopBtn=$("stopBtn"),csvBtn=$("csvBtn"),clearBtn=$("clearBtn"),
+      testBtn=$("testBtn"),measStopBtn=$("measStopBtn"),nextBtn=$("nextBtn"),openBtn=$("openBtn");
+const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const setStatus=(k,t)=>{$("status").className="status st-"+k;$("statusText").textContent=t;};
+const showMsg=(t,type="error")=>{const m=$("msg");m.className=type;m.textContent=t;};
+const clearMsg=()=>{const m=$("msg");m.className="";m.textContent="";};
+const diag=s=>{$("diag").textContent+=s+"\n";};
+const isMeasuring=()=>phase==="countdown"||phase==="rec";
+
+function setButtons(){
+  const m=isMeasuring();
+  startBtn.disabled=testBtn.disabled=running||testing;
+  measStopBtn.disabled=!(running&&m);
+  nextBtn.disabled=!(running&&phase==="paused");
+  stopBtn.disabled=!(running||testing);
+  stopBtn.textContent=testing?"Stop test":"End acquisition";
+  csvBtn.disabled=results.length===0;
+  clearBtn.disabled=results.length===0||m;
+  openBtn.disabled=m;
+  document.querySelectorAll("button.play,button.oct,button.del").forEach(b=>{
+    if(m){b.disabled=true;b.title="Not available while recording";}
+    else{b.disabled=b.dataset.lock==="1";b.title=b.dataset.lock==="1"?"Out of range":"";}
+  });
+}
+
+/* ===== YIN pitch estimator ===== */
+function yin(buf,sr){
+  const tauMin=Math.max(2,Math.floor(sr/CFG.maxF0));
+  const tauMax=Math.min(Math.floor(sr/CFG.minF0),Math.floor(buf.length/2));
+  const W=buf.length-tauMax,d=new Float32Array(tauMax+1);
+  for(let tau=1;tau<=tauMax;tau++){let s=0;for(let i=0;i<W;i++){const x=buf[i]-buf[i+tau];s+=x*x;}d[tau]=s;}
+  d[0]=1;let run=0;
+  for(let tau=1;tau<=tauMax;tau++){run+=d[tau];d[tau]=run>0?d[tau]*tau/run:1;}
+  let tau=-1;
+  for(let t=tauMin;t<=tauMax;t++){if(d[t]<CFG.yinThreshold){while(t+1<=tauMax&&d[t+1]<d[t])t++;tau=t;break;}}
+  if(tau<0)return null;
+  let bt=tau;
+  if(tau>1&&tau<tauMax){const a=d[tau-1],b=d[tau],c=d[tau+1],den=a+c-2*b;if(den!==0)bt=tau+(a-c)/(2*den);}
+  return{f0:sr/bt,confidence:1-d[tau]};
+}
+const rms=b=>{let s=0;for(let i=0;i<b.length;i++)s+=b[i]*b[i];return Math.sqrt(s/b.length);};
+function analyzeNote(f){
+  const semis=12*Math.log2(f/A4),n=Math.round(semis),midi=69+n;
+  const noteFreq=A4*Math.pow(2,n/12);
+  return{note:NOTE_NAMES[((midi%12)+12)%12]+(Math.floor(midi/12)-1),noteFreq,cents:1200*Math.log2(f/noteFreq)};
+}
+const median=a=>{const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+
+/* ===== A4 reference ===== */
+function setA4(v,silent){
+  v=Number(v);if(!isFinite(v))v=CFG.a4Default;
+  A4=Math.min(CFG.a4Max,Math.max(CFG.a4Min,v));
+  $("a4Range").value=A4;$("a4Num").value=+A4.toFixed(2);
+  renderTable();if(results.length)showSummary();
+  if(!silent&&playingIndex!=null){const r=results.find(x=>x.index===playingIndex);if(r)updatePlayUI(r);}
+}
+$("a4Range").addEventListener("input",e=>setA4(e.target.value));
+$("a4Num").addEventListener("change",e=>setA4(e.target.value));
+$("a4Reset").addEventListener("click",()=>setA4(CFG.a4Default));
+
+/* ===== Microphone (mobile-safe) ===== */
+function legacyGUM(c){
+  const g=navigator.getUserMedia||navigator.webkitGetUserMedia||navigator.mozGetUserMedia;
+  if(!g)return null;
+  return new Promise((res,rej)=>g.call(navigator,c,res,rej));
+}
+function requestMic(){
+  const md=navigator.mediaDevices;
+  const strict={audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}};
+  const simple={audio:true};
+  if(md&&md.getUserMedia){
+    return md.getUserMedia(strict).catch(e=>{
+      if(e&&(e.name==="NotAllowedError"||e.name==="SecurityError"))throw e;
+      diag("Strict constraints failed ("+e.name+"), retrying audio:true");
+      return md.getUserMedia(simple);
+    });
+  }
+  const p=legacyGUM(simple);
+  if(p)return p;
+  return Promise.reject(Object.assign(new Error("getUserMedia unavailable"),{name:"NoGetUserMedia"}));
+}
+async function openAudio(){
+  if(!window.isSecureContext)throw Object.assign(new Error(),{name:"InsecureContext"});
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw Object.assign(new Error(),{name:"NoAudioContext"});
+  audioCtx=new AC();
+  const resumeP=audioCtx.resume?audioCtx.resume().catch(()=>{}):Promise.resolve();
+  const micP=requestMic();
+  stream=await micP;
+  await resumeP;
+  if(audioCtx.state!=="running"){try{await audioCtx.resume();}catch(_){}}
+  audioCtx.onstatechange=()=>{
+    if(audioCtx&&(audioCtx.state==="suspended"||audioCtx.state==="interrupted")&&(running||testing))
+      audioCtx.resume().catch(()=>{});
+  };
+  const track=stream.getAudioTracks()[0];
+  if(!track)throw Object.assign(new Error("No audio track"),{name:"NotFoundError"});
+  track.onended=()=>{if(running||testing){showMsg("The microphone was released by the system (another app or call took it).");stopAll("ended");}};
+  source=audioCtx.createMediaStreamSource(stream);
+  hpf=audioCtx.createBiquadFilter();hpf.type="highpass";hpf.frequency.value=50;
+  analyser=audioCtx.createAnalyser();analyser.fftSize=CFG.frameSize;analyser.smoothingTimeConstant=0;
+  source.connect(hpf);hpf.connect(analyser);
+  diag(`Mic: "${track.label||"default"}" · sampleRate ${audioCtx.sampleRate} Hz · ctx ${audioCtx.state}`);
+  startLevelMeter();
+}
+function startLevelMeter(){
+  const buf=new Float32Array(analyser.fftSize),bar=$("level").firstElementChild;
+  const loop=()=>{
+    if(!analyser)return;
+    analyser.getFloatTimeDomainData(buf);
+    const db=20*Math.log10(rms(buf)+1e-9);
+    bar.style.width=Math.max(0,Math.min(100,(db+60)*100/60))+"%";
+    if(testing)$("live").textContent=`Mic level ${db.toFixed(0)} dBFS. Speak or sing; the blue bar should move.`;
+    levelRaf=requestAnimationFrame(loop);
+  };
+  loop();
+}
+function micErrorMessage(e){
+  switch(e&&e.name){
+    case"InsecureContext":return"This page is not in a secure context ("+location.protocol+"). Open it via https:// (for example GitHub Pages: https://USER.github.io/REPO/file.html). A github.com/blob link, a raw link or a local file will not work.";
+    case"NoGetUserMedia":return"This browser cannot capture audio. If you opened the link inside WhatsApp, Instagram or another app, use ⋮ → 'Open in Chrome' (Android) or 'Open in Safari' (iPhone).";
+    case"NoAudioContext":return"Web Audio API not supported. Update your browser.";
+    case"NotAllowedError":case"SecurityError":return"Microphone permission denied.\n• Android Chrome: lock icon → Permissions → Microphone → Allow, and Settings → Apps → Chrome → Permissions → Microphone → Allow.\n• iPhone Safari: aA → Website Settings → Microphone → Allow, and Settings → Privacy & Security → Microphone.\nThen reload the page.";
+    case"NotFoundError":case"OverconstrainedError":return"No microphone found or the phone rejected the audio settings.";
+    case"NotReadableError":case"AbortError":return"The microphone is busy (call, recorder, voice assistant or Bluetooth headset). Close those apps and try again.";
+    default:return"Could not start audio: "+(e&&(e.name+" – "+e.message));
+  }
+}
+function clearTimers(){timers.forEach(t=>{clearTimeout(t);clearInterval(t);});timers=[];
+  if(rafId)cancelAnimationFrame(rafId);rafId=null;}
+async function closeAudio(){
+  clearTimers();
+  if(levelRaf)cancelAnimationFrame(levelRaf);levelRaf=null;
+  try{source&&source.disconnect();}catch(_){}
+  try{hpf&&hpf.disconnect();}catch(_){}
+  if(stream)stream.getTracks().forEach(t=>{t.onended=null;t.stop();});
+  if(audioCtx){audioCtx.onstatechange=null;if(audioCtx.state!=="closed"){try{await audioCtx.close();}catch(_){}}}
+  stream=source=analyser=hpf=audioCtx=null;
+  $("level").firstElementChild.style.width="0%";
+}
+
+/* ===== Speech recognition (optional) ===== */
+function startRecognition(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){$("speechInfo").textContent="Voice commands are not supported here. Use the buttons.";return;}
+  recognition=new SR();recognition.continuous=true;recognition.interimResults=true;recognition.lang="en-US";
+  recognitionWanted=true;
+  recognition.onresult=ev=>{
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      const t=ev.results[i][0].transcript.toLowerCase();
+      if(/\bfinish(ed)?\b/.test(t)||/\bstop\s+acquisition\b/.test(t)){$("speechInfo").textContent=`Heard: "${t.trim()}"`;stopAll("voice");return;}
+    }
+  };
+  recognition.onerror=ev=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){recognitionWanted=false;
+    $("speechInfo").textContent="Speech recognition is not allowed. Use the buttons.";}};
+  recognition.onend=()=>{if(recognitionWanted&&running){try{recognition.start();}catch(_){}}};
+  try{recognition.start();$("speechInfo").textContent='Listening for "finish" or "stop acquisition"…';}
+  catch(_){$("speechInfo").textContent="Speech recognition failed to start. Use the buttons.";}
+}
+function stopRecognition(){recognitionWanted=false;if(recognition){recognition.onresult=recognition.onend=recognition.onerror=null;
+  try{recognition.abort();}catch(_){}recognition=null;}}
+
+/* ===== Measurement workflow ===== */
+function startMeasurement(){
+  if(!running||isMeasuring()||!audioCtx)return;
+  if(audioCtx.state!=="running")audioCtx.resume().catch(()=>{});
+  stopTone();clearMsg();
+  phase="countdown";setButtons();
+  setStatus("waiting","Get ready");$("progress").style.width="0%";
+  const end=performance.now()+CFG.gapSec*1000;
+  const iv=setInterval(()=>{$("live").textContent=`Measurement #${measureCount+1} starts in ${Math.max(0,(end-performance.now())/1000).toFixed(1)} s`;},100);
+  timers.push(iv);
+  timers.push(setTimeout(()=>{clearInterval(iv);recordWindow();},CFG.gapSec*1000));
+}
+function recordWindow(){
+  if(!running||!audioCtx)return;
+  phase="rec";setButtons();
+  setStatus("recording",`Recording #${measureCount+1} (max ${CFG.windowSec} s)`);
+  const sr=audioCtx.sampleRate,buf=new Float32Array(analyser.fftSize);
+  const useAudio=audioCtx.state==="running";
+  const now=()=>useAudio&&audioCtx?audioCtx.currentTime:performance.now()/1000;
+  win={t0:now(),now,freqs:[],total:0};
+  const tEnd=win.t0+CFG.windowSec;
+  const iv=setInterval(()=>{
+    if(phase!=="rec"||!win||!audioCtx)return;
+    if(now()>=tEnd){finishWindow(false);return;}
+    analyser.getFloatTimeDomainData(buf);win.total++;
+    const lvl=rms(buf);let s=`Level ${(20*Math.log10(lvl+1e-9)).toFixed(0)} dBFS`;
+    if(lvl>=CFG.minRms){const r=yin(buf,sr);
+      if(r&&r.confidence>=CFG.minConfidence&&r.f0>=CFG.minF0&&r.f0<=CFG.maxF0){win.freqs.push(r.f0);const n=analyzeNote(r.f0);
+        s+=` · ${r.f0.toFixed(1)} Hz (${n.note} ${sign(n.cents,0)}¢)`;}else s+=" · unreliable";}
+    else s+=" · silence";
+    $("live").textContent=s;
+  },CFG.hopMs);
+  timers.push(iv);
+  const prog=()=>{if(phase!=="rec"||!win)return;const p=Math.min(1,(now()-win.t0)/CFG.windowSec);
+    $("progress").style.width=(p*100).toFixed(1)+"%";if(p<1)rafId=requestAnimationFrame(prog);};
+  rafId=requestAnimationFrame(prog);
+}
+function finishWindow(interrupted){
+  if(!win)return;
+  const w=win;win=null;clearTimers();
+  const dur=Math.min(CFG.windowSec,Math.max(0,w.now()-w.t0));
+  $("progress").style.width=interrupted?(dur/CFG.windowSec*100).toFixed(1)+"%":"100%";
+  processWindow(w.freqs,w.total,dur,interrupted);
+}
+function interruptMeasurement(){
+  if(phase==="countdown"){clearTimers();enterPaused("Measurement cancelled before recording started.");}
+  else if(phase==="rec")finishWindow(true);
+}
+function processWindow(freqs,total,duration,interrupted){
+  setStatus("processing","Processing");measureCount++;
+  let row={index:measureCount,frames:freqs.length,totalFrames:total,valid:false,duration,interrupted};
+  if(freqs.length>=CFG.minValidFrames){
+    const med=median(freqs),kept=freqs.filter(f=>Math.abs(1200*Math.log2(f/med))<=CFG.outlierCents);
+    row.frames=kept.length;
+    if(kept.length>=CFG.minValidFrames){row.f0=kept.reduce((a,b)=>a+b,0)/kept.length;row.valid=true;}
+  }
+  results.push(row);addRow(row);showSummary();
+  const n=row.valid?analyzeNote(row.f0):null;
+  const res=row.valid?`${row.f0.toFixed(2)} Hz (${n.note} ${sign(n.cents,1)}¢)`:"no reliable pitch";
+  enterPaused(`Measurement #${row.index}${interrupted?" (stopped early, "+duration.toFixed(2)+" s)":""}: ${res}.`);
+}
+function enterPaused(text){
+  if(!running)return;
+  phase="paused";setButtons();
+  setStatus("paused",`Paused. Ready for #${measureCount+1}`);
+  $("live").textContent=text+" Tap Next measurement when ready.";
+}
+
+/* ===== Sawtooth playback ===== */
+function playTone(i){
+  const r=results.find(x=>x.index===i);
+  if(!r||!r.valid||isMeasuring())return;
+  if(playingIndex===i){stopTone();return;}
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC){showMsg("Web Audio API not supported. Cannot play tones.");return;}
+  if(!playCtx||playCtx.state==="closed")playCtx=new AC();
+  if(playCtx.state!=="running")playCtx.resume().catch(()=>{});
+  stopTone();
+  const osc=playCtx.createOscillator(),g=playCtx.createGain();
+  osc.type="sawtooth";osc.frequency.value=r.f0;
+  const t=playCtx.currentTime+0.01,D=CFG.toneSec,G=CFG.toneGain;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(G,t+0.02);
+  g.gain.setValueAtTime(G,t+D-0.08);
+  g.gain.linearRampToValueAtTime(0,t+D);
+  osc.connect(g);g.connect(playCtx.destination);
+  osc.start(t);osc.stop(t+D+0.02);
+  tone={osc,g};playingIndex=i;
+  osc.onended=()=>{if(tone&&tone.osc===osc){try{g.disconnect();}catch(_){}tone=null;playingIndex=null;updatePlayUI();}};
+  updatePlayUI(r);
+}
+function stopTone(){
+  if(!tone)return;
+  const{osc,g}=tone;tone=null;playingIndex=null;
+  try{osc.onended=null;osc.stop();}catch(_){}
+  try{g.disconnect();}catch(_){}
+  updatePlayUI();
+}
+function updatePlayUI(r){
+  document.querySelectorAll("#tbody tr[data-i]").forEach(tr=>{
+    const on=Number(tr.dataset.i)===playingIndex;
+    tr.classList.toggle("playing",on);
+    const b=tr.querySelector("button.play");if(b)b.textContent=on?"■ Stop":"▶ Play";
+  });
+  let t="";
+  if(playingIndex!=null&&r){const n=analyzeNote(r.f0);
+    t=`♪ Playing #${r.index}: ${r.f0.toFixed(2)} Hz (${n.note}, ${sign(n.cents,1)}¢ @ A4=${A4} Hz), sawtooth, ${CFG.toneSec} s`;}
+  $("nowPlaying").textContent=t;
+}
+
+/* ===== Row editing: octave shift & removal ===== */
+function shiftOctave(i,dir){
+  const r=results.find(x=>x.index===i);
+  if(!r||!r.valid||isMeasuring())return;
+  const nf=r.f0*Math.pow(2,dir);           // exact factor of 2 → same note name & same cents
+  if(nf<CFG.octMinHz||nf>CFG.octMaxHz)return;
+  if(playingIndex===i)stopTone();
+  const before=analyzeNote(r.f0).note;
+  r.f0=nf;
+  renderTable();showSummary();
+  showMsg(`#${r.index}: ${before} → ${analyzeNote(nf).note} (${nf.toFixed(2)} Hz, deviation unchanged).`,"info");
+}
+function removeResult(i){
+  if(isMeasuring())return;
+  const k=results.findIndex(x=>x.index===i);
+  if(k<0)return;
+  if(playingIndex===i)stopTone();
+  results.splice(k,1);
+  renderTable();
+  if(results.length)showSummary();else $("summary").className="card";
+  showMsg(`Result #${i} removed.`,"info");
+}
+
+/* ===== Table / summary ===== */
+const sign=(x,d)=>{const v=x.toFixed(d);return(Number(v)>0?"+":"")+(Number(v)===0?(0).toFixed(d):v);};
+function rowHTML(r){
+  const dur=`${r.duration.toFixed(2)}${r.interrupted?" ⏹":""}`;
+  const del=`<button class="del" data-i="${r.index}" aria-label="Remove result ${r.index}">✕</button>`;
+  if(!r.valid)return`<td>${r.index}</td><td colspan="4">No reliable pitch (silence / noise / unstable)</td><td>${r.frames}/${r.totalFrames}</td><td>${dur}</td><td>—</td><td>${del}</td>`;
+  const n=analyzeNote(r.f0);
+  const dn=r.f0/2<CFG.octMinHz?1:0,up=r.f0*2>CFG.octMaxHz?1:0;
+  return`<td>${r.index}</td><td>${r.f0.toFixed(2)}</td>`+
+    `<td class="notecell"><button class="oct" data-i="${r.index}" data-d="-1" data-lock="${dn}" aria-label="Octave down">−</button> <span>${n.note}</span> <button class="oct" data-i="${r.index}" data-d="1" data-lock="${up}" aria-label="Octave up">+</button></td>`+
+    `<td>${n.noteFreq.toFixed(2)}</td><td>${sign(n.cents,1)}</td><td>${r.frames}/${r.totalFrames}</td><td>${dur}</td>`+
+    `<td><button class="play" data-i="${r.index}" aria-label="Play sawtooth tone for measurement ${r.index}">▶ Play</button></td><td>${del}</td>`;
+}
+function addRow(r){
+  const er=$("emptyRow");if(er)er.remove();
+  const tr=document.createElement("tr");tr.dataset.i=r.index;
+  if(!r.valid)tr.className="invalid";
+  tr.innerHTML=rowHTML(r);
+  $("tbody").appendChild(tr);setButtons();
+}
+function renderTable(){
+  $("tbody").innerHTML=results.length?"":EMPTY_ROW;
+  results.forEach(addRow);
+  const r=playingIndex!=null?results.find(x=>x.index===playingIndex):null;
+  updatePlayUI(r);setButtons();
+}
+function showSummary(){
+  const v=results.filter(r=>r.valid);
+  let h=`<div>Measurements: <span class="big">${results.length}</span> (valid ${v.length}, unreliable ${results.length-v.length}, stopped early ${results.filter(r=>r.interrupted).length})</div>`;
+  if(v.length){const avg=v.reduce((a,r)=>a+r.f0,0)/v.length,n=analyzeNote(avg);
+    const meanAbs=v.reduce((a,r)=>a+Math.abs(analyzeNote(r.f0).cents),0)/v.length;
+    h+=`<div>Overall average pitch: <span class="big">${avg.toFixed(2)} Hz</span> ≈ ${n.note} (${sign(n.cents,1)} cents)</div>`;
+    h+=`<div>Mean absolute deviation from the closest notes: ${meanAbs.toFixed(1)} cents · Reference A4 = ${A4} Hz</div>`;}
+  else h+="<div>No valid measurements to average.</div>";
+  $("summaryBody").innerHTML=h;$("summary").className="card show";
+}
+
+/* ===== CSV export ===== */
+function csvEscape(v){const s=v==null?"":String(v);return /[",;\r\n]|^\s|\s$/.test(s)?`"${s.replace(/"/g,'""')}"`:s;}
+function exportCSV(){
+  const head=["Index","Valid","Average F0 (Hz)","Closest Note","Note Frequency (Hz)","Deviation from Closest Note (cents)","A4 Reference (Hz)","Valid Frames","Total Frames","Duration (s)","Stopped Early"];
+  const lines=[head.map(csvEscape).join(",")];
+  for(const r of results){const n=r.valid?analyzeNote(r.f0):null;
+    lines.push([r.index,r.valid?"yes":"no",r.valid?r.f0.toFixed(3):"",r.valid?n.note:"",
+      r.valid?n.noteFreq.toFixed(3):"",r.valid?n.cents.toFixed(2):"",A4,r.frames,r.totalFrames,
+      r.duration.toFixed(3),r.interrupted?"yes":"no"].map(csvEscape).join(","));}
+  const url=URL.createObjectURL(new Blob(["\uFEFF"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");a.href=url;a.download=`pitch_measurements_${new Date().toISOString().replace(/[:.]/g,"-")}.csv`;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+
+/* ===== CSV import ===== */
+function parseCSV(text){
+  text=text.replace(/^\uFEFF/,"");
+  const first=text.split(/\r?\n/)[0]||"";
+  const delim=(first.split(";").length>first.split(",").length)?";":",";
+  const rows=[];let row=[],f="",q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+    else if(c==='"')q=true;
+    else if(c===delim){row.push(f);f="";}
+    else if(c==="\n"||c==="\r"){if(c==="\r"&&text[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f="";}
+    else f+=c;
+  }
+  if(f!==""||row.length){row.push(f);rows.push(row);}
+  return{delim,rows:rows.filter(r=>r.some(x=>x.trim()!==""))};
+}
+function importCSV(text,fileName){
+  const{delim,rows}=parseCSV(text);
+  if(rows.length<2)throw new Error("The file has no data rows.");
+  const H=rows[0].map(h=>h.trim().toLowerCase());
+  const col=test=>H.findIndex(test);
+  const ci={index:col(h=>h==="index"||h==="#"),valid:col(h=>h==="valid"),
+    f0:col(h=>h.startsWith("average f0")||h.startsWith("avg f0")),
+    frames:col(h=>h==="valid frames"),total:col(h=>h==="total frames"),
+    dur:col(h=>h.startsWith("duration")),early:col(h=>h.startsWith("stopped early")),
+    a4:col(h=>h.startsWith("a4 reference"))};
+  if(ci.f0<0)throw new Error('Column "Average F0 (Hz)" not found. Is this a CSV exported by this app?');
+  const num=s=>{if(s==null)return NaN;s=String(s).trim();if(delim===";")s=s.replace(",",".");return s===""?NaN:Number(s);};
+  const yes=s=>/^(yes|sim|true|1)$/i.test(String(s||"").trim());
+  const out=[];let fileA4=NaN;
+  for(const r of rows.slice(1)){
+    const f0=num(r[ci.f0]);
+    const validFlag=ci.valid>=0?yes(r[ci.valid]):isFinite(f0);
+    const valid=validFlag&&isFinite(f0)&&f0>0;
+    const dur=num(r[ci.dur]);
+    out.push({valid,f0:valid?f0:undefined,
+      frames:ci.frames>=0&&isFinite(num(r[ci.frames]))?num(r[ci.frames]):0,
+      totalFrames:ci.total>=0&&isFinite(num(r[ci.total]))?num(r[ci.total]):0,
+      duration:isFinite(dur)?dur:CFG.windowSec,
+      interrupted:ci.early>=0?yes(r[ci.early]):false});
+    if(ci.a4>=0&&!isFinite(fileA4)){const a=num(r[ci.a4]);if(isFinite(a))fileA4=a;}
+  }
+  if(!out.length)throw new Error("No measurements found in the file.");
+  let append=false;
+  if(results.length)append=confirm(`Results are already on screen (${results.length}).\nOK = add the file's results after them\nCancel = replace them with the file`);
+  stopTone();
+  if(!append){results=[];measureCount=0;}
+  out.forEach(r=>{measureCount++;r.index=measureCount;results.push(r);});
+  if(isFinite(fileA4))setA4(fileA4,true);else renderTable();
+  showSummary();
+  const nv=out.filter(r=>r.valid).length;
+  showMsg(`Loaded "${fileName}": ${out.length} measurements (${nv} valid)${append?", added to the existing results":""}.`+
+    (isFinite(fileA4)?` A4 set to ${A4} Hz from the file.`:"")+" Tap ▶ Play to hear them.","info");
+  if(running&&phase==="paused")setStatus("paused",`Paused. Ready for #${measureCount+1}`);
+}
+openBtn.addEventListener("click",()=>{if(!isMeasuring())$("fileIn").click();});
+$("fileIn").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value="";
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{importCSV(String(rd.result),f.name);}catch(err){showMsg("Could not open CSV: "+err.message);}};
+  rd.onerror=()=>showMsg("Could not read the file.");
+  rd.readAsText(f,"utf-8");
+});
+
+/* ===== Controls ===== */
+function begin(mode){
+  clearMsg();$("diag").textContent="";stopTone();
+  diag(`Protocol ${location.protocol} · secure ${window.isSecureContext} · ${isMobile?"mobile":"desktop"}`);
+  startBtn.disabled=testBtn.disabled=true;stopBtn.disabled=false;
+  setStatus("waiting","Requesting microphone…");
+  openAudio().then(()=>{
+    if(mode==="test"){testing=true;setStatus("waiting","Mic test running");setButtons();return;}
+    running=true;
+    if($("voiceChk").checked)startRecognition();else $("speechInfo").textContent="Voice commands are off. Use the buttons.";
+    startMeasurement();
+  }).catch(async e=>{
+    diag("Error: "+(e&&e.name)+" – "+(e&&e.message));
+    await closeAudio();showMsg(micErrorMessage(e));
+    setStatus("stopped","Stopped");phase="idle";setButtons();
+  });
+}
+async function stopAll(reason){
+  const wasRunning=running,wasRec=phase==="rec";
+  if(!running&&!testing)return;
+  running=false;testing=false;win=null;phase="idle";
+  stopRecognition();await closeAudio();
+  setStatus("stopped","Stopped");$("progress").style.width="0%";
+  $("live").textContent=wasRunning
+    ?(reason==="voice"?"Session ended by voice command.":"Session ended.")+(wasRec?" The measurement in progress was discarded.":"")+" Results are kept below."
+    :"Mic test finished.";
+  if(wasRunning){startBtn.textContent="Start new acquisition";if(results.length)showSummary();}
+  setButtons();
+}
+
+testBtn.addEventListener("click",()=>begin("test"));
+startBtn.addEventListener("click",()=>begin("acq"));
+measStopBtn.addEventListener("click",interruptMeasurement);
+nextBtn.addEventListener("click",startMeasurement);
+stopBtn.addEventListener("click",()=>stopAll("button"));
+csvBtn.addEventListener("click",exportCSV);
+$("tbody").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b||b.disabled)return;
+  const i=Number(b.dataset.i);
+  if(b.classList.contains("play"))playTone(i);
+  else if(b.classList.contains("oct"))shiftOctave(i,Number(b.dataset.d));
+  else if(b.classList.contains("del"))removeResult(i);
+});
+clearBtn.addEventListener("click",()=>{if(isMeasuring())return;stopTone();results=[];measureCount=0;
+  renderTable();$("summary").className="card";clearMsg();});
+window.addEventListener("pagehide",()=>{running=testing=false;phase="idle";stopRecognition();stopTone();closeAudio();
+  if(playCtx){try{playCtx.close();}catch(_){}playCtx=null;}});
+
+$("voiceChk").checked=!isMobile&&!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+if(!window.isSecureContext)showMsg(micErrorMessage({name:"InsecureContext"}));
+else if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)&&!navigator.webkitGetUserMedia)showMsg(micErrorMessage({name:"NoGetUserMedia"}));
+renderTable();
+</script>
+</body>
+</html>
