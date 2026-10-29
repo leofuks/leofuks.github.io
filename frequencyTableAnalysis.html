@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vocal Pitch Recorder</title>
+<style>
+  :root { --bg:#0f1720; --card:#18232f; --fg:#e6edf3; --mut:#8b9bab; --acc:#3fb6a8; --err:#e5534b; --warn:#d29922; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:980px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { margin:0 0 4px; font-size:1.6rem; }
+  p.sub { margin:0 0 20px; color:var(--mut); }
+  .card { background:var(--card); border-radius:10px; padding:16px 18px; margin-bottom:16px; }
+  .card h2 { margin:0 0 8px; font-size:1.05rem; }
+  ol, ul { margin:6px 0; padding-left:20px; color:var(--mut); }
+  .controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  button { font:inherit; padding:10px 16px; border:0; border-radius:8px; cursor:pointer; background:var(--acc); color:#04201c; font-weight:600; }
+  button.stop { background:var(--err); color:#fff; }
+  button.sec { background:#2b3a49; color:var(--fg); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .status { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:20px; background:#223040; font-weight:600; }
+  .dot { width:12px; height:12px; border-radius:50%; background:var(--mut); }
+  .st-waiting .dot { background:var(--warn); }
+  .st-recording .dot { background:var(--err); animation:pulse 1s infinite; }
+  .st-processing .dot { background:#58a6ff; }
+  .st-stopped .dot { background:var(--mut); }
+  .st-idle .dot { background:var(--mut); }
+  @keyframes pulse { 50% { opacity:.3; } }
+  .meter { height:10px; background:#223040; border-radius:5px; overflow:hidden; margin-top:10px; }
+  .meter > div { height:100%; width:0; background:var(--acc); transition:width .1s linear; }
+  #live { margin-top:8px; color:var(--mut); font-variant-numeric:tabular-nums; }
+  #msg { margin-top:10px; padding:10px 12px; border-radius:8px; display:none; white-space:pre-line; }
+  #msg.error { display:block; background:#3b1d1d; color:#ffb4ae; }
+  #msg.info { display:block; background:#1d2f3b; color:#b6dcff; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:.92rem; }
+  th, td { padding:8px 6px; text-align:right; border-bottom:1px solid #2b3a49; }
+  th:first-child, td:first-child, th:nth-child(3), td:nth-child(3) { text-align:center; }
+  th { color:var(--mut); font-weight:600; }
+  tr.invalid td { color:var(--mut); font-style:italic; }
+  .tablewrap { overflow-x:auto; }
+  #summary { display:none; }
+  #summary.show { display:block; }
+  .big { font-size:1.3rem; font-weight:700; }
+  .speech { font-size:.85rem; color:var(--mut); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Vocal Pitch Recorder</h1>
+  <p class="sub">Measures the average fundamental frequency of successive 4-second vocalizations (12-TET, A4 = 440 Hz).</p>
+
+  <section class="card">
+    <h2>Microphone permission</h2>
+    <ol>
+      <li>Click <b>Start acquisition</b>. Your browser will ask to use the microphone; choose <b>Allow</b>.</li>
+      <li>If you blocked it earlier, click the lock / camera icon left of the address bar, set <b>Microphone → Allow</b>, then reload the page.</li>
+      <li>The page must be opened via <b>https://</b> or <b>http://localhost</b>; microphones are unavailable on plain http or many <code>file://</code> pages.</li>
+      <li>On macOS/Windows, also check that the OS privacy settings allow the browser to use the microphone.</li>
+    </ol>
+    <ul>
+      <li>Sing or hum one steady note per window. A short pause precedes each window.</li>
+      <li>Say <b>"finish"</b> or <b>"stop acquisition"</b> to end (Chrome/Edge/Safari), or press <b>Stop</b>.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="controls">
+      <button id="startBtn">Start acquisition</button>
+      <button id="stopBtn" class="stop" disabled>Stop acquisition</button>
+      <button id="csvBtn" class="sec" disabled>Export CSV</button>
+      <button id="clearBtn" class="sec" disabled>Clear results</button>
+      <span id="status" class="status st-idle"><span class="dot"></span><span id="statusText">Idle</span></span>
+    </div>
+    <div class="meter"><div id="progress"></div></div>
+    <div id="live">—</div>
+    <div id="speechInfo" class="speech"></div>
+    <div id="msg"></div>
+  </section>
+
+  <section class="card" id="summary">
+    <h2>Summary</h2>
+    <div id="summaryBody"></div>
+  </section>
+
+  <section class="card">
+    <h2>Measurements</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th><th>Avg F0 (Hz)</th><th>Closest note</th><th>Note freq (Hz)</th>
+            <th>Deviation (cents)</th><th>Interval vs A4 (cents)</th><th>Valid frames</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr id="emptyRow"><td colspan="7" style="text-align:center;color:var(--mut)">No measurements yet.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ===================== Configuration ===================== */
+const CFG = {
+  windowSec: 4.0,        // exact measurement window length
+  gapSec: 1.2,           // pause ("waiting") between windows
+  frameSize: 4096,       // analysis frame (≈85 ms @48 kHz) – enough for ≥2 periods at 60 Hz
+  hopMs: 30,             // analysis interval
+  minF0: 60, maxF0: 1100,// search range covering bass to soprano
+  yinThreshold: 0.15,    // YIN absolute threshold (lower = stricter)
+  minRms: 0.01,          // silence gate (linear amplitude)
+  minConfidence: 0.80,   // 1 - aperiodicity; frames below are rejected
+  outlierCents: 300,     // reject frames > 3 semitones from the window median (octave errors, glides)
+  minValidFrames: 10     // fewer valid frames ⇒ vocalization marked as unreliable
+};
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+/* ===================== State ===================== */
+let audioCtx = null, stream = null, source = null, analyser = null, hpf = null;
+let timers = [], rafId = null, recognition = null;
+let running = false, recognitionWanted = false;
+let results = [];                     // {index, f0, note, noteFreq, cents, intervalA4, frames, valid}
+let measureCount = 0;
+
+/* ===================== DOM ===================== */
+const $ = id => document.getElementById(id);
+const startBtn = $("startBtn"), stopBtn = $("stopBtn"), csvBtn = $("csvBtn"), clearBtn = $("clearBtn");
+
+function setStatus(kind, text) {
+  $("status").className = "status st-" + kind;
+  $("statusText").textContent = text;
+}
+function showMsg(text, type = "error") { const m = $("msg"); m.className = type; m.textContent = text; }
+function clearMsg() { const m = $("msg"); m.className = ""; m.textContent = ""; }
+
+/* ===================== Pitch estimation: YIN =====================
+ * YIN (de Cheveigné & Kawahara, 2002): difference function →
+ * cumulative-mean-normalized difference (CMND) → absolute threshold →
+ * parabolic interpolation for sub-sample lag precision.
+ *
+ * Limitations:
+ *  - Octave errors are still possible (especially breathy voice, vocal fry,
+ *    strong 2nd harmonic); mitigated by median-based outlier rejection.
+ *  - Assumes a single, roughly periodic source; polyphony, reverb, loud
+ *    background noise, or other voices degrade results.
+ *  - Range limited to CFG.minF0–CFG.maxF0; frame must contain ≥2 periods.
+ *  - Frames are polled from an AnalyserNode on a timer, so frames may overlap
+ *    or skip a few ms under heavy CPU load; this affects frame count, not pitch.
+ *  - Browser echo cancellation / noise suppression / AGC can distort the
+ *    signal; we request them disabled, but some browsers/devices ignore that.
+ *  - Mic frequency response and the (spoken) stop command itself may enter the
+ *    final window; the command is usually rejected as unreliable/outlier.
+ */
+function yin(buf, sr) {
+  const tauMin = Math.max(2, Math.floor(sr / CFG.maxF0));
+  const tauMax = Math.min(Math.floor(sr / CFG.minF0), Math.floor(buf.length / 2));
+  const W = buf.length - tauMax;
+  const d = new Float32Array(tauMax + 1);
+
+  // Difference function
+  for (let tau = 1; tau <= tauMax; tau++) {
+    let s = 0;
+    for (let i = 0; i < W; i++) { const x = buf[i] - buf[i + tau]; s += x * x; }
+    d[tau] = s;
+  }
+  // Cumulative mean normalized difference
+  d[0] = 1;
+  let running = 0;
+  for (let tau = 1; tau <= tauMax; tau++) {
+    running += d[tau];
+    d[tau] = running > 0 ? d[tau] * tau / running : 1;
+  }
+  // Absolute threshold: first dip below threshold, then descend to local minimum
+  let tau = -1;
+  for (let t = tauMin; t <= tauMax; t++) {
+    if (d[t] < CFG.yinThreshold) {
+      while (t + 1 <= tauMax && d[t + 1] < d[t]) t++;
+      tau = t; break;
+    }
+  }
+  if (tau < 0) return null; // no periodicity found → unvoiced/unreliable
+
+  // Parabolic interpolation
+  let betterTau = tau;
+  if (tau > 1 && tau < tauMax) {
+    const a = d[tau - 1], b = d[tau], c = d[tau + 1];
+    const den = a + c - 2 * b;
+    if (den !== 0) betterTau = tau + (a - c) / (2 * den);
+  }
+  return { f0: sr / betterTau, confidence: 1 - d[tau] };
+}
+
+function rms(buf) { let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i]; return Math.sqrt(s / buf.length); }
+
+/* ===================== Music math (12-TET, A4 = 440) ===================== */
+function analyzeNote(f) {
+  const semis = 12 * Math.log2(f / 440);
+  const nearest = Math.round(semis);
+  const midi = 69 + nearest;
+  const name = NOTE_NAMES[((midi % 12) + 12) % 12];
+  const octave = Math.floor(midi / 12) - 1;
+  const noteFreq = 440 * Math.pow(2, nearest / 12);
+  return {
+    note: name + octave,
+    noteFreq,
+    cents: 1200 * Math.log2(f / noteFreq),
+    intervalA4: 1200 * Math.log2(f / 440)
+  };
+}
+
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/* ===================== Audio setup / teardown ===================== */
+async function initAudio() {
+  if (!window.isSecureContext) {
+    throw Object.assign(new Error("insecure"), { name: "InsecureContext" });
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw Object.assign(new Error("nogum"), { name: "NoGetUserMedia" });
+  }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) throw Object.assign(new Error("noac"), { name: "NoAudioContext" });
+
+  stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
+  });
+  audioCtx = new AC();
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+  source = audioCtx.createMediaStreamSource(stream);
+  hpf = audioCtx.createBiquadFilter();       // remove rumble/DC below vocal range
+  hpf.type = "highpass"; hpf.frequency.value = 50;
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = CFG.frameSize;
+  analyser.smoothingTimeConstant = 0;
+  source.connect(hpf).connect(analyser);     // not connected to destination → no feedback
+}
+
+function micErrorMessage(e) {
+  switch (e && e.name) {
+    case "InsecureContext": return "Microphone access requires a secure context. Open this page via https:// or http://localhost (not plain http or file://).";
+    case "NoGetUserMedia": return "This browser does not support microphone capture (getUserMedia). Use a recent Chrome, Edge, Firefox or Safari.";
+    case "NoAudioContext": return "This browser does not support the Web Audio API.";
+    case "NotAllowedError":
+    case "SecurityError": return "Microphone permission was denied.\nClick the lock/microphone icon in the address bar, set Microphone to \"Allow\", reload the page and try again. Also check your OS privacy settings.";
+    case "NotFoundError":
+    case "OverconstrainedError": return "No microphone was found. Connect a microphone and try again.";
+    case "NotReadableError":
+    case "AbortError": return "The microphone is in use by another application or could not be started. Close other apps using it and retry.";
+    default: return "Could not start audio: " + (e && e.message ? e.message : e);
+  }
+}
+
+function clearTimers() {
+  timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+  timers = [];
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+}
+
+async function teardownAudio() {
+  clearTimers();
+  try { source && source.disconnect(); } catch (_) {}
+  try { hpf && hpf.disconnect(); } catch (_) {}
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (audioCtx && audioCtx.state !== "closed") { try { await audioCtx.close(); } catch (_) {} }
+  stream = source = analyser = hpf = audioCtx = null;
+}
+
+/* ===================== Speech recognition (stop commands) ===================== */
+function startRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    $("speechInfo").textContent = "Voice commands unavailable in this browser — use the Stop button.";
+    return;
+  }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+  recognitionWanted = true;
+
+  recognition.onresult = ev => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const txt = ev.results[i][0].transcript.toLowerCase();
+      if (/\bfinish(ed)?\b/.test(txt) || /\bstop\s+acquisition\b/.test(txt)) {
+        $("speechInfo").textContent = `Voice command detected: "${txt.trim()}"`;
+        stopAcquisition("voice");
+        return;
+      }
+    }
+  };
+  recognition.onerror = ev => {
+    if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+      recognitionWanted = false;
+      $("speechInfo").textContent = "Speech recognition not permitted — use the Stop button.";
+    } else if (ev.error === "network") {
+      $("speechInfo").textContent = "Speech recognition needs a network connection in this browser — use the Stop button.";
+    }
+  };
+  // Engines end sessions periodically; restart while acquisition is running.
+  recognition.onend = () => {
+    if (recognitionWanted && running) { try { recognition.start(); } catch (_) {} }
+  };
+  try {
+    recognition.start();
+    $("speechInfo").textContent = 'Listening for "finish" or "stop acquisition"…';
+  } catch (e) {
+    $("speechInfo").textContent = "Could not start speech recognition — use the Stop button.";
+  }
+}
+
+function stopRecognition() {
+  recognitionWanted = false;
+  if (recognition) {
+    recognition.onresult = recognition.onend = recognition.onerror = null;
+    try { recognition.abort(); } catch (_) {}
+    recognition = null;
+  }
+}
+
+/* ===================== Acquisition cycle ===================== */
+function scheduleNext() {
+  if (!running) return;
+  setStatus("waiting", "Waiting – get ready");
+  $("progress").style.width = "0%";
+  const tGapEnd = performance.now() + CFG.gapSec * 1000;
+  const iv = setInterval(() => {
+    const left = Math.max(0, (tGapEnd - performance.now()) / 1000);
+    $("live").textContent = `Next window #${measureCount + 1} in ${left.toFixed(1)} s`;
+  }, 100);
+  timers.push(iv);
+  timers.push(setTimeout(() => { clearInterval(iv); recordWindow(); }, CFG.gapSec * 1000));
+}
+
+function recordWindow() {
+  if (!running || !audioCtx) return;
+  setStatus("recording", `Recording #${measureCount + 1}`);
+  const sr = audioCtx.sampleRate;
+  const buf = new Float32Array(analyser.fftSize);
+  const t0 = audioCtx.currentTime;          // audio clock → exact 4 s window
+  const tEnd = t0 + CFG.windowSec;
+  const freqs = [];
+  let totalFrames = 0;
+
+  const tick = () => {
+    if (!running || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    if (now >= tEnd) { clearInterval(iv); clearRafProgress(); processWindow(freqs, totalFrames); return; }
+    analyser.getFloatTimeDomainData(buf);
+    totalFrames++;
+    const level = rms(buf);
+    let live =
