@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Single-Note Tuner</title>
+<style>
+ body{font-family:system-ui,sans-serif;background:#14161b;color:#e8e8e8;margin:0;padding:16px;max-width:1000px;margin:auto}
+ h1{font-size:1.3em;margin-bottom:2px}
+ .attr{opacity:.75;font-size:.9em;margin:0 0 14px}
+ footer{opacity:.6;font-size:.8em;text-align:center;margin:16px 0}
+ .card{background:#1f232b;border-radius:10px;padding:14px;margin-bottom:12px}
+ button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:9px 14px;font-size:.95em;cursor:pointer;margin:2px 4px 2px 0}
+ button:disabled{opacity:.4;cursor:default}
+ button.sec{background:#444}
+ button.sm{padding:3px 10px;font-size:.85em;margin:0}
+ .big{font-size:3em;font-weight:700}
+ .row{display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+ .meter{position:relative;height:36px;background:linear-gradient(90deg,#c33,#cc3 35%,#3c3 48%,#3c3 52%,#cc3 65%,#c33);border-radius:6px;margin-top:10px}
+ .needle{position:absolute;top:-4px;width:4px;height:44px;background:#fff;left:50%;transition:left .15s}
+ .ticks{display:flex;justify-content:space-between;font-size:.75em;opacity:.7}
+ .tw{overflow-x:auto}
+ table{width:100%;border-collapse:collapse;font-size:.8em}
+ td,th{padding:4px;border-bottom:1px solid #333;text-align:right;white-space:nowrap}
+ .click tr{cursor:pointer} .click tr:hover{background:#262c36}
+ tr.rej{opacity:.45;text-decoration:line-through}
+ tr.sel{background:#2d3a50!important}
+ small{opacity:.75}
+ input[type=number]{width:80px;font-size:1em}
+ input[type=range]{width:260px}
+ canvas{width:100%;height:120px;background:#111;border-radius:6px}
+ .live{font-family:monospace;opacity:.8}
+ .bar{position:relative;height:14px;background:#111;border-radius:4px;overflow:hidden;margin-top:6px}
+ .bar>div{position:absolute;top:0;bottom:0;left:0}
+ #lvl{background:linear-gradient(90deg,#3c3 70%,#cc3 88%,#c33)}
+ #nf{width:2px;background:#fff;opacity:.6}
+ #prog{background:#3a7bd5}
+ .ruler{display:flex;justify-content:space-between;font-size:.7em;opacity:.6;width:260px}
+ .sep{display:inline-block;width:12px}
+</style>
+</head>
+<body>
+<h1>Single-Note Tuner</h1>
+<p class="attr">Developed by Leonardo Fuchs for the study of music acoustics.</p>
+
+<div class="card">
+ <div class="row" style="gap:4px">
+  <button id="mic">Enable microphone</button>
+  <button id="start" disabled>Start recording</button>
+  <button id="stop" class="sec" disabled>Stop recording</button>
+  <span class="sep"></span>
+  <button id="play" class="sec" disabled>Reference tone (2 s)</button>
+  <button id="save" class="sec" disabled>Save project</button>
+  <button id="load" class="sec">Load project</button>
+  <button id="exlog" class="sec">Export log</button>
+  <button id="reset" class="sec">Reset project</button>
+  <input type="file" id="file" accept=".json,application/json" hidden>
+ </div>
+ <div class="bar"><div id="prog" style="width:0"></div></div>
+ <small id="ptxt">Microphone off. Enable the microphone to start a project.</small>
+</div>
+
+<div class="card">
+ <label>Reference A4 (La3):
+  <input type="range" id="refSlider" min="415" max="460" step="0.1" value="440">
+  <input type="number" id="refNum" min="415" max="460" step="0.1" value="440"> Hz
+ </label>
+ <hr style="border-color:#333">
+ <label>Mic sensitivity (input gain):
+  <input type="range" id="gain" min="-12" max="36" step="1" value="0">
+  <b id="gainTxt">0 dB</b>
+ </label>
+ <div class="ruler"><span>-12</span><span>0</span><span>+12</span><span>+24</span><span>+36 dB</span></div>
+ <div class="bar"><div id="lvl" style="width:0"></div><div id="nf" style="left:0"></div></div>
+ <small id="lvlTxt">Input: -- dBFS | noise floor: --</small>
+</div>
+
+<div class="card"><b>Project recordings</b> <small>(click a row to view its analysis)</small>
+ <div class="tw"><table><thead><tr><th>#</th><th>Time</th><th>Dur</th><th>Tones</th><th>Final Hz</th><th>Note</th><th>Cents</th><th>Spread ¢</th><th>Correction</th><th>Δ vs selected ¢</th><th>Audio</th></tr></thead>
+ <tbody id="recs" class="click"></tbody></table></div>
+</div>
+
+<div class="card">
+ <div><small id="vname">No recording selected</small></div>
+ <div class="row">
+  <div><div class="big" id="noteUS">--</div><div id="noteLA">--</div></div>
+  <div><div class="big" id="freq">-- Hz</div><div id="cents">-- cents</div></div>
+  <div id="stats"></div>
+ </div>
+ <div class="meter"><div class="needle" id="needle"></div></div>
+ <div class="ticks"><span>-50</span><span>-25</span><span>0</span><span>+25</span><span>+50</span></div>
+ <p class="live" id="live">Idle</p>
+</div>
+
+<div class="card"><b>Per-procedure summary</b> <small>(accepted tones only; min/max are observed values)</small>
+ <div class="tw"><table><thead><tr><th>Procedure</th><th>Tones (#)</th><th>Mean Hz</th><th>Min–Max of tone means</th><th>Min–Max of frames</th><th>Frames</th></tr></thead>
+ <tbody id="summ"></tbody></table></div>
+</div>
+
+<div class="card"><b>Harmonic profile</b><canvas id="spec" width="800" height="120"></canvas></div>
+
+<div class="card"><b>Attacks in selected recording</b> <small>(click a row to play that attack; [min–max] n = kept frames)</small>
+ <div class="tw"><table><thead><tr><th>#</th><th>Start</th><th>Dur</th><th>Autocorr Hz</th><th>Partial spacing Hz</th><th>HPS Hz</th><th>Correction</th><th>Final Hz</th><th>Note</th><th>Cents</th><th>Spread ¢</th><th>Q</th></tr></thead>
+ <tbody id="emis" class="click"></tbody></table></div>
+</div>
+
+<footer>Developed by Leonardo Fuchs for the study of music acoustics.</footer>
+
+<script>
+/* ---------- Settings ---------- */
+const FMIN=25, FLOW=20, FMAX=2000, NH=24, MAXT=20000, CAL=600, ATK=120, MIN_SNR=8, HOP=0.05;
+const CRIT={minInter:3,minEFrac:0.02,minFit:0.7,spTolC:50,minNs:0.7,vote:0.6,peakDb:12,peakRel:-50};
+const PROC={ac:'Autocorrelation (YIN+NSDF, initial)',sp:'Partial spacing',hps:'Harmonic product spectrum',fin:'Final (after octave decision)'};
+const US=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const LA=['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
+let ref=440, ctx, gainNode, src, proc, mute, stream=null, timer=null, sr;
+let rec=null, recPos=0, lastRms=0, lastClip=0;
+let noiseRms=1e-4, calAcc=[], sessT0=0, state='off', cur=null, belowSince=0;
+let project={recs:[]}, active=null, view=-1, nextId=1, sel=-1, curSrc=null, gainDb=0, logs=[];
+const $=id=>document.getElementById(id);
+const db=v=>20*Math.log10(v+1e-12);
+const avg=a=>a.reduce((s,v)=>s+v,0)/(a.length||1);
+const isRec=()=>state==='idle'||state==='note';
+const curRec=()=>isRec()?active:(project.recs[view]||null);
+
+/* ---------- Log (kept internally, exported/saved) ---------- */
+function log(m){ logs.push({t:new Date().toISOString(),m}); }
+const fmtLog=e=>`[${new Date(e.t).toLocaleString()}] ${e.m}`;
+
+/* ---------- Reference pitch ---------- */
+function setRef(v){
+  v=parseFloat(v); if(isNaN(v)) v=ref;
+  v=Math.min(460,Math.max(415,v)); ref=Math.round(v*10)/10;
+  $('refSlider').value=ref; $('refNum').value=ref; render();
+}
+$('refSlider').oninput=e=>setRef(e.target.value);
+$('refNum').onchange=e=>setRef(e.target.value);
+$('refNum').onkeydown=e=>{if(e.key==='Enter')setRef(e.target.value)};
+
+/* ---------- Sensitivity ---------- */
+$('gain').oninput=e=>{
+  const nd=+e.target.value, ratio=10**((nd-gainDb)/20);
+  gainDb=nd; noiseRms*=ratio;
+  if(gainNode) gainNode.gain.value=10**(gainDb/20);
+  $('gainTxt').textContent=(gainDb>0?'+':'')+gainDb+' dB';
+};
+
+/* ---------- Helpers ---------- */
+function noteInfo(f){
+  const m=69+12*Math.log2(f/ref), n=Math.round(m), pc=((n%12)+12)%12, oct=Math.floor(n/12)-1;
+  return {us:US[pc]+oct, la:LA[pc]+(oct-1), cents:(m-n)*100, target:ref*2**((n-69)/12)};
+}
+const cents=(a,b)=>1200*Math.log2(a/b);
+const parab=(y0,y1,y2)=>{const d=y0-2*y1+y2; return d?(y0-y2)/(2*d):0;};
+const median=a=>{const s=Array.from(a).sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const fH=v=>v.toFixed(2);
+const sg=v=>(v>=0?'+':'')+v.toFixed(1);
+
+/* ---------- FFT (radix-2, Hann) ---------- */
+const hannC={};
+function spectrum(seg){
+  const N=seg.length; let w=hannC[N];
+  if(!w){w=new Float32Array(N);for(let i=0;i<N;i++)w[i]=0.5-0.5*Math.cos(2*Math.PI*i/(N-1));hannC[N]=w;}
+  const re=new Float64Array(N), im=new Float64Array(N);
+  for(let i=0;i<N;i++) re[i]=seg[i]*w[i];
+  for(let i=1,j=0;i<N;i++){let b=N>>1;for(;j&b;b>>=1)j^=b;j|=b;if(i<j){const t=re[i];re[i]=re[j];re[j]=t;}}
+  for(let len=2;len<=N;len<<=1){
+    const a=-2*Math.PI/len, h=len>>1;
+    for(let k=0;k<h;k++){
+      const cr=Math.cos(a*k), ci=Math.sin(a*k);
+      for(let i=k;i<N;i+=len){const v=i+h,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;
+        re[v]=re[i]-xr; im[v]=im[i]-xi; re[i]+=xr; im[i]+=xi;}
+    }
+  }
+  const m=new Float32Array(N/2), sc=4/N;
+  for(let i=0;i<N/2;i++) m[i]=Math.hypot(re[i],im[i])*sc;
+  return m;
+}
+
+/* ---------- Autocorrelation: YIN + NSDF ---------- */
+function timeDomain(x,sd){
+  const N=x.length, maxT=Math.min(Math.floor(sd/FMIN),N>>1), minT=Math.floor(sd/FMAX), W=N-maxT;
+  const d=new Float32Array(maxT+2), ns=new Float32Array(maxT+2);
+  let e0=0; for(let j=0;j<W;j++) e0+=x[j]*x[j];
+  let et=e0;
+  for(let t=0;t<=maxT+1&&t+W<=N;t++){
+    let r=0; for(let j=0;j<W;j++) r+=x[j]*x[j+t];
+    d[t]=e0+et-2*r; ns[t]=2*r/((e0+et)||1);
+    if(t+W<N) et+=x[t+W]*x[t+W]-x[t]*x[t];
+  }
+  const c=new Float32Array(maxT+1); c[0]=1; let s=0;
+  for(let t=1;t<=maxT;t++){ s+=d[t]; c[t]=d[t]*t/(s||1); }
+  let ty=-1;
+  for(let t=minT;t<maxT;t++){ if(c[t]<0.15){ while(t+1<maxT&&c[t+1]<c[t]) t++; ty=t; break; } }
+  if(ty<0){ let mn=1e9; for(let t=minT;t<maxT;t++) if(c[t]<mn){mn=c[t];ty=t;} }
+  const fy=sd/(ty+parab(c[ty-1],c[ty],c[ty+1])), cy=Math.max(0,1-c[ty]);
+  const peaks=[]; let t=1; while(t<maxT&&ns[t]>0) t++;
+  while(t<maxT){
+    while(t<maxT&&ns[t]<=0) t++;
+    let bi=-1,bv=-1; while(t<maxT&&ns[t]>0){ if(ns[t]>bv&&t>=minT){bv=ns[t];bi=t;} t++; }
+    if(bi>0) peaks.push([bi,bv]);
+  }
+  let fn=0,cn=0;
+  if(peaks.length){
+    const mx=Math.max(...peaks.map(p=>p[1])), p=peaks.find(p=>p[1]>=0.9*mx);
+    fn=sd/(p[0]+parab(ns[p[0]-1],ns[p[0]],ns[p[0]+1])); cn=p[1];
+  }
+  return {fy,cy,fn,cn};
+}
+function nsdfAt(x,lag){
+  let r=0,m=0; for(let j=0;j+lag<x.length;j++){r+=x[j]*x[j+lag]; m+=x[j]*x[j]+x[j+lag]*x[j+lag];}
+  return m?2*r/m:0;
+}
+
+/* ---------- HPS ---------- */
+function hps(mag,binHz){
+  const lo=Math.max(2,Math.ceil(FMIN/binHz)), hi=Math.floor(FMAX/binHz);
+  let best=-1e9, bb=lo;
+  for(let b=lo;b<=hi;b++){
+    let p=0;
+    for(let h=1;h<=5;h++){ const i=b*h; if(i+1>=mag.length) break;
+      p+=Math.log(Math.max(mag[i-1],mag[i],mag[i+1])+1e-12); }
+    if(p>best){best=p;bb=b;}
+  }
+  return (bb+parab(mag[bb-1],mag[bb],mag[bb+1]))*binHz;
+}
+
+/* ---------- Fusion ---------- */
+function fuse(t,fh,clip,binHz){
+  const hTol=f=>Math.max(50,cents(f+1.5*binHz,f));
+  const okH=f=>fh&&Math.abs(cents(f,fh))<hTol(f);
+  let f=0,conf=0;
+  if(t.fn&&Math.abs(cents(t.fy,t.fn))<35){
+    const w=t.cy+t.cn||1;
+    f=2**((t.cy*Math.log2(t.fy)+t.cn*Math.log2(t.fn))/w);
+    conf=(t.cy+t.cn)/2+(okH(f)?0.2:0);
+  } else if(okH(t.fy)){ f=t.fy; conf=t.cy*0.8; }
+  else if(t.fn&&okH(t.fn)){ f=t.fn; conf=t.cn*0.8; }
+  else return null;
+  if(clip) conf*=0.6;
+  return f>=FMIN&&f<=FMAX?{f,conf:Math.min(conf,1)}:null;
+}
+
+/* ---------- Harmonic amplitudes + prominence ---------- */
+function harmonics(mag,binHz,f0,sr){
+  const a=new Float32Array(NH);
+  for(let k=1;k<=NH;k++){
+    if(k*f0>sr*0.45) break;
+    const c=Math.round(k*f0/binHz); let m=0;
+    for(let i=c-2;i<=c+2;i++) if(i>0&&i<mag.length) m=Math.max(m,mag[i]);
+    a[k-1]=m;
+  }
+  const lo=Math.max(1,Math.ceil(FMIN/binHz)), hi=Math.min(mag.length-1,Math.floor(8*FMAX/binHz));
+  const floor=median(mag.subarray(lo,hi))||1e-12, mx=Math.max(...a)||1e-12;
+  return {h:a.map(v=>v/mx), prom:db(Math.max(...a.subarray(0,8))/floor)};
+}
+
+/* ---------- Partial detection + spacing ---------- */
+function findPartials(mag,binHz,sr){
+  const lo=Math.max(2,Math.floor(FLOW/binHz)), hi=Math.min(mag.length-2,Math.floor(Math.min(5000,sr*0.45)/binHz));
+  const floor=median(mag.subarray(lo,hi))||1e-12; let mx=0;
+  for(let i=lo;i<hi;i++) if(mag[i]>mx) mx=mag[i];
+  const thr=Math.max(floor*10**(CRIT.peakDb/20), mx*10**(CRIT.peakRel/20));
+  let P=[];
+  for(let i=lo;i<hi;i++){ const v=mag[i];
+    if(v>thr&&v>mag[i-1]&&v>=mag[i+1]){
+      const d=parab(Math.log(mag[i-1]+1e-12),Math.log(v),Math.log(mag[i+1]+1e-12));
+      P.push({f:(i+d)*binHz,a:v}); } }
+  P.sort((a,b)=>b.a-a.a); P=P.slice(0,30).sort((a,b)=>a.f-b.f);
+  return P;
+}
+function spacing(P){
+  if(P.length<3) return null;
+  const D=[]; for(let i=1;i<P.length;i++) D.push({d:P[i].f-P[i-1].f,w:Math.min(P[i].a,P[i-1].a)});
+  D.sort((a,b)=>a.d-b.d);
+  const W=D.reduce((s,x)=>s+x.w,0); let acc=0,d=D[0].d;
+  for(const x of D){acc+=x.w; if(acc>=W/2){d=x.d;break;}}
+  if(d<FLOW) return null;
+  let sn=0,sd=0,m=0;
+  for(const p of P){const n=Math.round(p.f/d);
+    if(n>=1&&Math.abs(p.f/d-n)<0.2){const w=p.a*p.a; sn+=w*p.f*n; sd+=w*n*n; m++;}}
+  return m>=3?{f:sn/sd,raw:d,n:m}:null;
+}
+/* Test hypothesis: true fundamental = fA/k (k=2 or 4) */
+function octaveTest(P,fA,k,sp,td,sd,binHz){
+  const Fc=fA/k, tol=Math.max(1.5*binHz,0.03*Fc);
+  let eTot=0,eFit=0,eInt=0,nInt=0;
+  for(const p of P){ const e=p.a*p.a; eTot+=e; const n=Math.round(p.f/Fc);
+    if(n>=1&&Math.abs(p.f-n*Fc)<tol){ eFit+=e; if(n%k){eInt+=e;nInt++;} } }
+  const lag=Math.round(k*sd/fA), ns=lag<td.length/2?nsdfAt(td,lag):0;
+  const c={k,Fc,nInt,eFrac:eInt/(eTot||1),fit:eFit/(eTot||1),ns,sp:sp?sp.f:null};
+  c.pass=Fc>=FLOW&&nInt>=CRIT.minInter&&c.eFrac>=CRIT.minEFrac&&c.fit>=CRIT.minFit
+       &&!!sp&&Math.abs(cents(sp.f,Fc))<CRIT.spTolC&&ns>=CRIT.minNs;
+  return c;
+}
+
+/* ---------- One analysis frame ending at sample pos ---------- */
+function frameAt(buf,pos,s0,sr,snrW=1){
+  const D=sr>=88000?4:sr>=32000?2:1, sd=sr/D, need=4096*D;
+  const avail=pos-s0-Math.round(ATK*sr/1000);
+  if(avail<need||pos<need) return null;
+  const nfft=Math.min(16384,2**Math.floor(Math.log2(Math.min(avail,pos))));
+  const raw=buf.subarray(pos-need,pos); let clipN=0;
+  const td=new Float32Array(4096);
+  for(let i=0;i<4096;i++){let s=0;for(let j=0;j<D;j++){const v=raw[i*D+j]; s+=v; if(Math.abs(v)>0.98)clipN++;} td[i]=s/D;}
+  const mag=spectrum(buf.subarray(pos-nfft,pos)), binHz=sr/nfft;
+  const fh=hps(mag,binHz), r=fuse(timeDomain(td,sd),fh,clipN>5,binHz);
+  if(!r) return {rej:'methods disagree'};
+  r.conf*=snrW;
+  const P=findPartials(mag,binHz,sr), sp=spacing(P);
+  const tests=[2,4].map(k=>octaveTest(P,r.f,k,sp,td,sd,binHz));
+  const k=tests[1].pass?4:tests[0].pass?2:1, f=r.f/k;
+  const hm=harmonics(mag,binHz,f,sr);
+  if(hm.prom<15||r.conf<0.45) return {rej:'weak/noisy'};
+  return {t:(pos-s0)/sr*1000,fA:r.f,fH:fh,fSP:sp?sp.f:null,nP:P.length,k,f,conf:r.conf,h:hm.h,tests};
+}
+
+/* ---------- Robust stats ---------- */
+function robust(vals,wts,minTol){
+  const c=vals.map(v=>1200*Math.log2(v)), m=median(c);
+  const mad=median(c.map(v=>Math.abs(v-m)))*1.4826, tol=Math.max(minTol,3*mad);
+  const keep=c.map(v=>Math.abs(v-m)<=tol);
+  let sw=0,sx=0; c.forEach((v,i)=>{if(keep[i]){sw+=wts[i];sx+=wts[i]*v;}});
+  const mean=sx/(sw||1); let sv=0;
+  c.forEach((v,i)=>{if(keep[i]) sv+=wts[i]*(v-mean)**2;});
+  return {f:2**(mean/1200), sd:Math.sqrt(sv/(sw||1)), keep};
+}
+function stats(vals,w,minTol){
+  if(!vals.length) return null;
+  const r=robust(vals,w,minTol), kept=vals.filter((_,i)=>r.keep[i]);
+  return {mean:r.f,min:Math.min(...kept),max:Math.max(...kept),n:kept.length,of:vals.length,sd:r.sd};
+}
+
+/* ---------- Tone construction ---------- */
+function stablePart(fr){
+  let s=fr.filter(f=>f.t>=ATK); if(s.length<3) return [];
+  const m=median(s.map(f=>1200*Math.log2(f.fA)));
+  const near=f=>Math.abs(1200*Math.log2(f.fA)-m)<20;
+  let i=0; while(i+2<s.length&&!(near(s[i])&&near(s[i+1])&&near(s[i+2]))) i++;
+  s=s.slice(i); if(s.length>5) s=s.slice(0,-1);
+  return s.length>=3?s:[];
+}
+function buildTone(fr,id){
+  const s=stablePart(fr); if(!s.length) return null;
+  const votes={1:0,2:0,4:0}; s.forEach(f=>votes[f.k]++);
+  let k=1; for(const kk of [4,2]) if(votes[kk]/s.length>=CRIT.vote){k=kk;break;}
+  const amb=k===1&&votes[2]+votes[4]>0;
+  const w=s.map(f=>f.conf*Math.min(1,0.5+f.t/600));
+  const ac=stats(s.map(f=>f.fA),w,5), fin=stats(s.map(f=>f.fA/k),w,5);
+  const spF=s.filter(f=>f.fSP), sp=spF.length?stats(spF.map(f=>f.fSP),spF.map(f=>f.conf),10):null;
+  const hp=stats(s.map(f=>f.fH),s.map(f=>f.conf),10);
+  const q=avg(s.map(f=>f.conf))*Math.min(1,fin.n/10)/(1+fin.sd/10);
+  const ev={};
+  [2,4].forEach(kk=>{const T=s.map(f=>f.tests.find(c=>c.k===kk)).filter(Boolean);
+    ev[kk]={pass:T.filter(c=>c.pass).length,of:T.length,nInt:avg(T.map(c=>c.nInt)),eFrac:avg(T.map(c=>c.eFrac)),fit:avg(T.map(c=>c.fit)),ns:avg(T.map(c=>c.ns))};});
+  let hf=s.filter(f=>f.k===k); if(!hf.length) hf=s;
+  const harm=new Float32Array(NH), hw=hf.reduce((a,f)=>a+f.conf,0)||1;
+  hf.forEach(f=>{for(let j=0;j<NH;j++) harm[j]+=f.h[j]*f.conf/hw;});
+  return {id,k,votes,amb,nFrames:fr.length,nStable:s.length,ac,sp,hps:hp,fin,q,ev,harm,ok:true};
+}
+function toneLog(R,t){
+  const p=x=>x?`${fH(x.mean)} [${fH(x.min)}–${fH(x.max)}] n=${x.n}/${x.of}`:'n/a';
+  const e2=t.ev[2], e4=t.ev[4], n=noteInfo(t.fin.mean);
+  log(`Rec #${R.id} tone #${t.id}: ${t.nFrames} valid frames, ${t.nStable} stable. Autocorr ${p(t.ac)} | Spacing ${p(t.sp)} | HPS ${p(t.hps)}`);
+  log(`  /2 test pass ${e2.pass}/${e2.of} (intermediates ${e2.nInt.toFixed(1)}, energy ${(e2.eFrac*100).toFixed(1)}%, fit ${(e2.fit*100).toFixed(0)}%, NSDF ${e2.ns.toFixed(2)}); /4 test pass ${e4.pass}/${e4.of}`);
+  log(`  Decision: ${t.k>1?`corrected /${t.k}`:t.amb?'no correction (ambiguous evidence)':'no correction'} -> Final ${p(t.fin)} = ${n.us}/${n.la} ${sg(n.cents)} cents, Q ${t.q.toFixed(2)}`);
+}
+
+/* ---------- Level meter ---------- */
+function meter(){
+  const L=db(lastRms);
+  $('lvl').style.width=(state==='off'?0:Math.max(0,(L+80)/80*100))+'%';
+  $('nf').style.left=Math.max(0,(db(noiseRms)+80)/80*100)+'%';
+  $('lvlTxt').textContent=state==='off'?'Input: -- dBFS | noise floor: --'
+    :`Input: ${L.toFixed(0)} dBFS | noise floor: ${db(noiseRms).toFixed(0)} dBFS${lastClip>2?' | CLIPPING: lower sensitivity':''}`;
+}
+
+/* ---------- Main loop (runs while microphone is enabled) ---------- */
+function tick(){
+  meter();
+  if(!isRec()) return;
+  const now=performance.now(), el=now-sessT0;
+  $('prog').style.width=Math.min(100,el/MAXT*100)+'%';
+  $('ptxt').textContent=`Recording #${active.id}: ${(el/1000).toFixed(1)} / 20 s`;
+  if(el>=MAXT){ stopRecording(); return; }
+  const pos=recPos; if(pos<4096) return;
+  const x=rec.subarray(pos-4096,pos);
+  let rms=0; for(let i=0;i<x.length;i++) rms+=x[i]*x[i];
+  rms=Math.sqrt(rms/x.length);
+  const L=db(rms);
+
+  if(el<CAL){ calAcc.push(rms); $('live').textContent='Calibrating noise... stay silent'; return; }
+  if(calAcc.length){ noiseRms=Math.max(1e-6,median(calAcc)); calAcc=[]; active.noiseDb=db(noiseRms);
+    log(`Rec #${active.id}: noise floor calibrated ${db(noiseRms).toFixed(1)} dBFS (gain ${gainDb} dB)`); }
+
+  const on=Math.max(noiseRms*10**(MIN_SNR/20),2e-5);
+  if(state==='idle'){
+    if(rms<on) noiseRms=0.97*noiseRms+0.03*rms;
+    if(rms>on){ state='note'; cur={s0:Math.max(0,pos-2048),frames:[],peak:rms,rej:{}}; belowSince=0; }
+    else $('live').textContent=`Waiting for note... (${active.tones.length} tone(s) in this recording)`;
+    return;
+  }
+  cur.peak=Math.max(cur.peak,rms);
+  const off=rms<Math.max(on*0.7,cur.peak*0.05);
+  if(off){ belowSince=belowSince||now; if(now-belowSince>150){ finishSegment(pos); state='idle'; } return; }
+  belowSince=0;
+  const snr=L-db(noiseRms), snrW=Math.min(1,Math.max(0,(snr-MIN_SNR+4)/16));
+  const f=frameAt(rec,pos,cur.s0,sr,snrW);
+  if(!f){ $('live').textContent='Live: skipping attack...'; return; }
+  if(f.rej){ cur.rej[f.rej]=(cur.rej[f.rej]||0)+1; $('live').textContent=`Live: frame rejected (${f.rej}, SNR ${snr.toFixed(0)} dB)`; return; }
+  cur.frames.push(f);
+  const ni=noteInfo(f.f);
+  $('live').textContent=`Live: AC ${fH(f.fA)} Hz | spacing ${f.fSP?fH(f.fSP):'n/a'} | final ${fH(f.f)} Hz${f.k>1?` (/${f.k})`:''} ${ni.us}/${ni.la} ${sg(ni.cents)} cents | conf ${f.conf.toFixed(2)} | SNR ${snr.toFixed(0)} dB`;
+}
+
+function finishSegment(pos){
+  const a=Math.max(0,cur.s0-Math.round(0.05*sr));
+  const rj=Object.entries(cur.rej).map(([k,v])=>`${k}: ${v}`).join(', ')||'none';
+  const t=buildTone(cur.frames,active.tones.length+1);
+  if(!t){ log(`Rec #${active.id}: attack at ${(cur.s0/sr).toFixed(2)} s discarded, too few stable frames (${cur.frames.length} valid; rejected: ${rj})`); return; }
+  Object.assign(t,{a,b:pos,start:cur.s0/sr,dur:(pos-a)/sr});
+  active.tones.push(t);
+  log(`Rec #${active.id}: attack at ${t.start.toFixed(2)} s, ${t.dur.toFixed(2)} s long; rejected frames: ${rj}`);
+  toneLog(active,t); combine(active);
+}
+
+/* ---------- Combination & per-procedure summary (per recording) ---------- */
+function combine(R){
+  if(!R) return;
+  const T=R.tones;
+  if(!T.length){R.result=null;R.summary=[];render();return;}
+  const r=robust(T.map(t=>t.fin.mean),T.map(t=>t.q||1e-3),15);
+  T.forEach((t,i)=>t.ok=r.keep[i]);
+  const acc=T.filter(t=>t.ok), h=new Float32Array(NH);
+  acc.forEach(t=>{for(let k=0;k<NH;k++) h[k]+=(t.harm[k]||0)*t.q;});
+  const mx=Math.max(...h)||1;
+  R.summary=Object.keys(PROC).map(p=>{
+    const S=acc.filter(t=>t[p]); if(!S.length) return {p,ids:[]};
+    const w=S.map(t=>t.q||1e-3), sw=w.reduce((a,b)=>a+b,0);
+    return {p,ids:S.map(t=>t.id),
+      mean:2**(S.reduce((a,t,i)=>a+w[i]*Math.log2(t[p].mean),0)/sw),
+      tmin:Math.min(...S.map(t=>t[p].mean)),tmax:Math.max(...S.map(t=>t[p].mean)),
+      fmin:Math.min(...S.map(t=>t[p].min)),fmax:Math.max(...S.map(t=>t[p].max)),
+      frames:S.reduce((a,t)=>a+t[p].n,0)};
+  });
+  R.result={f:r.f,sd:r.sd,n:acc.length,harm:h.map(v=>v/mx),corr:acc.filter(t=>t.k>1).length,ac:R.summary[0].mean};
+  render();
+}
+
+/* ---------- Display ---------- */
+const fp=x=>x?`${fH(x.mean)} <small>[${fH(x.min)}–${fH(x.max)}] n=${x.n}</small>`:'n/a';
+function renderList(){
+  const S=project.recs[view], sf=!isRec()&&S&&S.result?S.result.f:null;
+  $('recs').innerHTML=project.recs.length?project.recs.map((r,i)=>{
+    const R=r.result, n=R&&noteInfo(R.f);
+    return `<tr class="${i===view&&!isRec()?'sel':''}" onclick="selectRec(${i})">
+      <td>${r.id}</td><td>${new Date(r.created).toLocaleTimeString()}</td><td>${(r.dur||0).toFixed(1)} s</td>
+      <td>${R?R.n:0}/${r.tones.length}</td><td><b>${R?fH(R.f):'no valid note'}</b></td>
+      <td>${R?`${n.us} / ${n.la}`:'--'}</td><td>${R?sg(n.cents):'--'}</td><td>${R?R.sd.toFixed(1):'--'}</td>
+      <td>${R?(R.corr?`${R.corr} tone(s)`:'none'):'--'}</td>
+      <td>${R&&sf?sg(cents(R.f,sf)):'--'}</td>
+      <td><button class="sm" ${r.audio?'':'disabled'} onclick="event.stopPropagation();playRec(${i})">Play</button></td></tr>`;}).join('')
+    :`<tr><td colspan="11" style="text-align:center;opacity:.6">No recordings in this project yet</td></tr>`;
+}
+function render(){
+  renderList(); updButtons();
+  const R=curRec(), T=R?R.tones:[], summ=R?R.summary||[]:[], res=R?R.result:null;
+  $('vname').textContent=R?`Recording #${R.id}${R===active?' (in progress)':''} | ${T.length} attack(s)`:'No recording selected';
+  $('emis').innerHTML=T.map((t,i)=>{
+    const n=noteInfo(t.fin.mean), kk=t.k>1?t.k:2, e=t.ev&&t.ev[kk];
+    const tip=e&&e.of!=null?`/${kk} test: pass ${e.pass}/${e.of}, intermediates ${(+e.nInt).toFixed(1)}, energy ${(e.eFrac*100).toFixed(1)}%, fit ${(e.fit*100).toFixed(0)}%, NSDF ${(+e.ns).toFixed(2)}`:'';
+    const corr=t.k>1?`/${t.k} (${t.votes[t.k]}/${t.nStable})`:t.amb?`none, ambiguous (${t.votes[2]+t.votes[4]}/${t.nStable})`:'none';
+    return `<tr class="${t.ok?'':'rej'} ${i===sel?'sel':''}" onclick="playTone(${i})" title="Click to play. ${tip}">
+      <td>${t.id}</td><td>${(t.start||0).toFixed(2)} s</td><td>${(t.dur||0).toFixed(2)} s</td><td>${fp(t.ac)}</td><td>${fp(t.sp)}</td><td>${fp(t.hps)}</td>
+      <td>${corr}</td><td><b>${fp(t.fin)}</b></td><td>${n.us} / ${n.la}</td><td>${sg(n.cents)}</td><td>${t.fin.sd.toFixed(1)}</td><td>${t.q.toFixed(2)}</td></tr>`;}).join('');
+  $('summ').innerHTML=summ.map(s=>s.ids.length
+    ?`<tr><td>${PROC[s.p]}</td><td>${s.ids.join(', ')}</td><td><b>${fH(s.mean)}</b></td><td>${fH(s.tmin)} – ${fH(s.tmax)}</td><td>${fH(s.fmin)} – ${fH(s.fmax)}</td><td>${s.frames}</td></tr>`
+    :`<tr><td>${PROC[s.p]}</td><td colspan="5">no valid detections</td></tr>`).join('');
+  if(!res){ ['noteUS','noteLA'].forEach(i=>$(i).textContent='--'); $('freq').textContent='-- Hz'; $('cents').textContent='-- cents'; $('stats').textContent=''; $('needle').style.left='50%'; drawSpec(null); return; }
+  const n=noteInfo(res.f);
+  $('noteUS').textContent=n.us; $('noteLA').textContent=n.la;
+  $('freq').textContent=fH(res.f)+' Hz';
+  $('cents').textContent=`${sg(n.cents)} cents (target ${fH(n.target)} Hz)`;
+  $('stats').innerHTML=`Tones used: ${res.n}/${T.length}<br>Spread: ±${res.sd.toFixed(1)} cents (1σ)<br>`+
+    (res.corr?`${res.corr} tone(s) octave-corrected<br>Initial autocorr: ${res.ac?fH(res.ac):'n/a'} Hz`:'No octave correction');
+  $('needle').style.left=`calc(${50+Math.max(-50,Math.min(50,n.cents))}% - 2px)`;
+  drawSpec(res.harm);
+}
+function drawSpec(h){
+  const c=$('spec'),g=c.getContext('2d'); g.clearRect(0,0,c.width,c.height); if(!h) return;
+  const bw=c.width/NH; g.fillStyle='#3a7bd5';
+  h.forEach((v,i)=>{const y=v*(c.height-14); g.fillRect(i*bw+2,c.height-y,bw-4,y);});
+  g.fillStyle='#aaa'; g.font='10px sans-serif'; h.forEach((_,i)=>g.fillText(i+1,i*bw+bw/2-4,10));
+}
+function updButtons(){
+  $('mic').disabled=state!=='off';
+  $('start').disabled=state!=='ready';
+  $('stop').disabled=!isRec();
+  const R=curRec(); $('play').disabled=!(R&&R.result);
+  $('save').disabled=!project.recs.length||isRec();
+  $('load').disabled=isRec();
+}
+function selectRec(i){ if(isRec()) return; view=i; sel=-1; render(); }
+
+/* ---------- Playback ---------- */
+function audioCtx(){ ctx=ctx||new AudioContext(); ctx.resume(); return ctx; }
+function playBuf(a,rate){
+  if(!a||!a.length) return false;
+  const ac=audioCtx(); try{curSrc&&curSrc.stop();}catch(e){}
+  const b=ac.createBuffer(1,a.length,rate); b.copyToChannel(a,0);
+  const s=ac.createBufferSource(); s.buffer=b; s.connect(ac.destination); s.start(); curSrc=s; return true;
+}
+function playTone(i){
+  const R=curRec(), t=R&&R.tones[i]; if(!t) return; sel=i; render();
+  const audio=R.audio||(R===active?rec:null);
+  if(!audio||!playBuf(audio.subarray(t.a,Math.min(t.b,audio.length)),R.sr)) $('live').textContent=`Tone #${t.id}: no audio available`;
+}
+function playRec(i){ const r=project.recs[i]; if(r&&!playBuf(r.audio,r.sr)) $('live').textContent=`Recording #${r.id}: no audio available`; }
+function playRef(){
+  const R=curRec(), res=R&&R.result; if(!res) return;
+  const ac=audioCtx(), f=res.f, re=new Float32Array(NH+1), im=new Float32Array(NH+1);
+  for(let k=1;k<=NH;k++) if(k*f<ac.sampleRate*0.45) im[k]=res.harm[k-1]||0;
+  const osc=ac.createOscillator(), g=ac.createGain(), t=ac.currentTime;
+  osc.setPeriodicWave(ac.createPeriodicWave(re,im)); osc.frequency.value=f;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(0.35,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.22,t+0.4);
+  g.gain.setValueAtTime(0.22,t+1.75);
+  g.gain.linearRampToValueAtTime(0,t+2);
+  osc.connect(g).connect(ac.destination); osc.start(t); osc.stop(t+2.05);
+}
+
+/* ---------- Save / load ---------- */
+function f32ToB64(a){
+  const i16=new Int16Array(a.length);
+  for(let i=0;i<a.length;i++) i16[i]=Math.max(-32768,Math.min(32767,Math.round(a[i]*32767)));
+  const u=new Uint8Array(i16.buffer); let s='';
+  for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));
+  return btoa(s);
+}
+function b64ToF32(b){
+  const s=atob(b), u=new Uint8Array(s.length);
+  for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i);
+  const i16=new Int16Array(u.buffer,0,u.length>>1), f=new Float32Array(i16.length);
+  for(let i=0;i<i16.length;i++) f[i]=i16[i]/32767;
+  return f;
+}
+const decode=b=>{try{return b?b64ToF32(b):null;}catch(e){return null;}};
+function serialize(){
+  return JSON.stringify({format:'vci-single-note-tuner-project',version:4,savedAt:new Date().toISOString(),
+    ref,gainDb,settings:{FMIN,FLOW,FMAX,MAXT,CAL,ATK,MIN_SNR,HOP,CRIT},
+    recordings:project.recs.map(r=>({id:r.id,created:r.created,sr:r.sr,gainDb:r.gainDb,ref:r.ref,dur:r.dur,noiseDb:r.noiseDb,
+      audioEncoding:'pcm16le-base64',audio:r.audio?f32ToB64(r.audio):null,
+      tones:r.tones.map(t=>({...t,harm:Array.from(t.harm)})),
+      result:r.result&&{...r.result,harm:Array.from(r.result.harm)},summary:r.summary})),
+    log:logs});
+}
+function fixTone(t,i){
+  if(!t||!t.fin||!isFinite(t.fin.mean)||t.fin.mean<=0) return null;
+  const {audio,...rest}=t, h=new Float32Array(NH); (t.harm||[]).slice(0,NH).forEach((v,j)=>h[j]=+v||0);
+  return {...rest,id:t.id??i+1,harm:h,ev:t.ev||{},votes:t.votes||{1:0,2:0,4:0},q:+t.q||1e-3,dur:+t.dur||0,start:+t.start||0};
+}
+function deserialize(txt){
+  const d=JSON.parse(txt); let recs;
+  if(d.format==='vci-single-note-tuner-project'&&Array.isArray(d.recordings)){
+    recs=d.recordings.map((r,i)=>{
+      const audio=decode(r.audio), s=r.sr||48000, L=audio?audio.length:0;
+      const tones=(r.tones||[]).map(fixTone).filter(Boolean).map(t=>({...t,a:Math.max(0,t.a|0),b:Math.min(L,t.b|0)}));
+      return {id:r.id??i+1,created:r.created||d.savedAt,sr:s,gainDb:r.gainDb??0,ref:r.ref??d.ref,noiseDb:r.noiseDb,
+        audio,dur:audio?L/s:(r.dur||0),tones,result:null,summary:[]};
+    });
+  } else if(d.format==='vci-single-note-tuner'&&Array.isArray(d.tones)){   // v3 file -> one recording
+    const s=(d.tones[0]&&d.tones[0].sr)||48000, parts=[]; let n=0;
+    const tones=d.tones.map((t,i)=>{const f=fixTone(t,i); if(!f) return null;
+      const a=decode(t.audio)||new Float32Array(0); const r={...f,a:n,b:n+a.length,start:n/s}; parts.push(a); n+=a.length; return r;}).filter(Boolean);
+    const audio=new Float32Array(n); let o=0; parts.forEach(p=>{audio.set(p,o);o+=p.length;});
+    recs=[{id:1,created:d.savedAt||new Date().toISOString(),sr:s,gainDb:d.gainDb??0,ref:d.ref,audio:n?audio:null,dur:n/s,tones,result:null,summary:[]}];
+  } else throw new Error('not a tuner project file');
+  return {d,recs};
+}
+$('save').onclick=()=>{
+  if(!project.recs.length) return;
+  log(`Project saved: ${project.recs.length} recording(s)`);
+  const a=document.createElement('a'), ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  a.href=URL.createObjectURL(new Blob([serialize()],{type:'application/json'}));
+  a.download=`tuner-project-${ts}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+$('load').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  if(project.recs.length&&!confirm('Loading replaces the current project. Continue?')) return;
+  try{
+    const {d,recs}=deserialize(await f.text());
+    logs=Array.isArray(d.log)?d.log:[];
+    project={recs}; nextId=Math.max(0,...recs.map(r=>+r.id||0))+1;
+    setRef(d.ref??440); recs.forEach(combine);
+    view=recs.length?0:-1; sel=-1;
+    log(`Loaded "${f.name}" (saved ${d.savedAt||'?'}): ${recs.length} recording(s)`);
+    $('live').textContent=`Project loaded: ${recs.length} recording(s).${state==='off'?' Enable the microphone to add recordings.':''}`;
+    render();
+  }catch(err){ alert('Could not load file: '+err.message); }
+};
+$('exlog').onclick=()=>{
+  const lines=logs.map(fmtLog);
+  project.recs.forEach(r=>(r.summary||[]).forEach(s=>s.ids.length&&lines.push(
+    `SUMMARY rec #${r.id} ${PROC[s.p]}: mean ${fH(s.mean)} Hz, tone means ${fH(s.tmin)}–${fH(s.tmax)}, frames ${fH(s.fmin)}–${fH(s.fmax)}, tones ${s.ids.join(',')}`)));
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));
+  a.download='tuner-log.txt'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+
+/* ---------- Microphone (enabled once per project) ---------- */
+async function enableMic(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  }catch(e){ alert('Microphone access denied: '+e.message); log('Microphone unavailable: '+e.message); return; }
+  const ac=audioCtx(); await ac.resume(); sr=ac.sampleRate;
+  gainNode=ac.createGain(); gainNode.gain.value=10**(gainDb/20);
+  proc=ac.createScriptProcessor(2048,1,1);
+  proc.onaudioprocess=e=>{
+    const d=e.inputBuffer.getChannelData(0); let s=0,c=0;
+    for(let i=0;i<d.length;i++){ s+=d[i]*d[i]; if(Math.abs(d[i])>0.98) c++; }
+    lastRms=Math.sqrt(s/d.length); lastClip=c;
+    if(isRec()&&rec){ const n=Math.min(d.length,rec.length-recPos); if(n>0){rec.set(d.subarray(0,n),recPos); recPos+=n;} }
+  };
+  mute=ac.createGain(); mute.gain.value=0;
+  src=ac.createMediaStreamSource(stream); src.connect(gainNode).connect(proc); proc.connect(mute).connect(ac.destination);
+  state='ready'; timer=setInterval(tick,HOP*1000);
+  log(`Microphone enabled (sample rate ${sr} Hz)`);
+  $('ptxt').textContent='Microphone active. Ready to record.';
+  $('live').textContent='Adjust sensitivity, then press Start recording.';
+  render();
+}
+function closeMic(){
+  clearInterval(timer); timer=null;
+  stream&&stream.getTracks().forEach(t=>t.stop()); stream=null;
+  [src,gainNode,proc,mute].forEach(n=>{try{n&&n.disconnect();}catch(e){}});
+  src=gainNode=proc=mute=null; lastRms=0; lastClip=0; state='off'; meter();
+}
+
+/* ---------- Recording control ---------- */
+function startRecording(){
+  if(state!=='ready') return;
+  rec=new Float32Array(Math.ceil(sr*(MAXT/1000+1))); recPos=0;
+  active={id:nextId++,created:new Date().toISOString(),sr,gainDb,ref,tones:[],result:null,summary:[],audio:null,dur:0};
+  calAcc=[]; sel=-1; sessT0=performance.now(); state='idle';
+  log(`Rec #${active.id} started (gain ${gainDb} dB, ref A4=${ref} Hz)`);
+  render();
+}
+function stopRecording(){
+  if(!isRec()) return;
+  if(state==='note') finishSegment(recPos);
+  state='ready';
+  active.audio=rec.slice(0,recPos); active.dur=recPos/sr;
+  project.recs.push(active); view=project.recs.length-1;
+  combine(active);
+  const r=active.result;
+  log(r?`Rec #${active.id} ended: ${fH(r.f)} Hz (${noteInfo(r.f).us}/${noteInfo(r.f).la}) from ${r.n}/${active.tones.length} tone(s)`:`Rec #${active.id} ended: no valid tone`);
+  $('live').textContent=r?`Recording #${active.id} analysed: ${r.n} stable tone(s).`:`Recording #${active.id}: no reliable note detected (try raising sensitivity).`;
+  $('ptxt').textContent='Microphone active. Ready to record.'; $('prog').style.width='0';
+  active=null; rec=null; render();
+}
+function resetProject(){
+  if(project.recs.length&&!confirm('Close the current project? Unsaved recordings will be lost.')) return;
+  try{curSrc&&curSrc.stop();}catch(e){}
+  closeMic();
+  project={recs:[]}; active=null; rec=null; recPos=0; view=-1; sel=-1; nextId=1; logs=[]; noiseRms=1e-4;
+  $('prog').style.width='0';
+  $('ptxt').textContent='Microphone off. Enable the microphone to start a project.';
+  $('live').textContent='Idle';
+  render();
+}
+$('mic').onclick=enableMic;
+$('start').onclick=startRecording;
+$('stop').onclick=stopRecording;
+$('reset').onclick=resetProject;
+$('play').onclick=playRef;
+render();
+</script>
+</body>
+</html>
