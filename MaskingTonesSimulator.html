@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Masking – 415 Hz</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#0e1117;color:#e6e6e6;display:flex;flex-direction:column;align-items:center}
+h1{font-size:1.1rem;margin:8px 0 2px}
+#ui,#cal{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:center;margin:4px;font-size:.85rem}
+#cal{border:1px solid #ffb347;border-radius:8px;padding:2px 10px 4px;max-width:900px}
+#cal legend{color:#ffb347;font-weight:700;padding:0 4px;font-size:.85rem}
+#cal details{font-size:.78rem;color:#9aa4b1}
+#cal details summary{cursor:pointer}
+#cal details p{margin:4px 0;max-width:700px}
+button{background:#ffb347;border:0;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600}
+button.on{background:#ff5e5e;color:#fff}
+input[type=number]{width:4em}
+input[type=range]{vertical-align:middle}
+.trim{border:1px solid #444;border-radius:6px;padding:2px 6px}
+canvas{background:#fff;border-radius:6px;touch-action:none;width:auto;height:auto;max-width:98vw;max-height:60vh}
+#info{font-family:monospace;margin:6px;min-height:2.6em;text-align:center;font-size:.85rem}
+#src{font-size:.78rem;color:#9aa4b1;margin:0 8px 8px;text-align:center;max-width:900px}
+#st{font-family:monospace}
+.aud{color:#5eff8a}.msk{color:#ff6b6b}
+</style>
+</head>
+<body>
+<h1>Masking level – pure tone of 415 Hz (Egan &amp; Hake, 1950)</h1>
+<div id="ui">
+  <button id="test">🔊 Sound test</button>
+  <button id="prime">▶ Prime tone 415 Hz</button>
+  <label>415 Hz IL:
+    <select id="il"><option>20</option><option>30</option><option>40</option><option>50</option>
+    <option>60</option><option>70</option><option selected>80</option></select> dB
+    <b id="ilv">(80.0)</b></label>
+  <label>Master volume <input type="range" id="vol" min="0" max="1" step="0.01" value="0.5"></label>
+  <label class="trim" title="Affects only the 415 Hz tone">415 Hz tone trim
+    <input type="range" id="pvol" min="-40" max="20" step="0.5" value="0"> <span id="pvolv">0.0</span> dB</label>
+  <label class="trim" title="Affects only the test tone">Test tone trim
+    <input type="range" id="tvol" min="-30" max="40" step="0.5" value="0"> <span id="tvolv">0.0</span> dB</label>
+  <label>Dynamic range <input type="range" id="dyn" min="20" max="100" value="50"> <span id="dynv">50</span> dB</label>
+  <label><input type="checkbox" id="pulse" checked> Pulse test tone</label>
+  <label><input type="checkbox" id="swap"> Inverted mode</label>
+  <span id="st">Audio: inactive</span>
+</div>
+
+<fieldset id="cal">
+  <legend>Calibration</legend>
+  <label title="Target level read on the meter">Reference <input type="number" id="ref" min="20" max="80" value="80"> dB SPL</label>
+  <button id="calplay">▶ Play 415 Hz at reference</button>
+  <label title="Global offset applied to all tones">Offset <input type="range" id="calo" min="-40" max="20" step="0.5" value="0"> <span id="calv">0.0</span> dB</label>
+  <label title="1 graph dB = 1 real dB"><input type="checkbox" id="lin"> Linear mode</label>
+  <button id="calreset">Reset</button>
+  <details><summary>How to calibrate</summary>
+    <p>Enable Linear mode, set both trims to 0 dB, place a sound level meter (or meter app) at the ear/headphone, play the reference and move "Offset" until the meter reads the reference level.</p>
+  </details>
+</fieldset>
+
+<canvas id="c" width="900" height="600"></canvas>
+<div id="info">Drag the orange dot (415 Hz) to change its level. Drag on the graph to play the test tone.</div>
+<p id="src">Source: <i>The Physics and Psychophysics of Music</i>, by Juan G. Roederer (Fig. 3.15), apud Egan, J. P. &amp; Hake, H. W. (1950), <i>Journal of the Acoustical Society of America</i>.</p>
+
+<script>
+const F0=415;
+// Curves digitized from Fig. 3.15: [Hz, ML dB]
+const CURVES={
+ 20:[[300,0],[380,1.5],[415,5],[455,1.5],[520,0]],
+ 30:[[200,0],[330,3],[390,9],[415,15],[460,9],[540,2],[620,0]],
+ 40:[[150,0],[250,2],[320,7],[380,16],[415,26],[460,20],[530,10],[640,3],[750,0]],
+ 50:[[130,0],[200,2.5],[300,9],[360,22],[400,31],[415,35],[460,30],[540,17],[700,5],[880,0]],
+ 60:[[100,0.5],[200,4],[300,15],[350,28],[390,40],[415,45],[460,40],[550,26],[700,13],[900,5],[1120,0]],
+ 70:[[100,1],[200,6],[250,11],[300,22],[350,38],[385,50],[415,55],[455,50],[550,37],[700,24],[900,13],[1150,5],[1450,0]],
+ 80:[[100,1.5],[150,4],[200,9],[250,16],[300,33],[340,48],[372,57],[415,65],[450,59],[530,50],[630,45],[800,40],[1000,37],[1150,32],[1700,20],[2500,9],[3500,0]]
+};
+const ILMIN=20,ILMAX=80,PK=15; // peak ML ≈ IL − 15
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const M={l:90,r:40,t:30,b:70},W=cv.width-M.l-M.r,H=cv.height-M.t-M.b;
+const FMIN=100,FMAX=6000,YMAX=68;
+const xOf=f=>M.l+W*Math.log10(f/FMIN)/Math.log10(FMAX/FMIN);
+const fOf=x=>FMIN*Math.pow(FMAX/FMIN,(x-M.l)/W);
+const yOf=d=>M.t+H*(1-d/YMAX);
+const dOf=y=>YMAX*(1-(y-M.t)/H);
+function mlk(il,f){const p=CURVES[il];
+ if(f<=p[0][0]||f>=p[p.length-1][0])return 0;
+ for(let i=0;i<p.length-1;i++){const[f1,d1]=p[i],[f2,d2]=p[i+1];
+  if(f>=f1&&f<=f2)return d1+(d2-d1)*Math.log(f/f1)/Math.log(f2/f1);}
+ return 0;}
+// Continuous IL: interpolate between neighboring curves
+function ml(il,f){il=Math.max(ILMIN,Math.min(ILMAX,il));
+ const lo=Math.min(70,Math.floor(il/10)*10),t=(il-lo)/10;
+ return mlk(lo,f)+(mlk(lo+10,f)-mlk(lo,f))*t;}
+const thr=f=>{const k=f/1000;return Math.max(0,3.64*k**-0.8-6.5*Math.exp(-0.6*(k-3.3)**2)+1e-3*k**4);};
+
+let IL=80,cursor=null,dragPrime=false,moved=false;
+const $=id=>document.getElementById(id);
+const dbg=db=>Math.pow(10,db/20);
+
+// ---------- CALIBRATION ----------
+let CAL=+(localStorage.getItem('mask415cal')||0);
+$('calo').value=CAL;$('calv').textContent=CAL.toFixed(1);
+$('calo').oninput=e=>{CAL=+e.target.value;$('calv').textContent=CAL.toFixed(1);
+ localStorage.setItem('mask415cal',CAL);refreshGains();};
+$('lin').onchange=e=>{if(e.target.checked){$('dyn').value=100;$('dynv').textContent=100;}refreshGains();};
+$('calreset').onclick=()=>{$('calo').value=0;$('calo').oninput({target:$('calo')});};
+$('calplay').onclick=()=>{const r=Math.max(ILMIN,Math.min(ILMAX,+$('ref').value||80));
+ $('ref').value=r;setIL(r);startPrime();};
+
+// ---------- AUDIO ----------
+let ac=null,master,primeBus,probeBus,prime=null,probe=null,pulseTimer=null,primeOn=false;
+function ensureAC(){
+ if(!ac){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC){alert('This browser does not support the Web Audio API.');return false;}
+  ac=new AC();
+  const lim=ac.createDynamicsCompressor();lim.threshold.value=-2;lim.knee.value=0;lim.ratio.value=20;
+  master=ac.createGain();master.gain.value=+$('vol').value;
+  master.connect(lim).connect(ac.destination);
+  // independent buses: one per tone
+  primeBus=ac.createGain();primeBus.gain.value=dbg(+$('pvol').value);primeBus.connect(master);
+  probeBus=ac.createGain();probeBus.gain.value=dbg(+$('tvol').value);probeBus.connect(master);
+  ac.onstatechange=status;
+  const b=ac.createBufferSource();b.buffer=ac.createBuffer(1,1,22050);b.connect(ac.destination);b.start(0);
+ }
+ if(ac.state!=='running')ac.resume();
+ status();return true;
+}
+function status(){$('st').textContent='Audio: '+(ac?ac.state:'inactive');
+ $('st').style.color=ac&&ac.state==='running'?'#5eff8a':'#ff6b6b';}
+
+// dB (0–100) → gain; dynamic range + calibration offset
+function gainOf(db){const D=$('lin').checked?100:+$('dyn').value;
+ return Math.min(1,0.5*Math.pow(10,-(100-Math.max(0,Math.min(100,db)))*(D/100)/20)*dbg(CAL));}
+
+function makeTone(f,bus){const o=ac.createOscillator(),g=ac.createGain();
+ o.type='sine';o.frequency.value=f;g.gain.value=0;o.connect(g).connect(bus||master);o.start();
+ return{o,g,level:0};}
+const ramp=(n,v)=>n&&ac&&n.g.gain.setTargetAtTime(v,ac.currentTime,0.02);
+const swap=()=>$('swap').checked;
+
+function startPrime(){if(!ensureAC())return;if(!prime)prime=makeTone(F0,primeBus);
+ prime.level=IL;ramp(prime,gainOf(IL));primeOn=true;btn();}
+function stopPrime(){ramp(prime,0);primeOn=false;btn();}
+function btn(){$('prime').classList.toggle('on',primeOn);
+ $('prime').textContent=primeOn?'■ Stop 415 Hz':'▶ Prime tone 415 Hz';}
+function refreshGains(){if(primeOn&&!swap())ramp(prime,gainOf(IL));}
+
+function setIL(v){
+ IL=Math.round(Math.max(ILMIN,Math.min(ILMAX,v))*2)/2;
+ $('ilv').textContent='('+IL.toFixed(1)+')';
+ $('il').value=Math.round(IL/10)*10;
+ if(primeOn&&!swap())ramp(prime,gainOf(IL));
+ if(cursor){info();updateProbe();}
+ draw();
+}
+
+function updateProbe(){
+ if(!cursor||!ensureAC())return;
+ if(!probe)probe=makeTone(cursor.f,probeBus);
+ if(!prime)prime=makeTone(F0,primeBus);
+ probe.o.frequency.setTargetAtTime(cursor.f,ac.currentTime,0.01);
+ if(swap()){probe.level=IL;prime.level=thr(F0)+cursor.d;}
+ else{probe.level=thr(cursor.f)+cursor.d;prime.level=IL;ramp(prime,gainOf(IL));}
+ if(!pulseTimer){ramp(probe,gainOf(probe.level));if(swap())ramp(prime,gainOf(prime.level));}
+ else ramp(swap()?probe:prime,gainOf((swap()?probe:prime).level));
+}
+function startPulse(){
+ clearInterval(pulseTimer);pulseTimer=null;
+ if(!$('pulse').checked)return;
+ let on=true;
+ pulseTimer=setInterval(()=>{on=!on;const t=swap()?prime:probe;
+  if(t)ramp(t,on?gainOf(t.level):0);},350);
+}
+function stopAll(){clearInterval(pulseTimer);pulseTimer=null;ramp(probe,0);
+ if(prime)ramp(prime,primeOn?gainOf(IL):0);}
+
+// ---------- DRAWING (Fig. 3.15 style) ----------
+function curvePath(get,dotted){
+ // solid curve; dotted between 385–455 Hz (beats region)
+ ctx.setLineDash([]);
+ let pen=false;
+ ctx.beginPath();
+ for(let px=M.l;px<=M.l+W;px+=1){const f=fOf(px),d=get(f);
+  if(d<=0.01||(f>385&&f<455)){pen=false;continue;}
+  pen?ctx.lineTo(px,yOf(d)):ctx.moveTo(px,yOf(d));pen=true;}
+ ctx.stroke();
+ ctx.save();ctx.setLineDash([2,4]);ctx.lineWidth=dotted;ctx.beginPath();pen=false;
+ for(let px=xOf(383);px<=xOf(457);px+=1){const d=get(fOf(px));
+  pen?ctx.lineTo(px,yOf(d)):ctx.moveTo(px,yOf(d));pen=true;}
+ ctx.stroke();ctx.restore();
+}
+function draw(){
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+ ctx.strokeStyle='#000';ctx.fillStyle='#000';ctx.lineWidth=2;ctx.setLineDash([]);
+ const x0=M.l,y0=yOf(0);
+ ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0,M.t-10);ctx.moveTo(x0,y0);ctx.lineTo(M.l+W+20,y0);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(x0,M.t-22);ctx.lineTo(x0-6,M.t-4);ctx.lineTo(x0+6,M.t-4);ctx.fill();
+ ctx.beginPath();ctx.moveTo(M.l+W+32,y0);ctx.lineTo(M.l+W+14,y0-6);ctx.lineTo(M.l+W+14,y0+6);ctx.fill();
+ ctx.font='bold 15px Arial';ctx.textAlign='right';ctx.textBaseline='middle';ctx.lineWidth=1.5;
+ for(let d=0;d<=65;d+=5){const y=yOf(d);ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x0+12,y);ctx.stroke();
+  if(d%10===0)ctx.fillText(d,x0-12,y);}
+ ctx.textAlign='center';ctx.textBaseline='top';
+ [200,300,400,500,600,700,800,900,1000,2000,3000,4000,5000].forEach(f=>{const x=xOf(f);
+  ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y0-10);ctx.stroke();});
+ [100,300,500,1000,3000,5000].forEach(f=>ctx.fillText(f,xOf(f),y0+10));
+ ctx.fillText('Frequency (Hz)',M.l+W/2,y0+38);
+ ctx.save();ctx.translate(30,M.t+H/2);ctx.rotate(-Math.PI/2);ctx.fillText('ML db',0,0);ctx.restore();
+
+ ctx.strokeStyle='#000';ctx.lineWidth=2.6;
+ for(const k in CURVES)curvePath(f=>mlk(k,f),2.6);
+ ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+ for(const k in CURVES){const y=yOf(Math.max(1,+k-PK-6));
+  ctx.fillStyle='#fff';ctx.fillRect(xOf(430)-11,y-8,22,16);
+  ctx.fillStyle='#000';ctx.fillText(k,xOf(432),y);}
+ const ay=yOf(59),ax=xOf(470);
+ ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ax+65,ay);ctx.lineTo(ax+4,ay);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(ax+14,ay-5);ctx.lineTo(ax+14,ay+5);ctx.fill();
+ ctx.textAlign='left';ctx.fillText('IL of Masking Tone',ax+75,ay);
+ // source inside the figure (bottom-right)
+ ctx.font='italic 11px Arial';ctx.fillStyle='#555';ctx.textAlign='right';
+ ctx.fillText('After Roederer, Fig. 3.15 — Egan & Hake (1950)',M.l+W,M.t+4);
+
+ ctx.strokeStyle='rgba(255,140,0,.85)';ctx.lineWidth=3;
+ curvePath(f=>ml(IL,f),3);
+ const hx=xOf(F0),hy=yOf(IL-PK);
+ ctx.save();ctx.setLineDash([4,5]);ctx.strokeStyle='rgba(255,140,0,.6)';ctx.lineWidth=1;
+ ctx.beginPath();ctx.moveTo(hx,yOf(0));ctx.lineTo(hx,yOf(65));ctx.stroke();ctx.restore();
+ ctx.fillStyle=primeOn?'#ff5e00':'#ffb347';ctx.strokeStyle='#000';ctx.lineWidth=1.5;
+ ctx.beginPath();ctx.arc(hx,hy,9,0,7);ctx.fill();ctx.stroke();
+ ctx.fillStyle='#c05000';ctx.font='bold 13px Arial';ctx.textAlign='right';
+ ctx.fillText('415 Hz · IL '+IL.toFixed(1)+' dB',hx-14,hy);
+
+ if(cursor){const{f,d}=cursor;
+  ctx.fillStyle=d>ml(IL,f)?'#1bbf4c':'#e53935';ctx.beginPath();ctx.arc(xOf(f),yOf(d),8,0,7);ctx.fill();}
+}
+
+function info(){const{f,d}=cursor,need=ml(IL,f),aud=d>need;
+ $('info').innerHTML=swap()
+ ?`Masker <b>${f.toFixed(0)} Hz</b> @ ${IL.toFixed(1)} dB · 415 Hz at ML=${d.toFixed(1)} dB (required ≈ ${need.toFixed(1)}) → <span class="${aud?'aud':'msk'}">${aud?'415 AUDIBLE':'415 MASKED'}</span>`
+ :`Test <b>${f.toFixed(0)} Hz</b> · ML=${d.toFixed(1)} dB · 415 Hz @ ${IL.toFixed(1)} dB (required ≈ ${need.toFixed(1)}) → <span class="${aud?'aud':'msk'}">${aud?'AUDIBLE':'MASKED'}</span>`;}
+
+// ---------- INTERACTION ----------
+function pos(e){const r=cv.getBoundingClientRect();
+ return{x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height};}
+function setCursor(e){const{x,y}=pos(e);
+ cursor={f:Math.min(FMAX,Math.max(FMIN,fOf(x))),d:Math.min(65,Math.max(0,dOf(y)))};
+ info();updateProbe();draw();}
+const ilFromY=y=>Math.max(0,Math.min(65,dOf(y)))+PK;
+
+cv.addEventListener('pointerdown',e=>{
+ ensureAC();cv.setPointerCapture(e.pointerId);
+ const{x,y}=pos(e);
+ if(Math.hypot(x-xOf(F0),y-yOf(IL-PK))<18){dragPrime=true;moved=false;return;}
+ const f=fOf(x);
+ for(const il in CURVES)if(mlk(il,f)>0&&Math.abs(yOf(mlk(il,f))-y)<8)setIL(+il);
+ if(!swap())startPrime();
+ setCursor(e);startPulse();});
+cv.addEventListener('pointermove',e=>{
+ if(dragPrime){moved=true;if(!primeOn&&!swap())startPrime();setIL(ilFromY(pos(e).y));return;}
+ if(e.buttons)setCursor(e);});
+function up(){if(dragPrime){dragPrime=false;if(!moved){primeOn?stopPrime():startPrime();draw();}return;}stopAll();}
+['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,up));
+
+$('test').onclick=()=>{if(!ensureAC())return;const t=makeTone(440,master);
+ t.g.gain.setTargetAtTime(0.3,ac.currentTime,0.01);
+ t.g.gain.setTargetAtTime(0,ac.currentTime+0.6,0.05);t.o.stop(ac.currentTime+1);};
+$('prime').onclick=()=>{primeOn?stopPrime():startPrime();draw();};
+$('il').onchange=e=>setIL(+e.target.value);
+$('vol').oninput=e=>{if(master)master.gain.value=+e.target.value;};
+$('pvol').oninput=e=>{$('pvolv').textContent=(+e.target.value).toFixed(1);
+ if(primeBus)primeBus.gain.setTargetAtTime(dbg(+e.target.value),ac.currentTime,0.02);};
+$('tvol').oninput=e=>{$('tvolv').textContent=(+e.target.value).toFixed(1);
+ if(probeBus)probeBus.gain.setTargetAtTime(dbg(+e.target.value),ac.currentTime,0.02);};
+$('dyn').oninput=e=>{$('dynv').textContent=e.target.value;$('lin').checked=false;refreshGains();};
+draw();
+</script>
+</body>
+</html>
