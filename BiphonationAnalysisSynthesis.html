@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Biphonation Analyzer – Two-Voice Partial Assignment</title>
+<style>
+ body{font-family:system-ui,sans-serif;background:#111;color:#ddd;margin:0;padding:12px}
+ h1{font-size:18px;margin:0 0 8px}
+ .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+ fieldset{border:1px solid #333;border-radius:6px;padding:6px 10px}
+ legend{color:#8cf;font-size:12px}
+ label{font-size:12px;display:inline-flex;flex-direction:column;margin-right:6px}
+ input,select{width:80px;background:#222;color:#eee;border:1px solid #444;border-radius:3px;padding:2px}
+ input[type=checkbox]{width:auto}
+ button{background:#2a4d6e;color:#fff;border:0;border-radius:4px;padding:6px 10px;cursor:pointer}
+ button:hover{background:#3a6d9e} button.rec{background:#a33}
+ button:disabled{opacity:.4;cursor:not-allowed}
+ button.recOn{background:#f22;animation:pulse 1s infinite}
+ #bAna{background:#2c7a3a;font-weight:bold} #bAna.stale{background:#c80;animation:pulse 1.2s infinite}
+ .tg{background:#222;border:2px solid #555}
+ #tglA{border-color:#f44} #tglB{border-color:#3df} #tglU{border-color:#999}
+ #tglA.on{background:#7a2020} #tglB.on{background:#106070} #tglU.on{background:#444}
+ canvas{background:#000;border:1px solid #333;display:block;width:100%;cursor:crosshair}
+ #status{font-size:12px;color:#9c9;min-height:16px}
+ #info{font-family:monospace;font-size:12px;color:#fc8;min-height:16px}
+ #hinfo{font-family:monospace;font-size:11px;color:#ccc;min-height:14px;white-space:pre-wrap}
+ textarea{width:100%;height:50px;background:#1a1a1a;color:#ddd;border:1px solid #444}
+ #recInd{display:none;align-items:center;gap:10px;background:#300;border:1px solid #f33;border-radius:6px;padding:6px 10px;margin-bottom:8px}
+ #recInd.on{display:flex}
+ .dot{width:14px;height:14px;border-radius:50%;background:#f22;animation:pulse 1s infinite}
+ @keyframes pulse{50%{opacity:.35}}
+ #recTime{font:bold 16px monospace;color:#f66;min-width:120px}
+ .bar{flex:1;height:10px;background:#222;border-radius:5px;overflow:hidden;min-width:120px}
+ .bar>div{height:100%;width:0}
+ #recBar>div{background:#f44} #lvl>div{background:linear-gradient(90deg,#4c4,#ee4,#f44)}
+ #progBox{display:none;align-items:center;gap:10px;background:#102030;border:1px solid #39f;border-radius:6px;padding:6px 10px;margin-bottom:8px}
+ #progBox.on{display:flex}
+ .spin{width:14px;height:14px;border:3px solid #39f;border-top-color:transparent;border-radius:50%;animation:rot .8s linear infinite}
+ @keyframes rot{to{transform:rotate(360deg)}}
+ #progBar>div{background:#39f}
+ #progTxt{font:12px monospace;color:#9cf;min-width:260px}
+ .hint{font-size:11px;color:#888}
+</style>
+</head>
+<body>
+<h1>Biphonation Analyzer — voice A (lowest, anterior) / voice B (second, posterior) partial assignment &amp; resynthesis</h1>
+
+<div class="row">
+ <fieldset><legend>Audio</legend>
+  <button id="bRec" class="rec">● Record (max 10 s)</button>
+  <button id="bStop">■ Stop</button>
+  <button id="bPlayO">▶ Original</button>
+  <input type="file" id="fAudio" accept="audio/*" style="width:180px">
+ </fieldset>
+ <fieldset><legend>Analysis (applied only when you press Analyze)</legend>
+  <label>Window ms<input id="winMs" type="number" value="100"></label>
+  <label>Hop ms<input id="hopMs" type="number" value="50"></label>
+  <label>F0 min Hz<input id="fmin" type="number" value="70"></label>
+  <label>F0 max Hz<input id="fmax" type="number" value="1000"></label>
+  <label>Partials up to Hz<input id="fmaxA" type="number" value="5000"></label>
+  <label>Peak thr dB<input id="thr" type="number" value="-50"></label>
+  <label>F0 min level dB<input id="f0Thr" type="number" value="-35"></label>
+  <label>Max harm.<input id="maxH" type="number" value="12"></label>
+  <label>Tol. cents<input id="tol" type="number" value="30"></label>
+  <label>Min sep. cents<input id="minSep" type="number" value="60"></label>
+  <label>B min fit<input id="minFit" type="number" step="0.05" value="0.3"></label>
+  <label>Miss penalty<input id="missPen" type="number" step="0.01" value="0.08"></label>
+  <label>B max jump ¢<input id="maxJump" type="number" value="300"></label>
+  <label>Gate dBFS<input id="gate" type="number" value="-50"></label>
+  <label>Zero-pad ×<select id="zp"><option>2</option><option selected>4</option><option>8</option></select></label>
+  <label>Display max Hz<input id="dispMax" type="number" value="2000"></label>
+  <button id="bAna">▶ Analyze</button>
+ </fieldset>
+ <fieldset><legend>Synthesis (full length)</legend>
+  <label>Timbre<select id="timbre" style="width:130px"><option value="parts">Assigned partials</option><option value="wave">Waveform</option></select></label>
+  <label>Wave A<select id="wave1"><option>sine</option><option>sawtooth</option><option>square</option><option>triangle</option></select></label>
+  <label>Wave B<select id="wave2"><option>sine</option><option>sawtooth</option><option>square</option><option>triangle</option></select></label>
+  <label>Balance A↔B<input id="bal" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+  <button id="bSyn">▶ A+B</button><button id="bS1">▶ Voice A</button><button id="bS2">▶ Voice B</button>
+  <button id="bWav">⬇ WAV A+B</button><button id="bWavA">⬇ WAV A</button><button id="bWavB">⬇ WAV B</button><button id="bStopP">■</button>
+ </fieldset>
+ <fieldset><legend>Click playback</legend>
+  <label>Tone dur. s<input id="clickDur" type="number" step="0.1" value="0.8"></label>
+  <label>Click radius px<input id="clickPx" type="number" value="30"></label>
+ </fieldset>
+ <fieldset><legend>Project</legend>
+  <button id="bSave">💾 Save</button>
+  <button id="bExp">⬇ Export .json</button>
+  <input type="file" id="fProj" accept=".json" style="width:160px">
+  <button id="bCsv">⬇ CSV</button>
+  <button id="bNew">New</button>
+ </fieldset>
+</div>
+
+<div id="recInd"><div class="dot"></div><b style="color:#f66">REC</b>
+ <span id="recTime">0.0 / 10.0 s</span>
+ <span class="hint">time</span><div class="bar" id="recBar"><div></div></div>
+ <span class="hint">level</span><div class="bar" id="lvl"><div></div></div></div>
+
+<div id="progBox"><div class="spin"></div><span id="progTxt">Analyzing…</span>
+ <div class="bar" id="progBar"><div></div></div></div>
+
+<div id="status">Ready. Record or load audio, set parameters, then press Analyze.</div>
+<canvas id="cMain" width="1200" height="420"></canvas>
+<div id="info">Click near a partial to hear only that partial · drag from a partial to hear its track over the region · hover to inspect.</div>
+<div class="row" style="margin:6px 0">
+ <button id="tglA" class="tg on">◼ Voice A (lowest F0 + harmonics)</button>
+ <button id="tglB" class="tg on">◼ Voice B (second F0 + harmonics)</button>
+ <button id="tglU" class="tg on">◼ Unassigned peaks</button>
+ <span class="hint">Selected frame:</span>
+ <button id="bFO">▶ Original</button><button id="bFA">▶ A</button><button id="bFB">▶ B</button><button id="bFAB">▶ A+B</button><button id="bFP">▶ Partial</button>
+ <span class="hint" id="selLbl">(none — click the graph)</span>
+</div>
+<canvas id="cSpec" width="1200" height="220"></canvas>
+<div id="hinfo"></div>
+<textarea id="notes" placeholder="Notes / annotations (saved with project)"></textarea>
+
+<script>
+const $=id=>document.getElementById(id);
+const PIDS=['winMs','hopMs','fmin','fmax','fmaxA','thr','f0Thr','maxH','tol','minSep','minFit','missPen','maxJump','gate','zp','dispMax','timbre','wave1','wave2','bal','clickDur','clickPx'];
+const ANA=['winMs','hopMs','fmin','fmax','fmaxA','thr','f0Thr','maxH','tol','minSep','minFit','missPen','maxJump','gate','zp'];
+const S={sr:44100,audio:null,env:null,frames:[],spec:[],nfft:0,N:0,anaP:null,synth:null};
+const show={a:true,b:true,u:true};
+let actx=null,playSrc=null,playT0=0,playDur=0,playOff=0,hoverI=-1,selI=-1,selP=null,specImg=null,busy=false,sel=null,drag=null,rec=null;
+const status=t=>$('status').textContent=t;
+const getAC=()=>actx||(actx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:44100}));
+const cents=(a,b)=>1200*Math.log2(a/b);
+const lin=db=>10**(db/20);
+const sleep=()=>new Promise(r=>setTimeout(r,0));
+const VN=['?','A','B'],VC=['#bbb','#ff4646','#3cf0ff'];
+
+/* ---------- params ---------- */
+function getP(){const P={};PIDS.forEach(k=>{const e=$(k);P[k]=e.type==='checkbox'?e.checked:(e.tagName==='SELECT'&&isNaN(+e.value)?e.value:+e.value)});return P;}
+function setP(P){PIDS.forEach(k=>{if(P[k]===undefined)return;const e=$(k);e.type==='checkbox'?e.checked=P[k]:e.value=P[k]});}
+function setBusy(b){busy=b;['bAna','bRec','fAudio','fProj','bSyn','bS1','bS2','bWav','bWavA','bWavB','bNew','bFA','bFB','bFAB','bFO','bFP'].forEach(k=>$(k).disabled=b);}
+function clearAnalysis(){S.frames=[];S.spec=[];specImg=null;S.anaP=null;S.synth=null;selI=-1;selP=null;sel=null;hoverI=-1;$('bAna').classList.remove('stale');$('selLbl').textContent='(none — click the graph)';$('hinfo').textContent='';drawSpectrum(-1);}
+function makeEnv(){if(!S.audio){S.env=null;return;}const W=1200,a=S.audio,n=a.length,E=[];let pk=1e-9;for(const v of a)if(Math.abs(v)>pk)pk=Math.abs(v);
+ for(let x=0;x<W;x++){let mn=0,mx=0;for(let i=Math.floor(x*n/W);i<Math.floor((x+1)*n/W);i++){if(a[i]<mn)mn=a[i];if(a[i]>mx)mx=a[i];}E.push([mn/pk,mx/pk]);}S.env=E;}
+function loadRaw(a,sr,msg){S.audio=a;S.sr=sr;clearAnalysis();makeEnv();draw();
+ status(`${msg} (${(a.length/sr).toFixed(2)} s @ ${sr} Hz) — raw waveform shown. Adjust parameters and press ▶ Analyze.`);save();}
+
+/* ---------- recording (no automatic analysis) ---------- */
+$('bRec').onclick=async()=>{
+ if(rec||busy)return;
+ const ac=getAC();await ac.resume();
+ let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});}
+ catch(e){return status('Microphone access denied: '+e.message);}
+ const src=ac.createMediaStreamSource(stream),proc=ac.createScriptProcessor(4096,1,1);
+ const max=10*ac.sampleRate;rec={stream,src,proc,chunks:[],len:0,max};
+ $('recInd').classList.add('on');$('bRec').classList.add('recOn');$('bRec').textContent='● Recording…';$('bAna').disabled=true;
+ status('Recording started.');
+ proc.onaudioprocess=e=>{if(!rec)return;const d=e.inputBuffer.getChannelData(0);rec.chunks.push(new Float32Array(d));rec.len+=d.length;
+  let s=0;for(const v of d)s+=v*v;const db=10*Math.log10(s/d.length+1e-12);
+  const t=rec.len/ac.sampleRate;$('recTime').textContent=`${t.toFixed(1)} / 10.0 s`;
+  $('recBar').firstChild.style.width=Math.min(100,t*10)+'%';$('lvl').firstChild.style.width=Math.max(0,Math.min(100,(db+60)/60*100))+'%';
+  if(rec.len>=max)stopRec();};
+ src.connect(proc);proc.connect(ac.destination);
+};
+function stopRec(){
+ if(!rec)return;const r=rec;rec=null;
+ r.proc.disconnect();r.src.disconnect();r.stream.getTracks().forEach(t=>t.stop());
+ $('recInd').classList.remove('on');$('bRec').classList.remove('recOn');$('bRec').textContent='● Record (max 10 s)';$('bAna').disabled=false;
+ const a=new Float32Array(Math.min(r.len,r.max));let o=0;
+ for(const c of r.chunks){const n=Math.min(c.length,a.length-o);a.set(c.subarray(0,n),o);o+=n;if(o>=a.length)break;}
+ loadRaw(a,getAC().sampleRate,'■ Recording stopped');
+}
+$('bStop').onclick=()=>{stopRec();stopPlay();};
+$('fAudio').onchange=async e=>{
+ const f=e.target.files[0];if(!f||busy)return;
+ const buf=await getAC().decodeAudioData(await f.arrayBuffer());
+ const n=Math.min(buf.length,10*buf.sampleRate),a=new Float32Array(n);
+ for(let c=0;c<buf.numberOfChannels;c++){const d=buf.getChannelData(c);for(let i=0;i<n;i++)a[i]+=d[i]/buf.numberOfChannels;}
+ loadRaw(a,buf.sampleRate,'File loaded');e.target.value='';
+};
+
+/* ---------- FFT ---------- */
+function fft(re,im){const n=re.length;
+ for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t;}}
+ for(let len=2;len<=n;len<<=1){const a=-2*Math.PI/len,wr=Math.cos(a),wi=Math.sin(a),h=len>>1;
+  for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<h;k++){const p=i+k,q=p+h,tr=re[q]*cr-im[q]*ci,ti=re[q]*ci+im[q]*cr;
+   re[q]=re[p]-tr;im[q]=im[p]-ti;re[p]+=tr;im[p]+=ti;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t;}}}}
+
+/* ---------- peak picking ---------- */
+function findPeaks(db,nfft,sr,P){
+ const k0=Math.max(2,Math.floor(P.fmin*0.8*nfft/sr));let mx=-1e9;
+ for(let k=k0;k<db.length;k++)if(db[k]>mx)mx=db[k];
+ const fl=mx+P.thr,pk=[];
+ for(let k=k0;k<db.length-1;k++){const b=db[k];
+  if(b>fl&&b>db[k-1]&&b>=db[k+1]){const a=db[k-1],c=db[k+1],d=a-2*b+c,p=d?0.5*(a-c)/d:0,A=b-0.25*(a-c)*p;
+   pk.push({f:(k+p)*sr/nfft,db:A,w:(A-fl)/(-P.thr),v:0,h:0});}}
+ pk.sort((x,y)=>y.db-x.db);return pk.slice(0,40).sort((x,y)=>x.f-y.f);
+}
+
+/* ---------- two-stage voice separation ----------
+ Stage 1: lowest eligible peak = F0 of voice A; collect its harmonics (iteratively refined F0) and mark them v=1.
+ Stage 2: from the REMAINING peaks only, choose voice B's F0 by harmonic support; mark its harmonics v=2.   */
+function series(p0,pk,P){
+ const used=new Set([p0]),list=[{p:p0,h:1}];let sw=lin(p0.db),swf=p0.f*sw,est=p0.f,miss=0,score=p0.w;
+ for(let h=2;h<=P.maxH&&h*est<=P.fmaxA;h++){
+  let b=null,bd=P.tol;for(const p of pk){if(p.v||used.has(p))continue;const d=Math.abs(cents(p.f,h*est));if(d<bd){bd=d;b=p;}}
+  if(!b){miss++;continue;}used.add(b);list.push({p:b,h});score+=b.w;
+  const w=lin(b.db)*h;sw+=w;swf+=w*b.f/h;est=swf/sw;}
+ return{f0:est,list,score:score-P.missPen*miss};
+}
+const mark=(S_,v)=>S_.list.forEach(({p,h})=>{p.v=v;p.h=h;});
+function separate(pk,P,prevB){
+ if(!pk.length)return{};
+ const mx=Math.max(...pk.map(p=>p.db)),el=p=>p.f>=P.fmin&&p.f<=P.fmax&&p.db>=mx+P.f0Thr;
+ const a0=pk.find(el);if(!a0)return{};
+ const A=series(a0,pk,P);mark(A,1);
+ const C=pk.filter(p=>!p.v&&el(p)&&cents(p.f,A.f0)>=P.minSep).map(p=>series(p,pk,P));
+ if(!C.length)return{A};
+ const best=Math.max(...C.map(c=>c.score));
+ let V=C.filter(c=>c.score>0&&c.score>=P.minFit*best);if(!V.length)V=[C.find(c=>c.score===best)];
+ let B=V[0];
+ if(prevB){const nb=V.reduce((a,c)=>Math.abs(cents(c.f0,prevB))<Math.abs(cents(a.f0,prevB))?c:a);if(Math.abs(cents(nb.f0,prevB))<=P.maxJump)B=nb;}
+ mark(B,2);return{A,B};
+}
+
+/* ---------- spectra ---------- */
+function prog(p,txt){$('progBar').firstChild.style.width=(p*100).toFixed(1)+'%';$('progTxt').textContent=txt;}
+async function computeSpec(P,withPeaks,el){
+ const sr=S.sr,x=S.audio,N=Math.round(P.winMs/1000*sr),hop=Math.max(1,Math.round(P.hopMs/1000*sr));
+ let nfft=1;while(nfft<N*P.zp)nfft<<=1;S.nfft=nfft;S.N=N;
+ const win=new Float64Array(N);let ws=0;
+ for(let i=0;i<N;i++){const a=2*Math.PI*i/(N-1);win[i]=0.42-0.5*Math.cos(a)+0.08*Math.cos(2*a);ws+=win[i];}
+ const re=new Float64Array(nfft),im=new Float64Array(nfft),kMax=Math.min(nfft/2-1,Math.floor(P.fmaxA*nfft/sr));
+ const total=Math.max(1,Math.floor((x.length-N)/hop)+1),out=[];S.spec=[];
+ for(let s=0,n=0;s+N<=x.length;s+=hop,n++){
+  re.fill(0);im.fill(0);let e=0;
+  for(let i=0;i<N;i++){const v=x[s+i];e+=v*v;re[i]=v*win[i];}
+  fft(re,im);const db=new Float32Array(kMax+1);
+  for(let k=0;k<=kMax;k++)db[k]=20*Math.log10(Math.hypot(re[k],im[k])*2/ws+1e-12);
+  S.spec.push(db);
+  const fr={t:+((s+N/2)/sr).toFixed(4),s,f1:null,a1:0,f2:null,a2:0,h1:[],h2:[],parts:[]};
+  if(withPeaks&&10*Math.log10(e/N+1e-20)>P.gate)fr.parts=findPeaks(db,nfft,sr,P);
+  out.push(fr);
+  if(n%15===0){prog(0.75*n/total,`Step 1/3 · spectra & peaks: frame ${n}/${total} · ${el()}`);await sleep();}
+ }
+ return out;
+}
+async function analyze(){
+ if(!S.audio)return status('No audio — record or load a file first.');
+ if(busy||rec)return;
+ const P=getP();setBusy(true);clearAnalysis();$('progBox').classList.add('on');
+ const T0=performance.now(),el=()=>((performance.now()-T0)/1000).toFixed(1)+' s';
+ try{
+  const F=await computeSpec(P,true,el);
+  let prevB=null,nA=0,nB=0;
+  for(let i=0;i<F.length;i++){const f=F[i],r=separate(f.parts,P,prevB);
+   const harm=v=>{const a=new Array(P.maxH).fill(0);f.parts.forEach(p=>{if(p.v===v)a[p.h-1]=+lin(p.db).toPrecision(5)});return a;};
+   const pw=v=>Math.sqrt(f.parts.reduce((s,p)=>s+(p.v===v?lin(p.db)**2:0),0));
+   if(r.A){f.f1=r.A.f0;f.a1=pw(1);f.h1=harm(1);nA++;}
+   if(r.B){f.f2=r.B.f0;f.a2=pw(2);f.h2=harm(2);nB++;}
+   prevB=f.f2;
+   f.parts=f.parts.map(p=>({f:+p.f.toFixed(3),db:+p.db.toFixed(2),w:+p.w.toFixed(3),v:p.v,h:p.h}));
+   if(i%25===0){prog(0.75+0.2*i/F.length,`Step 2/3 · assigning partials to voices A/B: frame ${i}/${F.length} · ${el()}`);await sleep();}
+  }
+  S.frames=F;S.anaP=Object.fromEntries(ANA.map(k=>[k,P[k]]));
+  prog(0.97,`Step 3/3 · rendering · ${el()}`);await sleep();
+  buildSpecImg();draw();prog(1,`Done · ${el()}`);
+  status(`✔ Analysis complete in ${el()} · ${F.length} frames · voice A in ${nA} · voice B in ${nB} · FFT=${S.nfft} · Δf=${(S.sr/S.nfft).toFixed(2)} Hz`);
+ }catch(err){status('Analysis error: '+err.message);console.error(err);}
+ finally{setBusy(false);setTimeout(()=>$('progBox').classList.remove('on'),1200);}
+}
+
+/* ---------- drawing ---------- */
+const vis=p=>p.v===1?show.a:p.v===2?show.b:show.u;
+function buildSpecImg(){
+ const P=getP(),H=300,W=S.spec.length;if(!W){specImg=null;return;}
+ const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d'),img=g.createImageData(W,H);
+ let mx=-1e9;S.spec.forEach(d=>d.forEach(v=>{if(v>mx)mx=v}));
+ const fTop=Math.min(P.dispMax,S.anaP?S.anaP.fmaxA:P.fmaxA);
+ for(let x=0;x<W;x++){const d=S.spec[x];for(let y=0;y<H;y++){
+  const k=Math.min(d.length-1,Math.round(fTop*(1-y/H)*S.nfft/S.sr)),v=Math.max(0,Math.min(1,(d[k]-mx+80)/80))*0.7,o=4*(y*W+x);
+  img.data[o]=255*Math.max(0,Math.min(1,v*1.8-0.6));img.data[o+1]=255*v*v;img.data[o+2]=255*Math.min(1,v*2)*(1-v*0.5);img.data[o+3]=255;}}
+ g.putImageData(img,0,0);specImg=c;
+}
+const dur=()=>S.audio?S.audio.length/S.sr:10;
+const fTopM=()=>{const P=getP();return Math.min(P.dispMax,S.anaP?S.anaP.fmaxA:P.fmaxA);};
+function draw(cursorT){
+ const cv=$('cMain'),g=cv.getContext('2d'),W=cv.width,H=cv.height,fTop=fTopM(),D=dur(),X=t=>t/D*W,Y=f=>H-f/fTop*H,A=S.frames.length>0;
+ g.fillStyle='#000';g.fillRect(0,0,W,H);g.font='11px monospace';
+ if(A&&specImg){g.imageSmoothingEnabled=false;const f0=S.frames[0].t,f1=S.frames.at(-1).t,dt=S.frames.length>1?S.frames[1].t-f0:0;
+  g.drawImage(specImg,X(f0-dt/2),0,X(f1+dt/2)-X(f0-dt/2),H);}
+ if(S.env){const wh=A?50:H-20,y0=A?H-wh:10;g.strokeStyle=A?'rgba(160,160,160,.45)':'#6c6';g.beginPath();
+  S.env.forEach((e,x)=>{g.moveTo(x+.5,y0+wh/2-e[1]*wh/2);g.lineTo(x+.5,y0+wh/2-e[0]*wh/2+1);});g.stroke();}
+ g.strokeStyle='rgba(255,255,255,.12)';g.fillStyle='#888';
+ if(A){const step=fTop>3000?500:fTop>1000?200:100;
+  for(let f=step;f<fTop;f+=step){g.beginPath();g.moveTo(0,Y(f));g.lineTo(W,Y(f));g.stroke();g.fillText(f+' Hz',2,Y(f)-2);}}
+ for(let t=1;t<D;t++){g.beginPath();g.moveTo(X(t),0);g.lineTo(X(t),H);g.stroke();g.fillText(t+'s',X(t)+2,H-3);}
+ if(!A){g.fillStyle='#ccc';g.font='14px system-ui';
+  g.fillText(S.audio?'Raw recording — set parameters and press ▶ Analyze':'No audio — press ● Record or load a file',20,26);
+  if(cursorT!=null){g.strokeStyle='#fff';g.beginPath();g.moveTo(X(cursorT),0);g.lineTo(X(cursorT),H);g.stroke();}return;}
+ if(sel){g.fillStyle='rgba(255,255,0,.12)';g.fillRect(X(sel.t0),0,Math.max(2,X(sel.t1)-X(sel.t0)),H);}
+ // partials coloured by voice
+ S.frames.forEach(fr=>fr.parts.forEach(p=>{if(!vis(p)||p.f>fTop)return;g.fillStyle=VC[p.v];
+  g.globalAlpha=p.v?0.9:0.5;g.beginPath();g.arc(X(fr.t),Y(p.f),1+3*p.w,0,7);g.fill();}));g.globalAlpha=1;
+ // F0 lines
+ [['f1',VC[1],show.a],['f2',VC[2],show.b]].forEach(([k,col,on])=>{if(!on)return;
+  g.strokeStyle=col;g.lineWidth=2;g.beginPath();let o=false;
+  S.frames.forEach(fr=>{if(fr[k]){o?g.lineTo(X(fr.t),Y(fr[k])):g.moveTo(X(fr.t),Y(fr[k]));o=true;}else o=false;});g.stroke();g.lineWidth=1;});
+ if(selP){const fr=S.frames[selP.i],p=fr.parts[selP.k];g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.arc(X(fr.t),Y(p.f),8,0,7);g.stroke();g.lineWidth=1;}
+ g.fillStyle=VC[1];g.fillText('━ A: lowest F0 + harmonics',W-420,14);g.fillStyle=VC[2];g.fillText('━ B: second F0 + harmonics',W-230,14);
+ g.fillStyle='#bbb';g.fillText('● unassigned',W-40-50,28);
+ if(hoverI>=0&&S.frames[hoverI]){g.strokeStyle='rgba(255,255,0,.5)';g.beginPath();g.moveTo(X(S.frames[hoverI].t),0);g.lineTo(X(S.frames[hoverI].t),H);g.stroke();}
+ if(cursorT!=null){g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.moveTo(X(cursorT),0);g.lineTo(X(cursorT),H);g.stroke();g.lineWidth=1;}
+}
+const specMap=()=>{const cv=$('cSpec'),fTop=S.anaP?S.anaP.fmaxA:getP().fmaxA;return{fTop,X:f=>f/fTop*cv.width};};
+function drawSpectrum(i){
+ const cv=$('cSpec'),g=cv.getContext('2d'),W=cv.width,H=cv.height;g.fillStyle='#000';g.fillRect(0,0,W,H);
+ const d=S.spec[i],fr=S.frames[i];if(!d||!fr){$('hinfo').textContent='';return;}
+ let mx=-1e9;d.forEach(v=>{if(v>mx)mx=v});
+ const {fTop,X}=specMap(),Y=db=>H-(db-mx+90)/90*H;g.font='11px monospace';
+ [[fr.f1,1,show.a],[fr.f2,2,show.b]].forEach(([f,v,on])=>{if(!f||!on)return;g.strokeStyle=VC[v];g.globalAlpha=.45;
+  for(let h=1;h*f<fTop;h++){g.setLineDash(h===1?[]:[3,4]);g.lineWidth=h===1?2:1;g.beginPath();g.moveTo(X(h*f),0);g.lineTo(X(h*f),H);g.stroke();}
+  g.setLineDash([]);g.lineWidth=1;g.globalAlpha=1;g.fillStyle=VC[v];g.fillText(`${VN[v]} F0=${f.toFixed(1)} Hz`,X(f)+3,12+(v-1)*13);});
+ g.strokeStyle='#7c7';g.beginPath();d.forEach((v,k)=>{const x=X(k*S.sr/S.nfft);k?g.lineTo(x,Y(v)):g.moveTo(x,Y(v))});g.stroke();
+ fr.parts.forEach((p,k)=>{if(!vis(p))return;g.fillStyle=VC[p.v];g.beginPath();g.arc(X(p.f),Y(p.db),p.v?5:3,0,7);g.fill();
+  if(p.v)g.fillText(VN[p.v]+p.h,X(p.f)-6,Y(p.db)-8);
+  if(selP&&selP.i===i&&selP.k===k){g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();g.arc(X(p.f),Y(p.db),9,0,7);g.stroke();g.lineWidth=1;}});
+ g.fillStyle='#888';for(let f=500;f<fTop;f+=500)g.fillText(f,X(f)+2,H-3);
+ g.fillStyle='#fff';g.fillText(`t=${fr.t.toFixed(3)} s`,W-90,H-3);
+ const L=[];[[1,show.a],[2,show.b]].forEach(([v,on])=>{if(!on)return;const ps=fr.parts.filter(p=>p.v===v).sort((a,b)=>a.h-b.h);
+  if(ps.length)L.push(`${VN[v]}: `+ps.map(p=>`h${p.h} ${p.f.toFixed(1)}Hz ${p.db.toFixed(1)}dB`).join(' · '));});
+ const nu=fr.parts.filter(p=>!p.v).length;if(nu)L.push(`Unassigned: ${nu} peak(s)`);
+ $('hinfo').textContent=L.join('\n');
+}
+function toggle(k){show[k]=!show[k];$({a:'tglA',b:'tglB',u:'tglU'}[k]).classList.toggle('on',show[k]);
+ draw();const i=hoverI>=0?hoverI:selI;if(i>=0)drawSpectrum(i);save();}
+$('tglA').onclick=()=>toggle('a');$('tglB').onclick=()=>toggle('b');$('tglU').onclick=()=>toggle('u');
+
+/* ---------- graph interaction: nearest single partial ---------- */
+const cvXY=(cv,e)=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*cv.width,y:(e.clientY-r.top)/r.height*cv.height,cx:e.clientX};};
+const tOfX=x=>Math.max(0,Math.min(dur(),x/$('cMain').width*dur()));
+const nearest=t=>{let bi=0;S.frames.forEach((f,i)=>{if(Math.abs(f.t-t)<Math.abs(S.frames[bi].t-t))bi=i});return bi;};
+function pickMain(x,y){
+ const W=$('cMain').width,H=$('cMain').height,fTop=fTopM(),D=dur(),i0=nearest(tOfX(x));let best=null,bd=getP().clickPx;
+ for(let i=Math.max(0,i0-3);i<=Math.min(S.frames.length-1,i0+3);i++){const fr=S.frames[i],px=fr.t/D*W;
+  fr.parts.forEach((p,k)=>{if(!vis(p)||p.f>fTop)return;const d=Math.hypot(px-x,H-p.f/fTop*H-y);if(d<bd){bd=d;best={i,k};}});}
+ return best;
+}
+function showInfo(i){const f=S.frames[i];if(!f)return;const c=v=>f.parts.filter(p=>p.v===v).length;
+ $('info').textContent=`t=${f.t.toFixed(3)}s | A F0=${f.f1?f.f1.toFixed(2)+' Hz':'—'} (${c(1)} partials) | B F0=${f.f2?f.f2.toFixed(2)+' Hz':'—'} (${c(2)} partials) | unassigned ${c(0)} | B/A=${f.f1&&f.f2?(f.f2/f.f1).toFixed(4):'—'} | ${f.f1&&f.f2?cents(f.f2,f.f1).toFixed(0)+'¢':''}`;}
+function selectPartial(i,k){selI=i;selP={i,k};const f=S.frames[i],p=f.parts[k];
+ $('selLbl').textContent=`t=${f.t.toFixed(3)} s · partial ${p.v?VN[p.v]+' h'+p.h:'unassigned'} ${p.f.toFixed(1)} Hz`;showInfo(i);drawSpectrum(i);draw();}
+const pLabel=p=>`${p.v?'voice '+VN[p.v]+' h'+p.h:'unassigned peak'} · ${p.f.toFixed(2)} Hz · ${p.db.toFixed(1)} dB`;
+
+$('cMain').onmousedown=e=>{if(!S.frames.length||busy)return;const c=cvXY($('cMain'),e);drag={...c,t:tOfX(c.x),pick:pickMain(c.x,c.y)};sel=null;};
+$('cMain').onmousemove=e=>{if(!S.frames.length)return;const c=cvXY($('cMain'),e),t=tOfX(c.x);hoverI=nearest(t);
+ if(drag&&Math.abs(e.clientX-drag.cx)>4)sel={t0:Math.min(drag.t,t),t1:Math.max(drag.t,t)};
+ showInfo(hoverI);draw();drawSpectrum(hoverI);};
+$('cMain').onmouseleave=()=>{hoverI=-1;draw();if(selI>=0){showInfo(selI);drawSpectrum(selI);}};
+window.addEventListener('mouseup',e=>{
+ if(!drag)return;const d=drag;drag=null;const c=cvXY($('cMain'),e),t=tOfX(c.x);
+ if(!d.pick){sel=null;draw();return status(`No detected partial within ${getP().clickPx}px of the click — nothing played.`);}
+ selectPartial(d.pick.i,d.pick.k);
+ if(Math.abs(e.clientX-d.cx)<=4){sel=null;playPartial(d.pick.i,d.pick.k);}
+ else{sel={t0:Math.min(d.t,t),t1:Math.max(d.t,t)};playPartialTrack(d.pick.i,d.pick.k,sel.t0,sel.t1);}
+ draw();});
+$('cSpec').onclick=e=>{const i=hoverI>=0?hoverI:selI;if(i<0||!S.frames[i])return status('Hover or click the main graph first to choose a frame.');
+ const c=cvXY($('cSpec'),e),{X}=specMap();let best=-1,bd=getP().clickPx;
+ S.frames[i].parts.forEach((p,k)=>{if(!vis(p))return;const dd=Math.abs(X(p.f)-c.x);if(dd<bd){bd=dd;best=k;}});
+ if(best<0)return status('No detected partial near that frequency — nothing played.');
+ selectPartial(i,best);playPartial(i,best);};
+
+/* ---------- synthesis ---------- */
+function wave(type,ph,f,sr){
+ if(type==='sine')return Math.sin(2*Math.PI*ph);
+ const nh=Math.min(40,Math.floor(sr/2/f));let s=0;
+ for(let k=1;k<=nh;k++){const v=Math.sin(2*Math.PI*k*ph);
+  if(type==='sawtooth')s+=v/k*(2/Math.PI);
+  else if(k&1){if(type==='square')s+=v/k*(4/Math.PI);else s+=((k-1)/2&1?-1:1)*v/(k*k)*(8/Math.PI/Math.PI);}}
+ return s;
+}
+const gains=P=>[0,Math.min(1,2*(1-P.bal)),Math.min(1,2*P.bal)];
+function normalize(o){let pk=1e-9;o.forEach(v=>{if(Math.abs(v)>pk)pk=Math.abs(v)});for(let i=0;i<o.length;i++)o[i]*=0.9/pk;return o;}
+function fade(a,ms=10){const n=Math.min(a.length>>1,Math.round(ms/1000*S.sr));for(let i=0;i<n;i++){const g=i/n;a[i]*=g;a[a.length-1-i]*=g;}return a;}
+function fillHold(a){for(let i=1;i<a.length;i++)if(!a[i])a[i]=a[i-1];for(let i=a.length-2;i>=0;i--)if(!a[i])a[i]=a[i+1];return a;}
+/* per-frame frequency/amplitude track of partial (voice v, harmonic h) */
+function partTrack(v,h){const F=S.frames,fq=new Float64Array(F.length),am=new Float64Array(F.length);
+ F.forEach((x,i)=>{const p=x.parts.find(q=>q.v===v&&q.h===h),f0=v===1?x.f1:x.f2;am[i]=p?lin(p.db):0;fq[i]=p?p.f:(f0?h*f0:0);});
+ return{fq:fillHold(fq),am};}
+function addTrack(out,fq,am,g,sA,type){const sr=S.sr,F=S.frames,t0=F[0].t,dt=F.length>1?F[1].t-t0:1,L=F.length;let ph=0;
+ for(let i=0;i<out.length;i++){const u=((i+sA)/sr-t0)/dt,j=Math.max(0,Math.min(L-1,Math.floor(u))),j2=Math.min(L-1,j+1),q=Math.max(0,Math.min(1,u-j));
+  const a=am[j]+(am[j2]-am[j])*q,f=fq[j]+(fq[j2]-fq[j])*q;if(!f)continue;ph=(ph+f/sr)%1;
+  if(a>0&&f<sr/2)out[i]+=g*a*(type?wave(type,ph,f,sr):Math.sin(2*Math.PI*ph));}}
+/* voices: which bit1=A, bit2=B. "parts" timbre = sum of the voice's assigned partials only */
+function synth(which,sA=0,sB){
+ if(!S.frames.length){status('Analyze first.');return null;}
+ const P=getP(),HN=S.anaP.maxH,G=gains(P);sB=sB??S.audio.length;const out=new Float32Array(Math.max(1,sB-sA));
+ for(const v of [1,2]){if(!(which&v))continue;
+  if(P.timbre==='parts')for(let h=1;h<=HN;h++){const T=partTrack(v,h);if(T.am.some(x=>x>0))addTrack(out,T.fq,T.am,G[v],sA);}
+  else{const k=v===1?'1':'2',fq=fillHold(Float64Array.from(S.frames,x=>x['f'+k]||0)),am=Float64Array.from(S.frames,x=>x['a'+k]);addTrack(out,fq,am,G[v],sA,P['wave'+k]);}}
+ return normalize(out);
+}
+function steady(list,d){const sr=S.sr,n=Math.round(d*sr),o=new Float32Array(n);
+ list.forEach(({f,a,type})=>{let ph=0;for(let i=0;i<n;i++){ph=(ph+f/sr)%1;o[i]+=a*(type?wave(type,ph,f,sr):Math.sin(2*Math.PI*ph));}});
+ return fade(normalize(o),15);}
+function playPartial(i,k){const p=S.frames[i].parts[k];play(steady([{f:p.f,a:1}],getP().clickDur),null);status(`▶ Single partial: ${pLabel(p)} @ ${S.frames[i].t.toFixed(3)} s`);}
+function playPartialTrack(i,k,t0,t1){const p=S.frames[i].parts[k],sA=Math.round(t0*S.sr),out=new Float32Array(Math.max(1,Math.round((t1-t0)*S.sr)));
+ if(p.v){const T=partTrack(p.v,p.h);addTrack(out,T.fq,T.am,1,sA);play(fade(normalize(out)),t0);status(`▶ Track of voice ${VN[p.v]} h${p.h} over ${t0.toFixed(2)}–${t1.toFixed(2)} s`);}
+ else{play(steady([{f:p.f,a:1}],t1-t0),t0);status(`▶ Unassigned peak ${p.f.toFixed(1)} Hz held over ${t0.toFixed(2)}–${t1.toFixed(2)} s`);}}
+function playFrameVoices(which){if(selI<0)return status('Click a partial on the graph first to select a frame.');
+ const P=getP(),f=S.frames[selI],G=gains(P),L=[];
+ for(const v of [1,2]){if(!(which&v))continue;
+  if(P.timbre==='parts')f.parts.forEach(p=>{if(p.v===v)L.push({f:p.f,a:G[v]*lin(p.db)})});
+  else{const f0=v===1?f.f1:f.f2;if(f0)L.push({f:f0,a:G[v]*(v===1?f.a1:f.a2),type:P['wave'+v]});}}
+ if(!L.length)return status('Selected frame has no partials for that voice.');
+ play(steady(L,P.clickDur),null);status(`▶ Frame @ ${f.t.toFixed(3)} s · ${which===3?'A+B':'voice '+VN[which]} · ${L.length} partial(s)`);}
+function play(arr,off=0){
+ if(!arr||!arr.length)return;stopPlay();const ac=getAC();ac.resume();
+ const b=ac.createBuffer(1,arr.length,S.sr);b.copyToChannel(arr,0);
+ playSrc=ac.createBufferSource();playSrc.buffer=b;playSrc.connect(ac.destination);playSrc.start();
+ playT0=ac.currentTime;playDur=arr.length/S.sr;playOff=off;
+ const me=playSrc,tick=()=>{if(playSrc!==me)return;const t=ac.currentTime-playT0;if(t>playDur){playSrc=null;draw();return;}
+  draw(playOff==null?null:playOff+t);requestAnimationFrame(tick)};tick();
+}
+function stopPlay(){if(playSrc){try{playSrc.stop()}catch(e){}playSrc=null;draw();}}
+$('bPlayO').onclick=()=>S.audio&&play(S.audio,0);
+$('bSyn').onclick=()=>{status('Synthesizing…');setTimeout(()=>{S.synth=synth(3);play(S.synth,0);S.synth&&status('▶ Voices A+B (resynthesized)')},10)};
+$('bS1').onclick=()=>{const s=synth(1);if(s){play(s,0);status('▶ Voice A — sum of its assigned partials');}};
+$('bS2').onclick=()=>{const s=synth(2);if(s){play(s,0);status('▶ Voice B — sum of its assigned partials');}};
+$('bStopP').onclick=stopPlay;
+$('bFO').onclick=()=>{if(selI<0)return status('Select a frame first.');const f=S.frames[selI];play(fade(S.audio.slice(f.s,f.s+S.N)),f.t-S.N/S.sr/2);};
+$('bFA').onclick=()=>playFrameVoices(1);$('bFB').onclick=()=>playFrameVoices(2);$('bFAB').onclick=()=>playFrameVoices(3);
+$('bFP').onclick=()=>selP?playPartial(selP.i,selP.k):status('Click a partial first.');
+
+/* ---------- export ---------- */
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+function wav(arr,sr){const b=new ArrayBuffer(44+arr.length*2),v=new DataView(b),w=(o,s)=>[...s].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+ w(0,'RIFF');v.setUint32(4,36+arr.length*2,true);w(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+ v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,arr.length*2,true);
+ arr.forEach((s,i)=>v.setInt16(44+i*2,Math.max(-1,Math.min(1,s))*32767,true));return new Blob([b],{type:'audio/wav'});}
+$('bWav').onclick=()=>{const s=S.synth||synth(3);if(s)dl(wav(s,S.sr),'biphonic_synth_AB.wav');};
+$('bWavA').onclick=()=>{const s=synth(1);if(s)dl(wav(s,S.sr),'biphonic_voice_A.wav');};
+$('bWavB').onclick=()=>{const s=synth(2);if(s)dl(wav(s,S.sr),'biphonic_voice_B.wav');};
+$('bCsv').onclick=()=>{if(!S.frames.length)return status('Analyze first.');const HN=S.anaP.maxH,hd=p=>Array.from({length:HN},(_,k)=>`${p}_h${k+1}_dB`).join(',');
+ const r=[`t_s,A_F0_Hz,ampA,B_F0_Hz,ampB,ratio_B_A,cents_B_A,nA,nB,nUnassigned,${hd('A')},${hd('B')}`];
+ const hv=h=>Array.from({length:HN},(_,k)=>h&&h[k]>0?(20*Math.log10(h[k])).toFixed(2):'').join(',');
+ S.frames.forEach(f=>{const c=v=>f.parts.filter(p=>p.v===v).length;
+  r.push([f.t,f.f1?.toFixed(3)??'',f.a1.toExponential(3),f.f2?.toFixed(3)??'',f.a2.toExponential(3),f.f1&&f.f2?(f.f2/f.f1).toFixed(5):'',f.f1&&f.f2?cents(f.f2,f.f1).toFixed(1):'',c(1),c(2),c(0),hv(f.h1),hv(f.h2)].join(','));});
+ dl(new Blob([r.join('\n')],{type:'text/csv'}),'biphonation_voices.csv');};
+
+/* ---------- project persistence (IndexedDB + JSON) ---------- */
+const idb=()=>new Promise((res,rej)=>{const q=indexedDB.open('biphonation',1);q.onupgradeneeded=()=>q.result.createObjectStore('p');q.onsuccess=()=>res(q.result);q.onerror=rej;});
+const proj=()=>({v:4,saved:new Date().toISOString(),params:getP(),anaP:S.anaP,show:{...show},sr:S.sr,audio:S.audio,notes:$('notes').value,frames:S.frames});
+async function save(){try{const db=await idb();db.transaction('p','readwrite').objectStore('p').put(proj(),'current');}catch(e){console.warn(e);}}
+async function restore(p){if(!p)return;setP(p.params||{});
+ if(p.show){Object.assign(show,p.show);[['a','tglA'],['b','tglB'],['u','tglU']].forEach(([k,id])=>$(id).classList.toggle('on',show[k]!==false));}
+ $('notes').value=p.notes||'';S.sr=p.sr||44100;S.audio=p.audio?new Float32Array(p.audio):null;clearAnalysis();makeEnv();
+ if(S.audio&&p.v>=4&&p.frames&&p.frames.length&&p.anaP){
+  setBusy(true);$('progBox').classList.add('on');const T0=performance.now(),el=()=>((performance.now()-T0)/1000).toFixed(1)+' s';
+  try{await computeSpec(p.anaP,false,el);S.frames=p.frames;S.anaP=p.anaP;buildSpecImg();}finally{setBusy(false);$('progBox').classList.remove('on');}
+  status(`Project restored (${p.saved}) with saved analysis.`);
+ }else status(S.audio?`Project restored (${p.saved}) — raw audio only; press ▶ Analyze.`:'Ready.');
+ draw();}
+async function load(){try{const db=await idb();const q=db.transaction('p').objectStore('p').get('current');q.onsuccess=()=>restore(q.result);}catch(e){draw();}}
+const b64e=u8=>{let s='';for(let i=0;i<u8.length;i+=32768)s+=String.fromCharCode.apply(null,u8.subarray(i,i+32768));return btoa(s);};
+const b64d=s=>{const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;};
+$('bSave').onclick=()=>save().then(()=>status('💾 Project saved.'));
+$('bExp').onclick=()=>{const p=proj();p.audio=S.audio?b64e(new Uint8Array(S.audio.buffer.slice(0))):null;dl(new Blob([JSON.stringify(p)]),'biphonation_project.json');};
+$('fProj').onchange=async e=>{const f=e.target.files[0];if(!f||busy)return;const p=JSON.parse(await f.text());
+ if(p.audio)p.audio=new Float32Array(b64d(p.audio).buffer);await restore(p);save();e.target.value='';};
+$('bNew').onclick=()=>{S.audio=null;S.env=null;clearAnalysis();$('notes').value='';draw();save();status('New project.');};
+$('bAna').onclick=()=>{if(busy||rec)return;analyze().then(save);};
+PIDS.forEach(k=>$(k).addEventListener('change',()=>{S.synth=null;
+ if(ANA.includes(k)&&S.frames.length){$('bAna').classList.add('stale');status('Analysis parameters changed — press ▶ Analyze to apply them.');}
+ if(k==='dispMax'){buildSpecImg();draw();}save();}));
+$('notes').addEventListener('change',save);
+window.addEventListener('beforeunload',()=>{save()});
+draw();load();
+</script>
+</body>
+</html>
