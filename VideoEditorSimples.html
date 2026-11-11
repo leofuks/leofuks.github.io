@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="author" content="Leonardo Fuks">
+<title>Video Editor — por Leonardo Fuks</title>
+<style>
+  body{font-family:sans-serif;max-width:900px;margin:20px auto;padding:0 10px}
+  header h2{margin-bottom:0}
+  header small{color:#666}
+  video{width:100%;background:#000;margin-top:10px}
+  #timeline{position:relative;height:30px;background:#c33;margin:10px 0;cursor:pointer}
+  .keep{position:absolute;top:0;height:100%;background:#3a3;color:#fff;font-size:12px;text-align:center;overflow:hidden;pointer-events:none}
+  .mark{position:absolute;top:-4px;width:2px;height:38px;background:#000;pointer-events:none}
+  #cursor{position:absolute;top:0;width:2px;height:100%;background:#ff0;pointer-events:none}
+  table{border-collapse:collapse;width:100%;margin-top:10px}
+  td,th{border:1px solid #ccc;padding:4px;text-align:center}
+  input[type=number]{width:90px}
+  button{margin:2px;padding:6px 10px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .legend span{display:inline-block;width:12px;height:12px;margin:0 4px}
+  #prog{margin-top:10px;padding:10px;border:1px solid #ccc;border-radius:6px}
+  #bar{width:100%;height:18px}
+  #status{margin-top:6px;font-weight:bold}
+  #status.ok{color:#2a2}
+  #status.err{color:#c22}
+  #status.warn{color:#d80}
+  #status.paused{color:#36c}
+  #errlog{white-space:pre-wrap;font-size:11px;max-height:150px;overflow:auto;color:#c22}
+  #ctrls{margin-top:6px}
+  #abort{background:#c33;color:#fff;border:1px solid #a22}
+  footer{margin-top:30px;padding-top:10px;border-top:1px solid #ddd;color:#666;font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h2>🎬 Video Editor</h2>
+  <small>Editor de vídeos desenvolvido por <b>Leonardo Fuks</b></small>
+</header>
+
+<p><input type="file" id="file" accept="video/mp4,video/*"></p>
+<video id="v" controls playsinline></video>
+<div>
+  <button id="mark">📍 Mark Point (<span id="now">0.000</span>s)</button>
+  <button id="clear">Limpar pontos</button>
+  <span class="legend"><span style="background:#3a3"></span>mantido <span style="background:#c33"></span>cortado</span>
+</div>
+<div id="timeline"><div id="cursor"></div></div>
+
+<h3>Pontos marcados</h3>
+<table><thead><tr><th>#</th><th>Tempo (s)</th><th></th></tr></thead><tbody id="pts"></tbody></table>
+
+<h3>Segmentos (ordem final)</h3>
+<table><thead><tr><th>Ordem</th><th>Início</th><th>Fim</th><th>Duração</th><th>Ganho dB (vazio = herda)</th><th>Efetivo</th><th></th></tr></thead>
+<tbody id="segs"></tbody></table>
+<p>Duração final: <b id="total">0</b>s</p>
+
+<button id="export">⬇️ Exportar vídeo</button>
+<div id="prog" hidden>
+  <progress id="bar" max="100"></progress>
+  <div id="status"></div>
+  <div id="ctrls" hidden>
+    <button id="pause">⏸ Interromper</button>
+    <button id="abort">⛔ Abortar</button>
+  </div>
+  <pre id="errlog" hidden></pre>
+</div>
+
+<footer>Video Editor — desenvolvido por Leonardo Fuks</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const v=$('v'), tl=$('timeline');
+let file=null, points=[], segs=[]; // seg: {start,end,gain:''|number}
+const fmt=t=>(+t).toFixed(3);
+
+/* ---------- Carregamento e player ---------- */
+$('file').onchange=e=>{
+  file=e.target.files[0]; if(!file) return;
+  if(v.src) URL.revokeObjectURL(v.src);
+  v.src=URL.createObjectURL(file); points=[]; segs=[]; render();
+};
+v.ontimeupdate=()=>{$('now').textContent=fmt(v.currentTime);
+  if(v.duration) $('cursor').style.left=(v.currentTime/v.duration*100)+'%';};
+v.onloadedmetadata=render;
+tl.onclick=e=>{if(v.duration) v.currentTime=e.offsetX/tl.clientWidth*v.duration;};
+
+/* ---------- Marcação de pontos ---------- */
+$('mark').onclick=()=>{
+  if(!file) return alert('Carregue um vídeo.');
+  v.pause(); const t=+v.currentTime.toFixed(3);
+  if(points.includes(t)) return;
+  points.push(t); rebuildSegs();
+};
+$('clear').onclick=()=>{points=[];segs=[];render();};
+
+function rebuildSegs(){
+  points.sort((a,b)=>a-b);
+  const old=segs, fresh=[];
+  for(let i=0;i<points.length;i+=2){
+    const s={start:points[i], end:points[i+1]??v.duration, gain:''};
+    const o=old.find(x=>x.start===s.start); if(o) s.gain=o.gain;
+    fresh.push(s);
+  }
+  fresh.sort((a,b)=>{const ia=old.findIndex(x=>x.start===a.start), ib=old.findIndex(x=>x.start===b.start);
+    return (ia<0?1e9+a.start:ia)-(ib<0?1e9+b.start:ib);});
+  segs=fresh; render();
+}
+function effectiveGains(){let last=0;return segs.map(s=>{if(s.gain!==''&&!isNaN(s.gain)) last=+s.gain;return last;});}
+
+/* ---------- Renderização ---------- */
+function render(){
+  const d=v.duration||1;
+  tl.querySelectorAll('.keep,.mark').forEach(n=>n.remove());
+  segs.forEach((s,i)=>{const k=document.createElement('div');k.className='keep';
+    k.style.left=s.start/d*100+'%';k.style.width=(s.end-s.start)/d*100+'%';k.textContent='#'+(i+1);tl.appendChild(k);});
+  points.forEach(p=>{const m=document.createElement('div');m.className='mark';m.style.left=p/d*100+'%';tl.appendChild(m);});
+
+  $('pts').innerHTML=points.map((p,i)=>
+    `<tr><td>T${i+1}</td><td><input type="number" step="0.001" min="0" value="${p}" onchange="editPt(${i},this.value)"></td>
+     <td><button onclick="v.currentTime=${p}">Ir</button><button onclick="delPt(${i})">🗑</button></td></tr>`).join('');
+
+  const eg=effectiveGains(); let total=0;
+  $('segs').innerHTML=segs.map((s,i)=>{total+=s.end-s.start;
+    return `<tr><td>${i+1}</td><td>${fmt(s.start)}</td><td>${fmt(s.end)}${points.indexOf(s.start)===points.length-1?' (fim)':''}</td>
+    <td>${fmt(s.end-s.start)}</td>
+    <td><input type="number" step="0.5" value="${s.gain}" placeholder="herda" onchange="segs[${i}].gain=this.value===''?'':+this.value;render()"></td>
+    <td>${eg[i]>0?'+':''}${eg[i]} dB</td>
+    <td><button onclick="mv(${i},-1)">↑</button><button onclick="mv(${i},1)">↓</button>
+    <button onclick="v.currentTime=${s.start};v.play()">▶</button></td></tr>`;}).join('');
+  $('total').textContent=fmt(total);
+}
+function editPt(i,val){val=+val;if(isNaN(val)||val<0||(v.duration&&val>v.duration))return render();
+  const oldStart=points[i];const s=segs.find(x=>x.start===oldStart);if(s)s.start=val;points[i]=val;rebuildSegs();}
+function delPt(i){points.splice(i,1);rebuildSegs();}
+function mv(i,d){const j=i+d;if(j<0||j>=segs.length)return;[segs[i],segs[j]]=[segs[j],segs[i]];render();}
+
+/* ---------- Interface de progresso ---------- */
+const expBtn=$('export'), bar=$('bar'), st=$('status'), errlog=$('errlog'),
+      ctrls=$('ctrls'), pauseBtn=$('pause'), abortBtn=$('abort');
+const fmtEta=s=>{s=Math.max(0,Math.round(s));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;};
+
+function setState(msg,pct,cls=''){
+  if(pct==null) bar.removeAttribute('value'); else bar.value=pct;
+  st.textContent=msg+(pct!=null&&(cls===''||cls==='paused')?` — ${pct.toFixed(1)}%`:'');
+  st.className=cls;
+}
+function finish(){
+  job=null; ctrls.hidden=true; expBtn.disabled=false;
+  pauseBtn.textContent='⏸ Interromper';
+}
+function fail(msg){
+  setState('❌ Falha na exportação',0,'err');
+  errlog.textContent=msg; errlog.hidden=false; finish();
+}
+
+/* ---------- Motor de exportação (navegador) ---------- */
+let pv=null, actx, gainN, dest, job=null;
+const canvas=document.createElement('canvas'), c2d=canvas.getContext('2d');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const once=(el,ev)=>new Promise(r=>el.addEventListener(ev,r,{once:true}));
+
+async function setupEngine(){
+  if(!pv){
+    pv=document.createElement('video'); pv.playsInline=true; pv.preload='auto';
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=actx.createMediaElementSource(pv);
+    gainN=actx.createGain(); dest=actx.createMediaStreamDestination();
+    src.connect(gainN); gainN.connect(dest);       // não vai para os alto-falantes
+  }
+  if(pv.src!==v.src){ pv.src=v.src; }
+  await actx.resume();
+  if(pv.readyState<1) await once(pv,'loadedmetadata');
+}
+function pickMime(){
+  const list=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4',
+              'video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  return list.find(m=>MediaRecorder.isTypeSupported(m))||'';
+}
+function seekTo(t){ const p=once(pv,'seeked'); pv.currentTime=t; return p; }
+async function waitUnpaused(){ while(job&&job.paused&&!job.aborted) await sleep(100); }
+
+async function runExport(list){
+  const my=job;
+  await setupEngine();
+  canvas.width=pv.videoWidth||640; canvas.height=pv.videoHeight||360;
+  const stream=new MediaStream([...canvas.captureStream(30).getVideoTracks(),
+                                ...dest.stream.getAudioTracks()]);
+  const mime=pickMime();
+  const rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:5e6}:{});
+  my.rec=rec; const chunks=[];
+  rec.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+
+  const total=list.reduce((a,s)=>a+s.end-s.start,0);
+  let done=0;
+  setState('⚙️ Processando...',null);
+
+  for(const s of list){
+    await waitUnpaused(); if(my.aborted) return;
+    gainN.gain.value=Math.pow(10,s.gain/20);       // dB -> fator linear
+    await seekTo(s.start); if(my.aborted) return;
+    c2d.drawImage(pv,0,0,canvas.width,canvas.height);
+    await waitUnpaused(); if(my.aborted) return;
+
+    if(rec.state==='inactive') rec.start(1000); else rec.resume();
+    my.inSeg=true;
+    await pv.play();
+    await new Promise(res=>{
+      (function loop(){
+        if(my.aborted) return res();
+        c2d.drawImage(pv,0,0,canvas.width,canvas.height);
+        const cur=Math.min(Math.max(pv.currentTime-s.start,0),s.end-s.start);
+        if(!my.paused){
+          const pct=(done+cur)/total*100;
+          setState(`⚙️ Processando (~${fmtEta(total-done-cur)} restantes)`,pct);
+        }
+        if(pv.currentTime>=s.end||pv.ended){
+          pv.pause(); if(rec.state==='recording') rec.pause(); return res();
+        }
+        requestAnimationFrame(loop);
+      })();
+    });
+    my.inSeg=false;
+    if(my.aborted) return;
+    done+=s.end-s.start;
+  }
+
+  setState('📦 Finalizando arquivo...',null);
+  await new Promise(r=>{ rec.onstop=r; rec.stop(); });
+  if(my.aborted) return;
+  const type=rec.mimeType||mime||'video/webm';
+  const blob=new Blob(chunks,{type});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='editado.'+(type.includes('mp4')?'mp4':'webm');
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+  setState('✅ Concluído! Download iniciado.',100,'ok');
+  finish();
+}
+
+/* ---------- Controles ---------- */
+expBtn.onclick=()=>{
+  if(!file||!segs.length) return alert('Carregue um vídeo e marque ao menos um ponto.');
+  if(segs.some(s=>!(s.end>s.start))) return alert('Há segmento com duração inválida.');
+  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)
+    return fail('Este navegador não suporta gravação de vídeo (MediaRecorder).');
+  const eg=effectiveGains();
+  const list=segs.map((s,i)=>({start:s.start,end:s.end,gain:eg[i]}));
+
+  v.pause();
+  job={paused:false,aborted:false,inSeg:false,rec:null};
+  expBtn.disabled=true; $('prog').hidden=false; errlog.hidden=true;
+  ctrls.hidden=false; pauseBtn.textContent='⏸ Interromper';
+  setState('⏳ Preparando processamento...',null);
+  runExport(list).catch(e=>{ if(job&&!job.aborted) fail(e.message||String(e)); });
+};
+
+pauseBtn.onclick=()=>{
+  if(!job) return;
+  if(!job.paused){
+    job.paused=true; pv.pause();
+    if(job.rec&&job.rec.state==='recording') job.rec.pause();
+    pauseBtn.textContent='▶️ Continuar';
+    setState('⏸ Processamento interrompido',bar.value||0,'paused');
+  }else{
+    job.paused=false;
+    if(job.inSeg){ job.rec.resume(); pv.play(); }
+    pauseBtn.textContent='⏸ Interromper';
+    setState('⚙️ Processando...',null);
+  }
+};
+
+abortBtn.onclick=()=>{
+  if(!job||!confirm('Abortar o processamento atual?')) return;
+  job.aborted=true;
+  if(pv) pv.pause();
+  if(job.rec&&job.rec.state!=='inactive'){ job.rec.onstop=null; job.rec.stop(); }
+  setState('⛔ Processamento abortado pelo usuário',0,'warn');
+  finish();
+};
+</script>
+</body>
+</html>

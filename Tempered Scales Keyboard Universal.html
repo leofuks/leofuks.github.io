@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Universal Temperament Keyboard</title>
+<style>
+:root{--bg:#11141b;--card:#1a1e28;--line:#2a3142;--fg:#e6e9f0;--mut:#8f9ab0;--acc:#4f9fe8;--acc2:#f08a5d;--ok:#46c483;--bad:#e05656;--warn:#e0b656}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;padding:8px 14px;background:#0d1016;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:1.15rem}.brand .attr{color:var(--mut);font-size:.75rem}
+.tabs{display:flex;flex-wrap:wrap;gap:3px}
+.tabs button{border-radius:8px 8px 0 0;background:transparent;border-bottom:2px solid transparent}
+.tabs button.active{border-bottom-color:var(--acc);background:#1d2330;color:#fff}
+.sound{display:flex;align-items:center;gap:8px}
+.dot{width:12px;height:12px;border-radius:50%;background:#555}.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+main{max-width:1400px;margin:0 auto;padding:12px}
+.tab{display:none;gap:12px}.tab.active{display:grid}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+h2{font-size:.85rem;margin:0 0 8px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+button{font:inherit;color:var(--fg);background:#252c3b;border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer}
+button:hover{background:#2f3749}
+button.go{background:var(--ok);color:#06210f;font-weight:700}
+button.on{background:var(--bad);color:#fff}
+input[type=number],input[type=text],select,textarea{font:inherit;color:var(--fg);background:#0c0f15;border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+textarea{width:100%;min-height:70px;font-family:ui-monospace,Consolas,monospace}
+input[type=range]{accent-color:var(--acc)}
+.opts{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.opts label{display:inline-flex;gap:5px;align-items:center;color:var(--mut)}
+.hint{color:var(--mut);font-size:.78rem;margin:6px 0 0}
+#readout{font-size:1.5rem;font-weight:700}#readSub{color:var(--mut)}
+.kbwrap{overflow-x:auto;margin-top:10px;padding-bottom:4px}
+.kb{position:relative;display:flex;height:170px;user-select:none;-webkit-user-select:none;touch-action:none}
+.key{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;font-size:9px;line-height:1.1;padding-bottom:4px;cursor:pointer;overflow:hidden;text-align:center}
+.white{flex:1;background:#f2f3f5;color:#333;border:1px solid #777;border-radius:0 0 4px 4px}
+.black{position:absolute;top:0;height:60%;background:#15171c;color:#ccc;border:1px solid #000;border-radius:0 0 3px 3px;z-index:2}
+.lin{flex:1;background:#e9ecf1;color:#222;border:1px solid #777;border-radius:0 0 4px 4px}
+.lin.dark{background:#3a4152;color:#ddd}
+.key.tonic{box-shadow:inset 0 -6px 0 var(--acc2)}
+.key.active{background:var(--acc)!important;color:#001!important}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500}
+.msgs div{padding:4px 8px;border-radius:5px;margin:3px 0;font-size:.82rem}
+.e{background:#4a1c1c;color:#ffd6d6}.w{background:#4a3f1c;color:#ffeec2}.i{background:#1c3a4a;color:#cdeeff}
+canvas{width:100%;display:block;background:#0b0e14;border-radius:8px}
+#scaleCv{height:120px}
+.lib{max-height:520px;overflow:auto}
+.lib tr{cursor:pointer}.lib tr:hover td{background:#222a3a}.lib tr.sel td{background:#22405e}
+.tag{display:inline-block;padding:1px 7px;border-radius:9px;font-size:.72rem;background:#2a3142;color:var(--mut)}
+.bend{display:flex;align-items:center;gap:8px}
+footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><h1>Universal Temperament Keyboard</h1><div class="attr">Developed by Leonardo Fuks · Stage 1 core</div></div>
+  <nav class="tabs">
+    <button data-tab="play" class="active">Keyboard</button>
+    <button data-tab="lib">Library</button>
+    <button data-tab="edit">Custom Editor</button>
+    <button data-tab="sound">Sound</button>
+    <button data-tab="cam">Head Control</button>
+    <button data-tab="save">Save / Export</button>
+    <button data-tab="ana">Analysis</button>
+  </nav>
+  <div class="sound"><span class="dot" id="dot"></span><button id="startBtn" class="go">Start sound</button></div>
+</header>
+
+<main>
+<!-- ============ KEYBOARD ============ -->
+<section class="tab active" id="tab-play">
+  <section class="card">
+    <div class="opts" style="justify-content:space-between">
+      <div><span id="readout">—</span> <span id="readSub"></span></div>
+      <div><b id="tunName"></b> <span class="tag" id="tunInfo"></span></div>
+    </div>
+    <div class="opts" style="margin-top:8px">
+      <label>Tonic <select id="tonicPc"></select><input type="number" id="tonicOct" min="0" max="8" style="width:52px"></label>
+      <label>A4 = <input type="number" id="ref" step="0.01" style="width:78px"> Hz</label>
+      <label>Tonic Hz override <input type="number" id="tonicHz" step="0.001" placeholder="auto" style="width:96px"></label>
+      <span class="hint" id="tonicTxt" style="margin:0"></span>
+    </div>
+    <div class="opts" style="margin-top:6px">
+      <label>Lowest period <input type="number" id="low" min="-4" max="4" style="width:52px"></label>
+      <label>Periods <input type="number" id="count" min="1" max="8" style="width:52px"></label>
+      <label>Layout <select id="layout"><option value="auto">Auto</option><option value="piano">Piano (12-TET mapping)</option><option value="linear">Linear (all notes)</option></select></label>
+      <label>Labels <select id="labels"><option value="cents">Cents</option><option value="deg">Degree</option><option value="hz">Hz</option><option value="et">Nearest 12-TET</option><option value="none">None</option></select></label>
+      <label><input type="checkbox" id="glide"> Continuous glide</label>
+      <label><input type="checkbox" id="pedal"> Sustain pedal (latched)</label>
+      <label><input type="checkbox" id="monoChk"> Mono</label>
+    </div>
+    <div class="bend" style="margin-top:6px"><span class="hint" style="margin:0">Pitch bend</span>
+      <input type="range" id="bend" min="-1" max="1" step="0.001" value="0" style="flex:1;max-width:360px"><output id="bendOut">0 ¢</output></div>
+    <div class="kbwrap"><div class="kb" id="kb"></div></div>
+    <p class="hint">Click, drag or use multitouch on the keys. Continuous glide moves the pitch smoothly with the pointer. Computer keys, in consecutive scale degrees: <b>Z X C … /</b> → <b>A S D … '</b> → <b>Q W E … ]</b> → <b>1 2 … =</b>. <b>← / →</b> shift by one period, <b>Space</b> is the sustain pedal (hold), and <b>↑ / ↓</b> bend the pitch. Key map starts at: <b id="kbBaseTxt"></b></p>
+  </section>
+</section>
+
+<!-- ============ LIBRARY ============ -->
+<section class="tab" id="tab-lib">
+  <section class="card">
+    <h2>Scales and temperaments (starter set — full database in Stage 4)</h2>
+    <div class="opts"><input type="text" id="libSearch" placeholder="Search name, origin, type, notes…" style="flex:1;min-width:200px">
+      <select id="libType"><option value="">All types</option></select></div>
+    <div class="lib" style="margin-top:8px"><table><thead><tr><th>Name</th><th>Origin</th><th>Type</th><th>Notes</th><th>Period ¢</th><th>Status</th></tr></thead><tbody id="libRows"></tbody></table></div>
+  </section>
+  <section class="card"><h2>Details</h2><div id="libInfo" class="hint">Select an entry to apply it to the keyboard.</div></section>
+</section>
+
+<!-- ============ EDITOR ============ -->
+<section class="tab" id="tab-edit">
+  <section class="card">
+    <h2>Custom temperament — comma-separated values</h2>
+    <div class="opts" style="margin-bottom:6px">
+      <label><input type="radio" name="mode" value="cum" checked> Cumulative positions</label>
+      <label><input type="radio" name="mode" value="int"> Successive intervals</label>
+      <label>Period <input type="number" id="edPeriod" value="1200" step="0.001" style="width:96px"> ¢</label>
+      <label><input type="checkbox" id="edNonPer"> Non-periodic (no repetition)</label>
+      <label><input type="checkbox" id="edAuto" checked> Auto-insert 0 and period</label>
+      <label><input type="checkbox" id="edLive"> Apply when editing ends</label>
+    </div>
+    <textarea id="ed">0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200</textarea>
+    <div class="opts" style="margin-top:6px">
+      <label>Name <input type="text" id="edName" value="Custom temperament 01" style="width:220px"></label>
+      <button class="go" id="edApply">APPLY</button>
+      <button id="edLoad">Load current tuning</button>
+      <span class="hint" style="margin:0">Examples:</span>
+      <button data-ex="0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200|cum">12-TET</button>
+      <button data-ex="0, 200, 400, 500, 700, 900, 1100, 1200|cum">Major</button>
+      <button data-ex="0, 315.64, 498.04, 701.96, 884.36, 1200|cum">5-note</button>
+      <button data-ex="200, 200, 100, 200, 200, 200, 100|int">Intervals (major)</button>
+      <button data-ex="1, 9/8, 5/4, 4/3, 3/2, 5/3, 15/8, 2|cum">Ratios (JI)</button>
+    </div>
+    <p class="hint">Accepts integers, decimals and ratios such as <code>3/2</code>. With <b>Non-periodic</b>, values are absolute pitches above the tonic with no repetition (for stretched tunings or harmonic series, for example).</p>
+    <div class="msgs" id="edMsgs"></div>
+  </section>
+  <section class="card"><h2>Preview</h2><canvas id="scaleCv"></canvas><div style="overflow:auto;margin-top:8px"><table id="edTable"></table></div></section>
+</section>
+
+<!-- ============ SOUND ============ -->
+<section class="tab" id="tab-sound">
+  <div class="grid">
+    <section class="card"><h2>Oscillator</h2>
+      <div class="opts"><label>Waveform <select id="wave"><option>sine</option><option>triangle</option><option>square</option><option>sawtooth</option><option value="additive">Additive (harmonics)</option></select></label></div>
+      <div class="opts" style="margin-top:6px"><label>Harmonics <input type="number" id="nh" min="1" max="64" style="width:60px"></label><label>Tilt dB/oct <input type="number" id="tilt" step="0.5" style="width:64px"></label></div>
+      <p class="hint">FM synthesis, MIDI instrument presets, noise and physical models come in Stage 2.</p></section>
+    <section class="card"><h2>Envelope (ADSR)</h2><div id="adsr"></div></section>
+    <section class="card"><h2>Performance</h2><div id="perf"></div></section>
+  </div>
+</section>
+
+<section class="tab" id="tab-cam"><section class="card"><h2>Head control (MediaPipe)</h2><p class="hint">Stage 3 will add yaw, pitch and roll tracking, modes A–D, calibration, and scale following.</p></section></section>
+<section class="tab" id="tab-save"><section class="card"><h2>Save and manage</h2><p class="hint">The last configuration is already saved automatically. Stage 5 will add saving, renaming, duplicating and deleting configurations, plus .js and JSON export and validated import.</p></section></section>
+<section class="tab" id="tab-ana"><section class="card"><h2>Analysis</h2><p class="hint">Stage 5 will add multi-tuning comparison, deviation graphs and exportable tables. The Custom Editor preview already shows cents, intervals, Hz and deviation from 12-TET.</p></section></section>
+</main>
+<footer>Universal Temperament Keyboard · Leonardo Fuks</footer>
+
+<script>
+(() => {
+'use strict';
+/* ================= Helpers ================= */
+const $ = id => document.getElementById(id);
+const NOTES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const BLACK = [1,3,6,8,10];
+const EPS = 1e-6;
+const clamp = (x,a,b) => Math.min(b, Math.max(a, x));
+const r2c = r => 1200 * Math.log2(r);
+const ET = (n, p = 1200) => Array.from({length: n}, (_, i) => i * p / n);
+const parseRatio = s => { const [a, b] = String(s).split('/').map(Number); return a / (b || 1); };
+const RAT = (...rs) => rs.map(r => r2c(parseRatio(r)));
+const fmt = (x, d = 2) => (Math.round(x * 10 ** d) / 10 ** d).toString();
+
+/* ================= Library (starter) ================= */
+function meantone(fifth) {
+  const a = []; for (let k = -3; k <= 8; k++) a.push(((k * fifth) % 1200 + 1200) % 1200);
+  return a.sort((x, y) => x - y);
+}
+const PYTH = ['1','256/243','9/8','32/27','81/64','4/3','729/512','3/2','128/81','27/16','16/9','243/128'];
+const SHRUTI = ['1','256/243','16/15','10/9','9/8','32/27','6/5','5/4','81/64','4/3','27/20','45/32','729/512','3/2','128/81','8/5','5/3','27/16','16/9','9/5','15/8','243/128'];
+const LIB = [
+  {name:'12-TET chromatic', origin:'Western / international', type:'Equal temperament', status:'Theoretical', cents:ET(12), src:'Standard equal temperament; A4 = 440 Hz (ISO 16:1975).'},
+  {name:'Major (Ionian), 12-TET', origin:'Western', type:'Scale (12-TET)', status:'Theoretical', cents:[0,200,400,500,700,900,1100], src:'Common-practice theory.'},
+  {name:'Natural minor (Aeolian), 12-TET', origin:'Western', type:'Scale (12-TET)', status:'Theoretical', cents:[0,200,300,500,700,800,1000], src:'Common-practice theory.'},
+  {name:'Major pentatonic, 12-TET', origin:'Western / global', type:'Scale (12-TET)', status:'Approximation', cents:[0,200,400,700,900], src:'12-TET rendering of a widespread anhemitonic pentatonic.'},
+  {name:'Whole-tone, 12-TET', origin:'Western', type:'Scale (12-TET)', status:'Theoretical', cents:ET(6), src:'Symmetric scale (Debussy and others).'},
+  {name:'19-TET', origin:'Western microtonal', type:'Equal temperament', status:'Theoretical', cents:ET(19), src:'Proposed by Salinas (1577) as a meantone approximation; Yasser (1932).'},
+  {name:'24-TET (quarter-tone)', origin:'Arabic theory / Western microtonal', type:'Equal temperament', status:'Theoretical', cents:ET(24), src:'Mikhail Mishaqa (19th c.); discussed at the Cairo Congress (1932).'},
+  {name:'31-TET', origin:'Western microtonal', type:'Equal temperament', status:'Theoretical', cents:ET(31), src:'Huygens (1691); Fokker organ (1950).'},
+  {name:'53-TET', origin:'Theoretical / Turkish theory basis', type:'Equal temperament', status:'Theoretical', cents:ET(53), src:'Mercator / Holder comma (1694).'},
+  {name:'Just major (5-limit)', origin:'Western', type:'Just intonation', status:'Theoretical', ratios:['1','9/8','5/4','4/3','3/2','5/3','15/8'], src:'Ptolemy syntonic diatonic; Zarlino (1558).'},
+  {name:'Pythagorean chromatic', origin:'Ancient Greek / medieval Western', type:'Pythagorean', status:'Theoretical', ratios:PYTH, src:'Chain of pure 3/2 fifths, E♭ to G♯.'},
+  {name:'Quarter-comma meantone', origin:'Western, Renaissance', type:'Meantone', status:'Historical', cents:meantone(701.955 - 21.506 / 4), src:'Aron (1523); Zarlino (1571). Fifths narrowed by 1/4 syntonic comma, E♭–G♯.'},
+  {name:'Fifth-comma meantone', origin:'Western, Baroque', type:'Meantone', status:'Historical', cents:meantone(701.955 - 21.506 / 5), src:'Fifths narrowed by 1/5 syntonic comma, E♭–G♯.'},
+  {name:'Werckmeister III', origin:'Western, Germany 1691', type:'Historical temperament', status:'Historical', cents:[0,90.225,192.18,294.135,390.225,498.045,588.27,696.09,792.18,888.27,996.09,1092.18], src:'Werckmeister, Musicalische Temperatur (1691). Fifths C–G–D–A and B–F♯ tempered by 1/4 Pythagorean comma.'},
+  {name:'Kirnberger III', origin:'Western, Germany 1779', type:'Historical temperament', status:'Historical', cents:[0,90.225,193.157,294.135,386.314,498.045,590.224,696.578,792.18,889.735,996.09,1088.269], src:'Kirnberger (1779). Four fifths C–E tempered by 1/4 syntonic comma.'},
+  {name:'Vallotti', origin:'Western, Italy c.1750', type:'Historical temperament', status:'Historical', cents:[0,94.135,196.09,298.045,392.18,501.955,592.18,698.045,796.09,894.135,1000,1090.225], src:'Vallotti. Six fifths F–B tempered by 1/6 Pythagorean comma.'},
+  {name:'22 shruti (just-intonation model)', origin:'India (theoretical reconstruction)', type:'Just intonation', status:'Theoretical model', ratios:SHRUTI, src:'A common modern JI reconstruction of the Natyashastra 22 shrutis. Not equal; measured practice differs (e.g., Levy 1982; Jairazbhoy & Stone 1963).'},
+  {name:'Maqam Rast (24-TET convention)', origin:'Arabic (Levant / Egypt)', type:'Microtonal (24-TET)', status:'Approximation', cents:[0,200,350,500,700,900,1050], src:'Quarter-tone notation convention. Performed neutral thirds and sevenths vary by region (Marcus 1989).'},
+  {name:'Maqam Bayati (24-TET convention)', origin:'Arabic', type:'Microtonal (24-TET)', status:'Approximation', cents:[0,150,300,500,700,800,1000], src:'Quarter-tone convention; the second degree is performed variably.'},
+  {name:'Makam Rast (53-comma, AEU)', origin:'Turkish (Ottoman)', type:'Microtonal (53-TET)', status:'Approximation', cents:[0,9,17,22,31,40,48].map(k => k * 1200 / 53), src:'Arel-Ezgi-Uzdilek system in Holdrian commas: 9-8-5-9-9-8-5. Practice deviates (Bozkurt et al. 2009).'},
+  {name:'Hirajōshi (12-TET approx.)', origin:'Japan', type:'Scale (12-TET)', status:'Approximation', cents:[0,200,300,700,800], src:'12-TET rendering of a koto tuning; actual koto tunings vary.'},
+  {name:'Sléndro (5-equal idealisation)', origin:'Indonesia, Java', type:'Microtonal', status:'Idealisation', cents:ET(5), src:'Idealised model only. Measured gamelans deviate markedly (Surjodiningrat, Sudarjana & Susanto 1972). Enter measured data in the Editor.'},
+  {name:'Bohlen-Pierce (13 ED3)', origin:'Contemporary', type:'Non-octave', status:'Theoretical', cents:ET(13, r2c(3)), period:r2c(3), src:'Bohlen (1972); Pierce (1984). 13 equal steps of the tritave (3/1).'},
+  {name:'Harmonic series 8–16', origin:'Acoustic', type:'Just intonation', status:'Theoretical', ratios:['8/8','9/8','10/8','11/8','12/8','13/8','14/8','15/8'], src:'Partials 8 to 16, octave-repeating.'},
+  {name:'Harmonic series 1–16 (non-periodic)', origin:'Acoustic', type:'Non-periodic', status:'Theoretical', ratios:Array.from({length:16}, (_, i) => String(i + 1)), period:null, src:'Absolute partials 1 to 16; no repetition.'}
+];
+LIB.forEach(e => {
+  if (e.ratios) e.cents = RAT(...e.ratios);
+  if (e.period === undefined) e.period = 1200;
+});
+
+/* ================= State ================= */
+const DEF = {
+  tuning: {name: LIB[0].name, cents: LIB[0].cents.slice(), period: 1200, meta: {type: LIB[0].type, status: LIB[0].status}},
+  tonicPc: 0, tonicOct: 4, ref: 440, tonicHz: null, low: -1, count: 3, layout: 'auto', labels: 'cents',
+  glide: false, mono: false, porta: 0.08, bendRange: 200,
+  wave: 'sawtooth', nh: 16, tilt: -6, vol: 0.7, A: 0.01, D: 0.3, Su: 0.7, Rl: 0.4, kbBase: 0
+};
+let S;
+try { S = Object.assign({}, DEF, JSON.parse(localStorage.getItem('utk.v1') || '{}')); } catch (e) { S = {...DEF}; }
+let saveT = 0;
+const save = () => { clearTimeout(saveT); saveT = setTimeout(() => localStorage.setItem('utk.v1', JSON.stringify(S)), 300); };
+
+/* ================= Temperament engine ================= */
+const T = () => S.tuning;
+const nSteps = () => T().cents.length;
+function tonicHz() {
+  if (S.tonicHz > 0) return S.tonicHz;
+  const midi = S.tonicPc + 12 * (S.tonicOct + 1);
+  return S.ref * Math.pow(2, (midi - 69) / 12);
+}
+function degCents(d) {
+  const t = T(), n = t.cents.length;
+  if (t.period) { const o = Math.floor(d / n); return o * t.period + t.cents[d - o * n]; }
+  return t.cents[d];
+}
+const centsHz = c => tonicHz() * Math.pow(2, c / 1200);
+const degHz = d => centsHz(degCents(d));
+function nearestET(f) {
+  const m = 69 + 12 * Math.log2(f / S.ref), r = Math.round(m);
+  return {name: NOTES[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1), dev: (m - r) * 100, pc: ((r % 12) + 12) % 12};
+}
+function degRange() {
+  const n = nSteps();
+  if (!T().period) return [0, n - 1];
+  return [S.low * n, (S.low + S.count) * n];
+}
+
+/* ================= Audio engine ================= */
+let ctx = null, master = null, wavePW = null;
+const voices = new Map(), sustained = new Set();
+let mono = null, monoStack = [], pedalDown = false;
+function ensureAudio() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({latencyHint: 'interactive'});
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -12; comp.ratio.value = 6;
+    master = ctx.createGain(); master.gain.value = S.vol * S.vol;
+    master.connect(comp); comp.connect(ctx.destination);
+    buildWave();
+  }
+  if (ctx.state !== 'running') ctx.resume();
+  $('dot').classList.add('on'); $('startBtn').textContent = 'Stop sound'; $('startBtn').classList.add('on');
+}
+function stopAudio() {
+  allOff();
+  if (ctx) ctx.suspend();
+  $('dot').classList.remove('on'); $('startBtn').textContent = 'Start sound'; $('startBtn').classList.remove('on');
+}
+$('startBtn').onclick = () => (ctx && ctx.state === 'running') ? stopAudio() : ensureAudio();
+
+function buildWave() {
+  if (!ctx || S.wave !== 'additive') { wavePW = null; return; }
+  const n = clamp(S.nh | 0, 1, 64), re = new Float32Array(n + 1), im = new Float32Array(n + 1);
+  for (let k = 1; k <= n; k++) im[k] = Math.pow(10, S.tilt * Math.log2(k) / 20);
+  wavePW = ctx.createPeriodicWave(re, im);
+}
+function setWave(o) { if (S.wave === 'additive' && wavePW) o.setPeriodicWave(wavePW); else o.type = S.wave === 'additive' ? 'sine' : S.wave; }
+function mkVoice(f) {
+  const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+  setWave(o); o.frequency.value = f; o.detune.value = bendCents();
+  g.gain.value = 0; o.connect(g); g.connect(master); o.start();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.3, t + Math.max(0.003, S.A));
+  g.gain.setTargetAtTime(0.3 * S.Su, t + Math.max(0.003, S.A), Math.max(0.005, S.D / 3));
+  return {o, g};
+}
+function relVoice(v) {
+  const t = ctx.currentTime, r = Math.max(0.01, S.Rl);
+  v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(v.g.gain.value, t);
+  v.g.gain.setTargetAtTime(0, t, r / 4);
+  try { v.o.stop(t + r * 1.5 + 0.05); } catch (e) {}
+}
+const glideTo = (v, f, time) => v.o.frequency.setTargetAtTime(f, ctx.currentTime, Math.max(0.003, time / 4));
+
+function noteOn(id, f) {
+  ensureAudio(); sustained.delete(id);
+  if (S.mono) {
+    monoStack = monoStack.filter(x => x.id !== id); monoStack.push({id, f});
+    if (!mono) mono = mkVoice(f); else glideTo(mono, f, S.porta);
+    return;
+  }
+  if (voices.has(id)) relVoice(voices.get(id));
+  voices.set(id, mkVoice(f));
+}
+function noteOff(id) { if (pedalDown) { sustained.add(id); return; } doOff(id); }
+function doOff(id) {
+  if (!ctx) return;
+  if (S.mono) {
+    monoStack = monoStack.filter(x => x.id !== id);
+    if (!mono) return;
+    if (monoStack.length) glideTo(mono, monoStack[monoStack.length - 1].f, S.porta);
+    else { relVoice(mono); mono = null; }
+    return;
+  }
+  const v = voices.get(id); if (v) { relVoice(v); voices.delete(id); }
+}
+function setFreq(id, f) {
+  if (!ctx) return;
+  if (S.mono) {
+    const e = monoStack.find(x => x.id === id); if (e) e.f = f;
+    if (mono && monoStack.length && monoStack[monoStack.length - 1].id === id) glideTo(mono, f, 0.02);
+    return;
+  }
+  const v = voices.get(id); if (v) glideTo(v, f, 0.02);
+}
+function setPedal(on) {
+  pedalDown = on; $('pedal').checked = on;
+  if (!on) { [...sustained].forEach(doOff); sustained.clear(); }
+}
+function allOff() {
+  if (!ctx) return;
+  voices.forEach(relVoice); voices.clear(); if (mono) relVoice(mono); mono = null; monoStack = [];
+  sustained.clear(); active.clear(); refreshActive();
+}
+let bendVal = 0;
+const bendCents = () => bendVal * S.bendRange;
+function setBend(v) {
+  bendVal = clamp(v, -1, 1); $('bend').value = bendVal; $('bendOut').textContent = fmt(bendCents(), 1) + ' ¢';
+  if (!ctx) return;
+  const t = ctx.currentTime, c = bendCents();
+  voices.forEach(x => x.o.detune.setTargetAtTime(c, t, 0.01)); if (mono) mono.o.detune.setTargetAtTime(c, t, 0.01);
+}
+
+/* ================= Keyboard ================= */
+const kb = $('kb'), keyEls = new Map(), active = new Map(); // active: id -> degree
+function label(d) {
+  const c = degCents(d), f = centsHz(c), t = T();
+  switch (S.labels) {
+    case 'cents': return fmt(t.period ? ((c % t.period) + t.period) % t.period : c, 1);
+    case 'deg': return t.period ? String(((d % nSteps()) + nSteps()) % nSteps()) : String(d);
+    case 'hz': return fmt(f, 1);
+    case 'et': { const e = nearestET(f); return e.name + '<br>' + (e.dev >= 0 ? '+' : '') + fmt(e.dev, 0); }
+    default: return '';
+  }
+}
+function isTwelveLike() {
+  const c = T().cents;
+  return T().period && Math.abs(T().period - 1200) < EPS && c.length === 12 && c.every((x, i) => Math.abs(x - i * 100) < 35);
+}
+function renderKeyboard() {
+  allOff(); kb.innerHTML = ''; keyEls.clear();
+  const [a, b] = degRange(), items = [];
+  for (let d = a; d <= b; d++) {
+    const c = degCents(d); if (c === undefined) continue;
+    const f = centsHz(c); if (f < 8 || f > 20000) continue;
+    items.push({d, f, black: BLACK.includes(nearestET(f).pc)});
+  }
+  const piano = S.layout === 'piano' || (S.layout === 'auto' && isTwelveLike());
+  const n = nSteps(), mk = (it, cls) => {
+    const k = document.createElement('div'); k.className = 'key ' + cls; k.dataset.d = it.d;
+    if (T().period ? ((it.d % n) + n) % n === 0 : it.d === 0) k.classList.add('tonic');
+    k.innerHTML = label(it.d); k.title = `Degree ${it.d} · ${fmt(degCents(it.d), 3)} ¢ · ${fmt(it.f, 3)} Hz`;
+    keyEls.set(it.d, k); kb.append(k); return k;
+  };
+  const whites = items.filter(i => !i.black);
+  if (piano && whites.length) {
+    kb.style.minWidth = whites.length * 26 + 'px';
+    const W = 100 / whites.length, groups = new Map(); let wi = 0;
+    items.forEach(it => {
+      if (!it.black) { mk(it, 'white'); wi++; }
+      else { if (!groups.has(wi)) groups.set(wi, []); groups.get(wi).push(it); }
+    });
+    groups.forEach((g, bnd) => {
+      const gw = W * 0.62 * Math.min(g.length, 1.6), w = gw / g.length;
+      g.forEach((it, j) => {
+        const k = mk(it, 'black'); k.style.width = w + '%';
+        k.style.left = clamp(bnd * W - gw / 2 + j * w, 0, 100 - w) + '%';
+      });
+    });
+  } else {
+    kb.style.minWidth = items.length * 24 + 'px';
+    items.forEach(it => mk(it, 'lin' + (it.black ? ' dark' : '')));
+  }
+  const t = T();
+  $('tunName').textContent = t.name;
+  $('tunInfo').textContent = `${n} notes · ${t.period ? 'period ' + fmt(t.period, 3) + ' ¢' : 'non-periodic'}` + (t.meta && t.meta.status ? ' · ' + t.meta.status : '');
+  $('tonicTxt').textContent = 'Tonic = ' + fmt(tonicHz(), 3) + ' Hz';
+  $('kbBaseTxt').textContent = 'degree ' + S.kbBase + ' (' + fmt(degHz(S.kbBase) || 0, 2) + ' Hz)';
+}
+function refreshActive() {
+  const set = new Set(active.values());
+  keyEls.forEach((el, d) => el.classList.toggle('active', set.has(d)));
+}
+function readout(c) {
+  const f = centsHz(c), e = nearestET(f);
+  $('readout').textContent = fmt(f, 2) + ' Hz';
+  $('readSub').textContent = `${fmt(c, 2)} ¢ from tonic · ≈ ${e.name} ${e.dev >= 0 ? '+' : ''}${fmt(e.dev, 1)} ¢`;
+}
+function playDeg(id, d) {
+  const c = degCents(d); if (c === undefined) return;
+  active.set(id, d); refreshActive(); readout(c); noteOn(id, centsHz(c));
+}
+function stopId(id) { if (!active.has(id)) return; active.delete(id); refreshActive(); noteOff(id); }
+
+/* Pointer (mouse, pen, multitouch) */
+const ptrs = new Map();
+function centersX() {
+  return [...keyEls.entries()].map(([d, el]) => { const r = el.getBoundingClientRect(); return {d, x: r.left + r.width / 2, c: degCents(d)}; })
+    .sort((p, q) => p.x - q.x);
+}
+function interpCents(arr, x) {
+  if (x <= arr[0].x) return {c: arr[0].c, d: arr[0].d};
+  const L = arr[arr.length - 1]; if (x >= L.x) return {c: L.c, d: L.d};
+  for (let i = 0; i < arr.length - 1; i++) {
+    const p = arr[i], q = arr[i + 1];
+    if (x >= p.x && x <= q.x) { const t = (x - p.x) / (q.x - p.x || 1); return {c: p.c + (q.c - p.c) * t, d: t < 0.5 ? p.d : q.d}; }
+  }
+}
+kb.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const id = 'p' + e.pointerId; try { kb.setPointerCapture(e.pointerId); } catch (er) {}
+  if (S.glide) {
+    const arr = centersX(); if (!arr.length) return;
+    const r = interpCents(arr, e.clientX);
+    ptrs.set(e.pointerId, {arr, d: r.d}); active.set(id, r.d); refreshActive(); readout(r.c); noteOn(id, centsHz(r.c));
+    return;
+  }
+  const k = e.target.closest('.key'); if (!k) return;
+  ptrs.set(e.pointerId, {d: +k.dataset.d}); playDeg(id, +k.dataset.d);
+});
+kb.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId); if (!p) return; const id = 'p' + e.pointerId;
+  if (S.glide) {
+    const r = interpCents(p.arr, e.clientX); setFreq(id, centsHz(r.c)); readout(r.c);
+    if (r.d !== p.d) { p.d = r.d; active.set(id, r.d); refreshActive(); }
+    return;
+  }
+  const el = document.elementFromPoint(e.clientX, e.clientY), k = el && el.closest && el.closest('.key');
+  if (k && +k.dataset.d !== p.d) {
+    p.d = +k.dataset.d;
+    if (S.mono) { active.set(id, p.d); refreshActive(); readout(degCents(p.d)); setFreq(id, degHz(p.d)); }
+    else { stopId(id); playDeg(id, p.d); }
+  }
+});
+const endPtr = e => { if (!ptrs.has(e.pointerId)) return; ptrs.delete(e.pointerId); stopId('p' + e.pointerId); };
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => kb.addEventListener(t, endPtr));
+
+/* Computer keyboard */
+const KSEQ = 'KeyZ KeyX KeyC KeyV KeyB KeyN KeyM Comma Period Slash KeyA KeyS KeyD KeyF KeyG KeyH KeyJ KeyK KeyL Semicolon Quote KeyQ KeyW KeyE KeyR KeyT KeyY KeyU KeyI KeyO KeyP BracketLeft BracketRight Digit1 Digit2 Digit3 Digit4 Digit5 Digit6 Digit7 Digit8 Digit9 Digit0 Minus Equal'.split(' ');
+const isTyping = t => t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes(t.type)));
+window.addEventListener('keydown', e => {
+  if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setPedal(true); return; }
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { e.preventDefault(); setBend(e.code === 'ArrowUp' ? 1 : -1); return; }
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+    e.preventDefault(); const step = T().period ? nSteps() : 10;
+    S.kbBase += e.code === 'ArrowRight' ? step : -step; save();
+    $('kbBaseTxt').textContent = 'degree ' + S.kbBase + ' (' + fmt(degHz(S.kbBase) || 0, 2) + ' Hz)'; return;
+  }
+  const i = KSEQ.indexOf(e.code); if (i < 0) return;
+  e.preventDefault(); if (e.repeat || active.has('k' + e.code)) return;
+  const d = S.kbBase + i; if (degCents(d) === undefined) return;
+  playDeg('k' + e.code, d);
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space' && !isTyping(e.target)) { e.preventDefault(); setPedal(false); return; }
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { setBend(0); return; }
+  stopId('k' + e.code);
+});
+window.addEventListener('blur', () => { setPedal(false); [...active.keys()].forEach(stopId); });
+
+/* Bend slider springs back */
+$('bend').addEventListener('input', e => setBend(+e.target.value));
+['pointerup', 'pointercancel'].forEach(t => $('bend').addEventListener(t, () => setBend(0)));
+$('pedal').addEventListener('change', e => setPedal(e.target.checked));
+
+/* Keyboard controls */
+NOTES.forEach((n, i) => $('tonicPc').add(new Option(n, i)));
+function bindCtl(id, key, conv = Number, after = renderKeyboard) {
+  const el = $(id), isChk = el.type === 'checkbox';
+  if (isChk) el.checked = !!S[key]; else el.value = S[key] ?? '';
+  el.addEventListener('change', () => {
+    S[key] = isChk ? el.checked : conv(el.value); save(); after();
+  });
+}
+bindCtl('tonicPc', 'tonicPc'); bindCtl('tonicOct', 'tonicOct');
+bindCtl('ref', 'ref', v => +v > 0 ? +v : 440);
+bindCtl('tonicHz', 'tonicHz', v => +v > 0 ? +v : null);
+bindCtl('low', 'low'); bindCtl('count', 'count', v => clamp(+v || 1, 1, 8));
+bindCtl('layout', 'layout', String); bindCtl('labels', 'labels', String);
+bindCtl('glide', 'glide', Boolean, () => {});
+bindCtl('monoChk', 'mono', Boolean, allOff);
+
+/* ================= Library UI ================= */
+const types = [...new Set(LIB.map(e => e.type))]; types.forEach(t => $('libType').add(new Option(t, t)));
+function applyTuning(name, cents, period, meta) {
+  S.tuning = {name, cents: cents.slice(), period, meta: meta || {}};
+  S.kbBase = 0; save(); renderKeyboard();
+}
+function renderLib() {
+  const q = $('libSearch').value.toLowerCase(), ty = $('libType').value;
+  $('libRows').innerHTML = '';
+  LIB.forEach(e => {
+    const hay = [e.name, e.origin, e.type, e.status, e.cents.length + ' notes'].join(' ').toLowerCase();
+    if ((q && !hay.includes(q)) || (ty && e.type !== ty)) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.name}</td><td>${e.origin}</td><td>${e.type}</td><td>${e.cents.length}</td><td>${e.period ? fmt(e.period, 2) : '—'}</td><td><span class="tag">${e.status}</span></td>`;
+    tr.onclick = () => {
+      document.querySelectorAll('#libRows tr').forEach(r => r.classList.remove('sel')); tr.classList.add('sel');
+      applyTuning(e.name, e.cents, e.period, {type: e.type, status: e.status, origin: e.origin, src: e.src});
+      $('libInfo').innerHTML = `<b>${e.name}</b> — ${e.origin}<br>Type: ${e.type} · Status: ${e.status}<br>Source: ${e.src}<br>Cents: ${e.cents.map(c => fmt(c, 3)).join(', ')}${e.ratios ? '<br>Ratios: ' + e.ratios.join(', ') : ''}<br><i>Applied to keyboard.</i>`;
+    };
+    $('libRows').append(tr);
+  });
+}
+$('libSearch').addEventListener('input', renderLib); $('libType').addEventListener('change', renderLib);
+
+/* ================= Custom editor ================= */
+const NUM = /^[+-]?(\d+\.?\d*|\.\d+)$/, RATIO = /^(\d+\.?\d*)\s*\/\s*(\d+\.?\d*)$/;
+function parseScale(text, mode, period, nonPer, autoEnds) {
+  const E = [], W = [], I = [];
+  const raw = text.split(','), toks = raw.map(s => s.trim());
+  if (toks.some((t, i) => t === '' && i < toks.length - 1)) W.push('Empty entries between commas were ignored.');
+  const vals = [];
+  toks.filter(t => t !== '').forEach(t => {
+    if (NUM.test(t)) vals.push(+t);
+    else if (RATIO.test(t)) {
+      const m = t.match(RATIO), r = +m[1] / +m[2];
+      if (r > 0 && isFinite(r)) { vals.push(r2c(r)); I.push(`"${t}" converted to ${fmt(r2c(r), 3)} ¢.`); } else E.push(`Invalid ratio "${t}".`);
+    } else E.push(`Invalid entry "${t}" (only numbers or ratios like 3/2).`);
+  });
+  if (!vals.length) E.push('Enter at least one value.');
+  if (E.length) return {E, W, I};
+  let cum;
+  if (mode === 'int') {
+    if (vals.some(v => v <= 0)) return {E: ['Intervals must be positive.'], W, I};
+    cum = [0]; vals.forEach(v => cum.push(cum[cum.length - 1] + v));
+    I.push('Cumulative: ' + cum.map(c => fmt(c, 3)).join(', '));
+  } else cum = vals.slice();
+  for (let i = 1; i < cum.length; i++) {
+    if (Math.abs(cum[i] - cum[i - 1]) < EPS) E.push(`Duplicate value ${fmt(cum[i], 3)} (positions ${i} and ${i + 1}).`);
+    else if (cum[i] < cum[i - 1]) E.push(`Not ascending: ${fmt(cum[i - 1], 3)} → ${fmt(cum[i], 3)}.`);
+  }
+  if (cum.some(c => c < 0)) E.push('Negative values are not allowed (positions are measured above the tonic).');
+  if (E.length) return {E, W, I};
+  if (Math.abs(cum[0]) > EPS) {
+    if (autoEnds) { cum.unshift(0); W.push('0 (tonic) was inserted at the start.'); }
+    else E.push('The first value must be 0 (tonic), or enable auto-insert.');
+  }
+  if (nonPer) return {E, W, I, steps: cum, period: null};
+  if (!(period > 0)) return {E: ['Period must be positive.'], W, I};
+  const last = cum[cum.length - 1];
+  const over = cum.filter(c => c > period + EPS);
+  if (over.length) { E.push(`Values beyond the period (${fmt(period, 3)} ¢): ${over.map(c => fmt(c, 2)).join(', ')}. Increase the period or use Non-periodic.`); return {E, W, I}; }
+  let steps = cum;
+  if (Math.abs(last - period) < 1e-4) steps = cum.slice(0, -1);
+  else if (autoEnds) W.push(`Period endpoint ${fmt(period, 3)} ¢ inserted (final interval ${fmt(period - last, 3)} ¢).`);
+  else W.push(`Sequence does not end at ${fmt(period, 3)} ¢; the scale still repeats at the period.`);
+  if (!steps.length) return {E: ['The scale needs at least one note below the period.'], W, I};
+  return {E, W, I, steps, period};
+}
+const edMode = () => document.querySelector('input[name=mode]:checked').value;
+let lastParse = null;
+function edPreview() {
+  const r = lastParse = parseScale($('ed').value, edMode(), +$('edPeriod').value, $('edNonPer').checked, $('edAuto').checked);
+  $('edMsgs').innerHTML = [...r.E.map(m => `<div class="e">✖ ${m}</div>`), ...r.W.map(m => `<div class="w">⚠ ${m}</div>`), ...r.I.map(m => `<div class="i">ℹ ${m}</div>`)].join('')
+    + (r.steps ? `<div class="i">✔ ${r.steps.length} notes${r.period ? ' per period of ' + fmt(r.period, 3) + ' ¢' : ' (non-periodic)'}.</div>` : '');
+  drawScale(r); tableScale(r);
+  return r;
+}
+function tableScale(r) {
+  const tb = $('edTable'); if (!r.steps) { tb.innerHTML = ''; return; }
+  const pts = r.period ? [...r.steps, r.period] : r.steps;
+  let h = '<thead><tr><th>#</th><th>Cents</th><th>Interval ¢</th><th>Ratio</th><th>Hz</th><th>Nearest 12-TET</th><th>Dev. ¢</th></tr></thead><tbody>';
+  pts.forEach((c, i) => {
+    const f = centsHz(c), e = nearestET(f);
+    h += `<tr><td>${i === r.steps.length && r.period ? 'P' : i}</td><td>${fmt(c, 3)}</td><td>${i ? fmt(c - pts[i - 1], 3) : '—'}</td><td>${fmt(Math.pow(2, c / 1200), 5)}</td><td>${fmt(f, 3)}</td><td>${e.name}</td><td>${(e.dev >= 0 ? '+' : '') + fmt(e.dev, 2)}</td></tr>`;
+  });
+  tb.innerHTML = h + '</tbody>';
+}
+function drawScale(r) {
+  const cv = $('scaleCv'), d = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (W < 20) return;
+  cv.width = W * d; cv.height = H * d; const g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, W, H);
+  if (!r || !r.steps) return;
+  const pts = r.period ? [...r.steps, r.period] : r.steps, span = pts[pts.length - 1] || 1, L = 20, Rr = W - 20, X = c => L + c / span * (Rr - L);
+  g.strokeStyle = '#2a3142'; g.fillStyle = '#56627a'; g.font = '10px sans-serif'; g.textAlign = 'center';
+  for (let c = 0; c <= span + EPS; c += 100) { g.beginPath(); g.moveTo(X(c), 30); g.lineTo(X(c), 70); g.stroke(); if (c % 1200 === 0) g.fillText(c, X(c), 84); }
+  g.strokeStyle = '#8f9ab0'; g.beginPath(); g.moveTo(L, 50); g.lineTo(Rr, 50); g.stroke();
+  pts.forEach((c, i) => {
+    g.fillStyle = i === 0 || (r.period && i === pts.length - 1) ? '#4f9fe8' : '#f08a5d';
+    g.beginPath(); g.arc(X(c), 50, 6, 0, 7); g.fill();
+    g.fillStyle = '#e6e9f0'; g.fillText(fmt(c, 1), X(c), i % 2 ? 108 : 22);
+  });
+}
+function edApply() {
+  const r = edPreview(); if (!r.steps) return;
+  applyTuning($('edName').value.trim() || 'Custom temperament', r.steps, r.period, {type: 'Custom', status: 'User-defined'});
+  $('edMsgs').insertAdjacentHTML('beforeend', '<div class="i">✔ Applied to keyboard.</div>');
+}
+$('ed').addEventListener('input', edPreview);
+$('ed').addEventListener('change', () => { if ($('edLive').checked) edApply(); });
+['edPeriod', 'edNonPer', 'edAuto'].forEach(id => $(id).addEventListener('change', edPreview));
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', edPreview));
+$('edApply').onclick = edApply;
+$('edLoad').onclick = () => {
+  const t = T(); document.querySelector('input[name=mode][value=cum]').checked = true;
+  $('edNonPer').checked = !t.period; if (t.period) $('edPeriod').value = fmt(t.period, 6);
+  $('ed').value = (t.period ? [...t.cents, t.period] : t.cents).map(c => fmt(c, 4)).join(', ');
+  $('edName').value = t.name; edPreview();
+};
+document.querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
+  const [txt, mode] = b.dataset.ex.split('|');
+  document.querySelector(`input[name=mode][value=${mode}]`).checked = true;
+  $('edNonPer').checked = false; $('edPeriod').value = 1200; $('ed').value = txt; edPreview();
+});
+
+/* ================= Sound UI ================= */
+function slider(host, label, key, min, max, step, unit, after) {
+  const row = document.createElement('div'); row.className = 'opts'; row.style.margin = '6px 0';
+  row.innerHTML = `<label style="flex:1">${label}<input type="range" min="${min}" max="${max}" step="${step}" style="flex:1"></label><output style="min-width:64px;text-align:right"></output>`;
+  const inp = row.querySelector('input'), out = row.querySelector('output');
+  inp.value = S[key]; out.textContent = S[key] + unit;
+  inp.addEventListener('input', () => { S[key] = +inp.value; out.textContent = inp.value + unit; save(); after && after(); });
+  host.append(row);
+}
+slider($('adsr'), 'Attack', 'A', 0.001, 2, 0.001, ' s');
+slider($('adsr'), 'Decay', 'D', 0.01, 3, 0.01, ' s');
+slider($('adsr'), 'Sustain', 'Su', 0, 1, 0.01, '');
+slider($('adsr'), 'Release', 'Rl', 0.01, 5, 0.01, ' s');
+slider($('perf'), 'Volume', 'vol', 0, 1, 0.01, '', () => { if (master) master.gain.setTargetAtTime(S.vol * S.vol, ctx.currentTime, 0.03); });
+slider($('perf'), 'Portamento (mono)', 'porta', 0, 1, 0.005, ' s');
+slider($('perf'), 'Bend range', 'bendRange', 0, 1200, 1, ' ¢', () => setBend(bendVal));
+$('wave').value = S.wave; $('nh').value = S.nh; $('tilt').value = S.tilt;
+$('wave').addEventListener('change', e => { S.wave = e.target.value; buildWave(); save(); });
+$('nh').addEventListener('change', e => { S.nh = clamp(+e.target.value || 1, 1, 64); buildWave(); save(); });
+$('tilt').addEventListener('change', e => { S.tilt = +e.target.value || 0; buildWave(); save(); });
+
+/* ================= Tabs ================= */
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.tab').forEach(p => p.classList.toggle('active', p.id === 'tab-' + b.dataset.tab));
+  if (b.dataset.tab === 'edit') requestAnimationFrame(edPreview);
+});
+window.addEventListener('resize', () => lastParse && drawScale(lastParse));
+
+/* ================= Init ================= */
+renderLib(); renderKeyboard(); edPreview();
+})();
+</script>
+</body>
+</html>
