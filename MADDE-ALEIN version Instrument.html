@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MADDE-Allein</title>
+<title>Madde-Allein</title>
 <style>
 :root{--bg:#11141b;--card:#1a1e28;--line:#2a3142;--fg:#e6e9f0;--mut:#8f9ab0;--acc:#4f9fe8;--acc2:#f08a5d;--ok:#46c483;--bad:#e05656}
 *{box-sizing:border-box}
@@ -94,8 +94,8 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
 <body>
 <header>
   <div class="brand">
-    <h1>MADDE-Allein - Voice Synthesis with Camera Gesture Control </h1>
-    <div class="attr">Developed by Leonardo Fuks · Inspired by Svante Granqvist's MADDE - TOLVAN DATA  . Dedicated to Johan Sundberg </div>
+    <h1>Madde-Allein - Voice Synthesis with Camera Gesture Control</h1>
+    <div class="attr">Developed by Leonardo Fuks · Inspired by Svante Granqvist's MADDE - TOLVAN DATA . Dedicated to Johan Sundberg</div>
   </div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="main" class="active" aria-selected="true">Graphs and Interface</button>
@@ -132,7 +132,7 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
   <section class="card">
     <h2>Live spectrum (0–8 kHz)</h2>
     <canvas id="spec"></canvas>
-    <p class="hint">Dashed lines show the formants as they are applied. When Formant Following is on, the small grey ticks at the top mark the set (target) values. Drag a line to change its frequency or drag its dot to change its strength. Scroll the mouse wheel over a line to change its bandwidth. The order F1 &lt; F2 &lt; F3 &lt; F4 &lt; F5 is always kept.</p>
+    <p class="hint">Dashed lines show the formants as they are applied. When Formant Following is on, the small grey ticks at the top mark the set (target) values. Drag a line to change its frequency or drag its dot to change its strength. Scroll the mouse wheel over a line to change its bandwidth. Each formant moves independently and may cross the others.</p>
   </section>
 
   <div class="g2">
@@ -154,12 +154,14 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
       <div class="opts" style="margin-bottom:6px">
         <label class="chk"><input type="checkbox" id="useFace" checked> Face → F1/F2</label>
         <label class="chk"><input type="checkbox" id="useHead" checked> Head rotation → pitch</label>
-        <label class="chk"><input type="checkbox" id="useHand" checked> Right hand → F3/F4</label>
+        <label class="chk"><input type="checkbox" id="useEyes" checked> Eyes + eyebrows → volume</label>
+        <label class="chk"><input type="checkbox" id="useHand" checked> Hand → F3/F4</label>
+        <label class="chk"><input type="checkbox" id="handRight"> Use right hand (unchecked = left)</label>
       </div>
       <p class="hint" id="camStat" style="margin:0 0 6px">The camera is off.</p>
       <canvas id="camCv"></canvas>
       <div id="meters" style="margin-top:6px"></div>
-      <p class="hint">Jaw opening controls F1, lip spreading controls F2 and turning your head changes pitch. On your right hand, spreading the fingers raises F3 and straightening them raises F4. When the camera starts, hold a neutral face and a relaxed, half-open right hand for 1.5 s. Video is processed locally in the browser.</p>
+      <p class="hint">Jaw opening controls F1, lip spreading controls F2 and turning your head changes pitch (up to ±6 octaves). Closing your eyes and lowering your eyebrows together lower the volume: open eyes with relaxed eyebrows give full volume, and fully closed eyes with fully lowered eyebrows give silence. On the selected hand, spreading the fingers raises F3 and straightening them raises F4. When the camera starts, hold a neutral face (eyes open, eyebrows relaxed) and a relaxed, half-open hand for 1.5 s. Video is processed locally in the browser.</p>
     </section>
   </div>
 
@@ -218,7 +220,7 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
   <section class="card">
     <h2>Formants F1–F5 (frequency, bandwidth, strength, range)</h2>
     <div class="grid" id="formGrid"></div>
-    <p class="hint">Formants can never cross (minimum spacing 60 Hz). Formant Following moves each applied formant to the harmonic nearest its set frequency while keeping the order.</p>
+    <p class="hint">Each formant is adjusted independently within its own range; formants may cross. Formant Following moves each applied formant to the harmonic nearest its set frequency.</p>
   </section>
 
   <div class="grid">
@@ -242,8 +244,15 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
         <div class="row"><label for="headMode">Mode (tonic off)</label>
           <select id="headMode"><option value="continuous">Continuous glide</option><option value="chromatic">Chromatic steps</option></select></div>
         <label class="chk"><input type="checkbox" id="headInv"> Invert direction</label>
+        <div id="headSliders"></div>
+        <p class="hint">Maximum range is ±72 semitones (6 octaves); the resulting pitch is limited to the keyboard range C2–G6.</p>
       </div>
-      <div class="fcard" id="handSet"><h3>Right hand → F3 / F4</h3>
+      <div class="fcard" id="eyeSet"><h3>Eyes + eyebrows → volume</h3>
+        <div id="eyeSliders"></div>
+        <div class="toolbar" style="margin-top:6px"><button id="eyeCal">Recalibrate eyes/brows neutral</button></div>
+        <p class="hint">Eye closure is the eyelid gap relative to eye width; brow lowering is the brow-to-eyelid distance relative to face height (both eyes and both brows averaged). Both are measured against the neutral face. Attenuation = weight × eye closure + (1 − weight) × brow lowering, so the two signals work together: full volume with eyes open and eyebrows relaxed, silence with eyes fully closed and eyebrows fully lowered. The manual Volume slider stays as the upper limit.</p>
+      </div>
+      <div class="fcard" id="handSet"><h3 id="handTitle">Left hand → F3 / F4</h3>
         <label class="chk"><input type="checkbox" id="handSwap" checked> Swap handedness labels (unmirrored webcam)</label>
         <p class="hint" id="handRaw">Raw: —</p>
         <div class="toolbar" style="margin-top:6px"><button id="hcalBoth">Calibrate reference (both)</button><button id="hcal3">F3 only</button><button id="hcal4">F4 only</button></div>
@@ -264,7 +273,7 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
   </section>
 </section>
 </main>
-<footer>MADDE-Allein · Developed by Leonardo Fuks · Inspired by Svante Granqvist's MADDE . Dedicated to Johan Sundberg </footer>
+<footer>Madde-Allein · Developed by Leonardo Fuks · Inspired by Svante Granqvist's MADDE . Dedicated to Johan Sundberg</footer>
 <div style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;overflow:hidden;pointer-events:none"><video id="vid" playsinline muted></video></div>
 
 <script>
@@ -274,8 +283,9 @@ footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
 /* ================= Constants & helpers ================= */
 const NOTES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const MIDI_MIN = 36, MIDI_MAX = 91, H_MIN = 10, H_MAX = 60, MAX_KEYED = 8;
-const DB_FLOOR = -48, GAP = 60, BUS_GAIN = 0.6, FORMANT_MAKEUP = 2, BOOST_MAX_DB = 6;
+const DB_FLOOR = -48, BUS_GAIN = 0.6, FORMANT_MAKEUP = 2, BOOST_MAX_DB = 6;
 const BW_MIN = 30, BW_MAX = 600, G_MAX = 2, MAXF = 8000;
+const HEAD_RANGE_MAX = 72;   // 6 octaves
 const midiToHz = m => 440 * Math.pow(2, (m - 69) / 12);
 const hzToMidi = f => 69 + 12 * Math.log2(f / 440);
 const pc = m => ((Math.round(m) % 12) + 12) % 12;
@@ -300,7 +310,6 @@ const state = {
   formants: [{f: 730, bw: 90, g: 1}, {f: 1090, bw: 110, g: 0.8}, {f: 2440, bw: 170, g: 0.5},
              {f: 3400, bw: 250, g: 0.3}, {f: 4500, bw: 300, g: 0.15}]
 };
-// Applied formant frequencies (= set values, or nearest harmonics when Formant Following is on)
 const eff = state.formants.map(F => F.f);
 const R = [{min: 250, max: 1500}, {min: 500, max: 3000}, {min: 1500, max: 4000}, {min: 2500, max: 5000}, {min: 3500, max: 6500}];
 const RLIM = [[150, 2000], [300, 4000], [1000, 5500], [1500, 6500], [2500, 8000]];
@@ -331,10 +340,11 @@ const voices = new Map(), keys = {}, heldCodes = new Map(), capEls = new Map();
 let activeKey = null, ptrNote = null, pitchSl = null, headDriving = false;
 const fUI = [], gnumInputs = [], vowelBtns = [];
 const cam = {on: false, busy: false, stream: null, face: null, hand: null, loop: 0, token: 0, lastVT: -1, lastTs: 0, prevT: 0, lastFace: 0, ref: {}, cal: null, dirty: false};
-// Face: independent sensitivity (g1/g2) and smoothing (s1/s2) for F1 and F2
 const faceCtl = {enabled: true, g1: 1, g2: 1, s1: 0.4, s2: 0.4, base: null, sig: {jaw: 0, lips: 0}};
-const headCtl = {enabled: true, range: 7, smooth: 0.5, base: 57, sig: 0, lastNote: null};
-// Hand: angle-based features; full-scale in degrees, independent gains/smoothing, dead zone, cross-talk compensation
+const headCtl = {enabled: true, range: 7, smooth: 0.5, fs: 0.2, base: 57, sig: 0, lastNote: null};
+// Eyes + eyebrows → volume: weight of eyes (brows get 1−w), closure/lowering full-scale fractions, dead zone, curve, smoothing
+const eyeCtl = {enabled: true, w: 0.5, er: 0.75, br: 0.35, dz: 0.05, curve: 1.5, smooth: 0.6, vol: 1, applied: 1, sig: {eye: 0, brow: 0}};
+const eyeGain = () => (cam.on && eyeCtl.enabled) ? eyeCtl.vol : 1;
 const handCtl = {enabled: true, g3: 1, g4: 1, s3: 0.5, s4: 0.5, fs: 12, fe: 50, dz: 0.05, xc: 0,
                  ref: {}, cal: null, base: null, raw: null, sig: {s: 0, e: 0}};
 const tonic = {enabled: false, root: 0, quality: 'major', selecting: false, picks: []};
@@ -350,20 +360,15 @@ const harmLevel = i => (i < state.nHarm && state.harmDb[i] > DB_FLOOR) ? dbToGai
 function srcNorm() { let s = 0; for (let i = 0; i < state.nHarm; i++) s += harmLevel(i) ** 2; return 1 / Math.max(1, Math.sqrt(s)); }
 const nyq = () => (ctx ? ctx.sampleRate : 44100) * 0.45;
 
-/* Formant Following: each applied formant = harmonic of F0 nearest its set value.
-   Ordering is preserved: if a harmonic is already used by the formant below, take the next one up. */
 function computeEff() {
   const f0 = midiToHz(state.midi), top = nyq();
-  let prev = 0;
   state.formants.forEach((F, i) => {
     let v = F.f;
     if (state.follow) {
-      let k = Math.max(1, Math.round(F.f / f0));
-      while (k * f0 <= prev + 1) k++;
-      v = k * f0;
-      if (v > top) v = Math.max(prev + GAP, Math.min(F.f, top));
+      v = Math.max(1, Math.round(F.f / f0)) * f0;
+      if (v > top) v = Math.min(F.f, top);
     }
-    eff[i] = Math.round(v * 10) / 10; prev = eff[i];
+    eff[i] = Math.round(v * 10) / 10;
   });
 }
 
@@ -411,7 +416,6 @@ function setVoiceHarm(v, imm) {
   const f0 = midiToHz(v.midi), lim = ctx.sampleRate * 0.4;
   v.hg.forEach((g, i) => put(g.gain, f0 * (i + 1) < lim ? harmLevel(i) : 0, imm, 0.02));
 }
-// Continuous retune of an existing voice (portamento)
 function retuneVoice(id, midi) {
   const v = voices.get(id); if (!v || !ctx) return;
   v.midi = midi; const f0 = midiToHz(midi);
@@ -456,7 +460,7 @@ function applyPitch(imm) {
     m.osc.forEach((o, i) => put(o.frequency, f0 * (i + 1), imm, 0.015));
     setVoiceHarm(m, imm);
   }
-  if (state.follow) { computeEff(); applyFormants(imm); refreshSummary(); }   // follow F0 continuously
+  if (state.follow) { computeEff(); applyFormants(imm); refreshSummary(); }
 }
 function applyHarmonics(imm) { if (!ctx) return; voices.forEach(v => setVoiceHarm(v, imm)); put(nodes.norm.gain, srcNorm(), imm, 0.03); }
 function applySustain() { if (!ctx) return; const m = voices.get('main'); if (m) put(m.env.gain, state.sustain ? 1 : 0, false, 0.03); updateBus(); }
@@ -484,7 +488,13 @@ function applyVibrato(imm) {
     put(nodes.lfo.frequency, vibTarget, false, 0.35);
   }, 60);
 }
-function applyOutput(imm) { if (!ctx) return; put(nodes.master.gain, state.volume * state.volume, imm, 0.03); put(nodes.dry.gain, state.dry, imm, 0.03); }
+/* Output = manual volume² × eye/brow factor */
+function applyOutput(imm) {
+  const t = $('eyeVolTxt'); if (t) t.textContent = 'Eyes/brows volume factor: ' + pct(eyeGain());
+  if (!ctx) return;
+  put(nodes.master.gain, state.volume * state.volume * eyeGain(), imm, 0.03);
+  put(nodes.dry.gain, state.dry, imm, 0.03);
+}
 function applyAll(imm) { computeEff(); applyPitch(imm); applyHarmonics(imm); applyVibrato(imm); applyOutput(imm); applyBoost(imm); updateBus(); }
 
 function startAudio() {
@@ -575,8 +585,6 @@ safe('piano', () => {
     else { k.className = 'key white'; whites++; if (m % 12 === 0) k.textContent = noteName(m); }
     keys[m] = k; kb.append(k);
   }
-  /* Portamento: continuous MIDI value from horizontal position, piecewise-linear between white-key centres
-     (black keys sit exactly halfway between their neighbours, so the mapping matches the drawn keyboard). */
   const midiAtX = clientX => {
     const r = kb.getBoundingClientRect();
     const c = clamp((clientX - r.left) / r.width, 0, 1) * total - 0.5;
@@ -739,19 +747,14 @@ function snapScale(m) {
   return best === null ? Math.round(m) : best;
 }
 
-/* ================= Formants: ordering, setters, UI ================= */
-function fixOrder(fs, i) {
-  for (let j = i + 1; j < 5; j++) fs[j] = Math.min(R[j].max, Math.max(fs[j], fs[j - 1] + GAP));
-  if (i < 4) fs[i] = Math.min(fs[i], fs[i + 1] - GAP);
-  for (let j = i - 1; j >= 0; j--) fs[j] = Math.max(R[j].min, Math.min(fs[j], fs[j + 1] - GAP));
-  if (i > 0) fs[i] = Math.max(fs[i], fs[i - 1] + GAP);
-  for (let j = 1; j < 5; j++) if (fs[j] < fs[j - 1] + GAP) fs[j] = fs[j - 1] + GAP;
-  for (let j = 0; j < 5; j++) fs[j] = Math.round(Math.min(fs[j], nyq()));
+/* ================= Formants: independent setters, UI ================= */
+function fixOrder(fs) {
+  for (let j = 0; j < 5; j++) fs[j] = Math.round(Math.min(clamp(fs[j], R[j].min, R[j].max), nyq()));
 }
 function commitFreqs(fs, src) {
   fs.forEach((v, j) => { state.formants[j].f = v; });
   computeEff(); applyFormants(false);
-  if (src !== 'cam' && cam.on) {          // manual edits move the camera neutral points
+  if (src !== 'cam' && cam.on) {
     if (faceCtl.base) faceCtl.base = [state.formants[0].f, state.formants[1].f];
     if (handCtl.base) handCtl.base = [state.formants[2].f, state.formants[3].f];
   }
@@ -850,7 +853,7 @@ function drawGraph() {
     g2.beginPath(); g2.moveTo(bx, by); g2.lineTo(X(F1), Y(F2)); g2.stroke(); g2.setLineDash([]);
     g2.beginPath(); g2.arc(bx, by, 6, 0, 7); g2.stroke();
   }
-  if (state.follow) {                                   // applied (harmonic-snapped) point
+  if (state.follow) {
     g2.strokeStyle = '#4f9fe8'; g2.lineWidth = 2;
     g2.beginPath(); g2.arc(X(eff[0]), Y(eff[1]), 6, 0, 7); g2.stroke();
   }
@@ -886,533 +889,486 @@ function vibText() {
 safe('vibrato/output', () => {
   slider($('vibCard'), {label: 'Rate', min: 0, max: 10, step: 0.1, value: state.vibRate, fmt: v => v.toFixed(1) + ' Hz', oninput: v => { state.vibRate = v; applyVibrato(false); vibText(); }});
   slider($('vibCard'), {label: 'Depth (±)', min: 0, max: 1, step: 0.01, value: state.vibDepth, fmt: v => `${v.toFixed(2)} tone (${Math.round(v * 200)} ¢)`, oninput: v => { state.vibDepth = v; applyVibrato(false); vibText(); }});
+  /* ===================== REBUILT SECTION (from here to the end) ===================== */
   slider($('vibCard'), {label: 'Rate jitter (±)', min: 0, max: 2, step: 0.05, value: state.vibJitter, fmt: v => v.toFixed(2) + ' Hz', oninput: v => { state.vibJitter = v; applyVibrato(false); vibText(); }});
-  slider($('outCard'), {label: 'Master volume', min: 0, max: 1, step: 0.01, value: state.volume, fmt: pct, oninput: v => { state.volume = v; applyOutput(false); }});
-  slider($('outCard'), {label: 'Dry (unfiltered) mix', min: 0, max: 1, step: 0.01, value: state.dry, fmt: pct, oninput: v => { state.dry = v; applyOutput(false); }});
-  slider($('outCard'), {label: 'Formant boost', min: 0, max: BOOST_MAX_DB, step: 0.1, value: state.boost, fmt: v => '+' + v.toFixed(1) + ' dB', oninput: v => { state.boost = v; applyBoost(false); }});
-  vibText();
+  slider($('outCard'), {label: 'Volume', min: 0, max: 1, step: 0.01, value: state.volume, fmt: pct, oninput: v => { state.volume = v; applyOutput(false); }});
+  slider($('outCard'), {label: 'Unfiltered source (dry)', min: 0, max: 1, step: 0.01, value: state.dry, fmt: pct, oninput: v => { state.dry = v; applyOutput(false); }});
+  slider($('outCard'), {label: 'Formant boost', min: 0, max: BOOST_MAX_DB, step: 0.5, value: state.boost, fmt: v => v.toFixed(1) + ' dB', oninput: v => { state.boost = v; applyBoost(false); }});
+  const p = document.createElement('p'); p.className = 'hint'; p.id = 'eyeVolTxt'; $('outCard').append(p);
+  vibText(); applyOutput(false);
 });
-
-/* ================= Harmonic editor ================= */
-const hc = $('harmCv'), hx = hc.getContext('2d'), HP = {l: 40, r: 10, t: 10, b: 24};
-let hHover = -1, hLast = null;
-function updateHarmInfo() {
-  const f0 = midiToHz(state.midi), lim = (ctx ? ctx.sampleRate : 44100) * 0.4;
-  let s = `Harmonics: ${state.nHarm} · audible at ${f0.toFixed(1)} Hz: ${Math.max(0, Math.min(state.nHarm, Math.floor((lim - 1e-6) / f0)))}`;
-  if (hHover >= 0) { const db = state.harmDb[hHover]; s += ` · H${hHover + 1} = ${Math.round(f0 * (hHover + 1))} Hz, ${db <= DB_FLOOR ? 'off' : db.toFixed(1) + ' dB'}`; }
-  $('harmInfo').textContent = s;
-}
-function drawHarm() {
-  const d = dpr(), W = hc.width / d, H = hc.height / d; if (W < 50) return;
-  const pw = W - HP.l - HP.r, ph = H - HP.t - HP.b, n = state.nHarm, bw = pw / n;
-  const f0 = midiToHz(state.midi), lim = (ctx ? ctx.sampleRate : 44100) * 0.4;
-  hx.setTransform(d, 0, 0, d, 0, 0); hx.clearRect(0, 0, W, H);
-  hx.font = '11px sans-serif'; hx.strokeStyle = '#222a39'; hx.fillStyle = '#6b778f'; hx.lineWidth = 1;
-  hx.textAlign = 'right'; hx.textBaseline = 'middle';
-  for (let db = 0; db >= DB_FLOOR; db -= 12) { const y = HP.t + db / DB_FLOOR * ph; hx.beginPath(); hx.moveTo(HP.l, y); hx.lineTo(W - HP.r, y); hx.stroke(); hx.fillText(db === DB_FLOOR ? 'off' : db, HP.l - 5, y); }
-  hx.textAlign = 'center'; hx.textBaseline = 'top';
-  for (let i = 0; i < n; i++) {
-    const db = state.harmDb[i], x = HP.l + i * bw, y = HP.t + db / DB_FLOOR * ph, over = f0 * (i + 1) >= lim;
-    hx.fillStyle = i === hHover ? '#9fd0ff' : over ? '#a04545' : '#4f9fe8';
-    if (db > DB_FLOOR) hx.fillRect(x + bw * 0.15, y, Math.max(1, bw * 0.7), HP.t + ph - y);
-    hx.fillStyle = over ? '#e05656' : '#f08a5d'; hx.fillRect(x + bw * 0.15, y - 1.5, Math.max(1, bw * 0.7), 3);
-    if (i === 0 || (i + 1) % 10 === 0) { hx.fillStyle = '#6b778f'; hx.fillText(i + 1, x + bw / 2, H - HP.b + 5); }
-  }
-}
-function hPos(e) {
-  const r = hc.getBoundingClientRect(), pw = r.width - HP.l - HP.r, ph = r.height - HP.t - HP.b;
-  return {i: Math.floor(clamp((e.clientX - r.left - HP.l) / pw, 0, 0.99999) * state.nHarm),
-          db: clamp((e.clientY - r.top - HP.t) / ph, 0, 1) * DB_FLOOR};
-}
-const setH = (k, db) => { state.harmDb[k] = db <= DB_FLOOR + 0.5 ? DB_FLOOR : Math.round(db * 10) / 10; };
-function paintH(a, b) {
-  if (a.i === b.i) setH(b.i, b.db);
-  else { const s = a.i < b.i ? 1 : -1; for (let k = a.i; k !== b.i + s; k += s) setH(k, a.db + (b.db - a.db) * (k - a.i) / (b.i - a.i)); }
-  applyHarmonics(false); drawHarm(); updateHarmInfo();
-}
-hc.addEventListener('pointerdown', e => { hc.setPointerCapture(e.pointerId); const p = hPos(e); hLast = p; paintH(p, p); e.preventDefault(); });
-hc.addEventListener('pointermove', e => {
-  const p = hPos(e);
-  if (hLast) { paintH(hLast, p); hLast = p; }
-  if (p.i !== hHover) { hHover = p.i; drawHarm(); updateHarmInfo(); }
-});
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => hc.addEventListener(t, () => { hLast = null; }));
-hc.addEventListener('pointerleave', () => { if (!hLast) { hHover = -1; drawHarm(); updateHarmInfo(); } });
-function setHarmCount(n) {
-  n = clamp(Math.round(n) || 40, H_MIN, H_MAX);
-  state.nHarm = n; $('hCount').value = n; $('hCountNum').value = n;
-  rebuildVoices(); applyHarmonics(false); drawHarm(); updateHarmInfo();
-}
-$('hCount').addEventListener('input', e => setHarmCount(+e.target.value));
-$('hCountNum').addEventListener('change', e => setHarmCount(+e.target.value));
-const setAllH = fn => { for (let i = 0; i < H_MAX; i++) state.harmDb[i] = fn(i); applyHarmonics(false); drawHarm(); updateHarmInfo(); };
-$('hMax').onclick = () => setAllH(() => 0);
-$('hZero').onclick = () => setAllH(() => DB_FLOOR);
-$('hTiltBtn').onclick = () => { const t = parseFloat($('hTilt').value) || 0; setAllH(i => clamp(t * Math.log2(i + 1), DB_FLOOR, 0)); };
 
 /* ================= Spectrum ================= */
-const cv = $('spec'), c2 = cv.getContext('2d'), KN_TOP = 30, KN_BOT = 14;
-const specDrag = {i: -1, mode: '', off: 0}; let specHover = -1;
-const knobY = g => { const h = cv.height / dpr(); return h - KN_BOT - clamp(g / G_MAX, 0, 1) * (h - KN_BOT - KN_TOP); };
-function resizeCanvases() {
-  const d = dpr();
-  [cv, gc, hc].forEach(c => { const r = c.getBoundingClientRect(); if (r.width > 0) { c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d); } });
-  drawSpectrum(); drawGraph(); drawHarm();
-}
-function redrawIdle() { if (!running) drawSpectrum(); }
+const sc = $('spec'), s2 = sc.getContext('2d'), SP = {l: 34, r: 8, t: 8, b: 18};
+const FCOL = ['#f08a5d', '#e8c44f', '#46c483', '#4f9fe8', '#b07be8'];
+const specX = (f, W) => SP.l + f / MAXF * (W - SP.l - SP.r);
+const gY = (g, H) => SP.t + (1 - g / G_MAX) * (H - SP.t - SP.b);
 function drawSpectrum() {
-  cancelAnimationFrame(rafId);
-  const W = cv.width, H = cv.height, d = dpr();
-  c2.clearRect(0, 0, W, H);
-  c2.font = (10 * d) + 'px sans-serif'; c2.fillStyle = '#6b778f'; c2.strokeStyle = '#222a39'; c2.lineWidth = 1;
-  for (let f = 1000; f < MAXF; f += 1000) { const x = f / MAXF * W; c2.beginPath(); c2.moveTo(x, 0); c2.lineTo(x, H); c2.stroke(); c2.fillText(f / 1000 + 'k', x + 3, H - 4); }
+  const d = dpr(), W = sc.width / d, H = sc.height / d; if (W < 50) return;
+  s2.setTransform(d, 0, 0, d, 0, 0); s2.clearRect(0, 0, W, H);
+  s2.font = '10px sans-serif'; s2.strokeStyle = '#222a39'; s2.fillStyle = '#6b778f'; s2.lineWidth = 1;
+  s2.textAlign = 'center'; s2.textBaseline = 'top';
+  for (let f = 0; f <= MAXF; f += 1000) { const x = specX(f, W); s2.beginPath(); s2.moveTo(x, SP.t); s2.lineTo(x, H - SP.b); s2.stroke(); s2.fillText(f / 1000 + 'k', x, H - SP.b + 3); }
   if (running && nodes) {
     nodes.an.getByteFrequencyData(nodes.buf);
-    const nb = Math.min(nodes.buf.length, Math.floor(MAXF / (ctx.sampleRate / nodes.an.fftSize)));
-    c2.beginPath(); c2.moveTo(0, H);
-    for (let i = 0; i < nb; i++) c2.lineTo(i / nb * W, H - nodes.buf[i] / 255 * H);
-    c2.lineTo(W, H); c2.closePath(); c2.fillStyle = 'rgba(79,159,232,.35)'; c2.fill(); c2.strokeStyle = '#4f9fe8'; c2.lineWidth = d; c2.stroke();
+    const bh = ctx.sampleRate / nodes.an.fftSize;
+    s2.beginPath(); s2.strokeStyle = '#8fb7e8'; s2.lineWidth = 1.2;
+    for (let i = 0; i * bh <= MAXF && i < nodes.buf.length; i++) {
+      const x = specX(i * bh, W), y = SP.t + (1 - nodes.buf[i] / 255) * (H - SP.t - SP.b);
+      i ? s2.lineTo(x, y) : s2.moveTo(x, y);
+    }
+    s2.stroke();
   }
   state.formants.forEach((F, i) => {
-    const x = eff[i] / MAXF * W, act = i === specDrag.i || (specDrag.i < 0 && i === specHover), ky = knobY(F.g) * d;
-    if (act) { c2.fillStyle = 'rgba(240,138,93,.08)'; c2.fillRect(R[i].min / MAXF * W, 0, (R[i].max - R[i].min) / MAXF * W, H); }
-    if (state.follow) { const nx = F.f / MAXF * W; c2.fillStyle = '#8f9ab0'; c2.fillRect(nx - d, 0, 2 * d, 8 * d); }
-    c2.strokeStyle = '#f08a5d'; c2.fillStyle = '#f08a5d'; c2.lineWidth = (act ? 2.5 : 1) * d;
-    c2.setLineDash(act ? [] : [5 * d, 4 * d]); c2.beginPath(); c2.moveTo(x, 0); c2.lineTo(x, H); c2.stroke(); c2.setLineDash([]);
-    if (act) { const bp = F.bw / MAXF * W; c2.beginPath(); c2.moveTo(x - bp / 2, ky); c2.lineTo(x + bp / 2, ky); c2.stroke(); }
-    c2.lineWidth = d; c2.fillText('F' + (i + 1), x + 3, 18 * d);
-    c2.beginPath(); c2.arc(x, ky, (act ? 6.5 : 4.5) * d, 0, 7); c2.fillStyle = act ? '#fff' : '#f08a5d'; c2.fill(); c2.stroke();
-    if (act) {
-      const rt = x > W * 0.6; c2.fillStyle = '#ffd9c9'; c2.textAlign = rt ? 'right' : 'left';
-      c2.fillText(`${Math.round(eff[i])} Hz${state.follow ? ' (set ' + F.f + ')' : ''} (${R[i].min}–${R[i].max}) · BW ${F.bw} · ${Math.round(F.g * 100)}%`, x + (rt ? -8 : 8) * d, 30 * d); c2.textAlign = 'left';
-    }
+    const x = specX(eff[i], W), y = gY(F.g, H);
+    s2.strokeStyle = FCOL[i]; s2.lineWidth = 1.5; s2.setLineDash([4, 4]);
+    s2.beginPath(); s2.moveTo(x, SP.t); s2.lineTo(x, H - SP.b); s2.stroke(); s2.setLineDash([]);
+    s2.fillStyle = FCOL[i]; s2.beginPath(); s2.arc(x, y, 5, 0, 7); s2.fill();
+    s2.textAlign = 'left'; s2.textBaseline = 'middle'; s2.fillText('F' + (i + 1), x + 7, y);
+    if (state.follow) { const xs = specX(F.f, W); s2.strokeStyle = '#999'; s2.beginPath(); s2.moveTo(xs, SP.t); s2.lineTo(xs, SP.t + 8); s2.stroke(); }
   });
-  if (running) rafId = requestAnimationFrame(drawSpectrum);
 }
-window.addEventListener('resize', resizeCanvases);
-safe('spectrum drag', () => {
-  const pos = e => { const r = cv.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height}; };
-  const hit = p => {
-    let best = null, bd = 1e9;
-    state.formants.forEach((F, i) => { const k = Math.hypot(p.x - eff[i] / MAXF * p.w, p.y - knobY(F.g)); if (k <= 12 && k < bd) { best = {i, mode: 'gain'}; bd = k; } });
-    if (best) return best;
-    state.formants.forEach((F, i) => { const dx = Math.abs(p.x - eff[i] / MAXF * p.w); if (dx <= 14 && dx < bd) { best = {i, mode: 'freq'}; bd = dx; } });
-    return best;
-  };
-  cv.addEventListener('pointerdown', e => {
-    if (e.button) return; const p = pos(e), h = hit(p); if (!h) return;
-    specDrag.i = h.i; specDrag.mode = h.mode; specDrag.off = state.formants[h.i].f - p.x / p.w * MAXF;
-    try { cv.setPointerCapture(e.pointerId); } catch (er) {} e.preventDefault(); redrawIdle();
-  });
-  cv.addEventListener('pointermove', e => {
-    const p = pos(e);
-    if (specDrag.i >= 0) {
-      if (specDrag.mode === 'freq') setFormantFreq(specDrag.i, p.x / p.w * MAXF + specDrag.off);
-      else setFormantGain(specDrag.i, (p.h - KN_BOT - p.y) / (p.h - KN_BOT - KN_TOP) * G_MAX);
-      return;
-    }
-    const h = hit(p); cv.style.cursor = h ? (h.mode === 'gain' ? 'ns-resize' : 'ew-resize') : 'default';
-    const hv = h ? h.i : -1; if (hv !== specHover) { specHover = hv; redrawIdle(); }
-  });
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => cv.addEventListener(t, () => { if (specDrag.i >= 0) { specDrag.i = -1; redrawIdle(); } }));
-  cv.addEventListener('pointerleave', () => { if (specDrag.i < 0 && specHover >= 0) { specHover = -1; redrawIdle(); } });
-  cv.addEventListener('wheel', e => { const h = hit(pos(e)); if (!h) return; e.preventDefault(); setFormantBw(h.i, state.formants[h.i].bw * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, {passive: false});
+function redrawIdle() { drawSpectrum(); }
+let sDrag = null;
+function specHit(e) {
+  const r = sc.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let bi = -1, bd = 12;
+  eff.forEach((f, i) => { const dx = Math.abs(specX(f, r.width) - x); if (dx < bd) { bd = dx; bi = i; } });
+  if (bi < 0) return null;
+  return {i: bi, mode: Math.abs(gY(state.formants[bi].g, r.height) - y) < 10 ? 'g' : 'f'};
+}
+sc.addEventListener('pointerdown', e => { sDrag = specHit(e); if (sDrag) { sc.setPointerCapture(e.pointerId); e.preventDefault(); } });
+sc.addEventListener('pointermove', e => {
+  if (!sDrag) { const h = specHit(e); sc.style.cursor = h ? (h.mode === 'g' ? 'ns-resize' : 'ew-resize') : 'default'; return; }
+  const r = sc.getBoundingClientRect();
+  if (sDrag.mode === 'f') setFormantFreq(sDrag.i, (e.clientX - r.left - SP.l) / (r.width - SP.l - SP.r) * MAXF);
+  else setFormantGain(sDrag.i, (1 - (e.clientY - r.top - SP.t) / (r.height - SP.t - SP.b)) * G_MAX);
 });
+['pointerup', 'pointercancel'].forEach(t => sc.addEventListener(t, () => { sDrag = null; }));
+sc.addEventListener('wheel', e => {
+  const h = specHit(e); if (!h) return; e.preventDefault();
+  setFormantBw(h.i, state.formants[h.i].bw * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+}, {passive: false});
 
-/* ================= Sing-along: periodic microphone pitch detection ================= */
-const sing = {on: false, busy: false, stream: null, src: null, an: null, buf: null, timer: 0,
-              winMs: 150, intMs: 1000, minDb: -50, lo: 70, hi: 1000, thr: 0.15};
-function singStatus(t, err) { const el = $('singStat'); el.textContent = t; el.classList.toggle('err', !!err); if (err) showMsg(t); }
-function setSingBtn() {
-  const b = $('singBtn'); b.textContent = sing.on ? 'Disable sing-along' : 'Enable sing-along';
-  b.classList.toggle('on', sing.on); b.setAttribute('aria-pressed', sing.on);
-}
-/* YIN pitch estimator (cumulative mean normalised difference + parabolic interpolation) */
-function yin(x, sr, lo, hi, thr) {
-  const tMin = Math.max(2, Math.floor(sr / hi)), tMax = Math.min(Math.floor(sr / lo), Math.floor(x.length / 2));
-  if (tMax <= tMin + 2) return null;
-  const W = x.length - tMax, d = new Float32Array(tMax + 2);
-  for (let t = 1; t <= tMax + 1 && t < x.length - W; t++) {
-    let s = 0; for (let i = 0; i < W; i++) { const v = x[i] - x[i + t]; s += v * v; } d[t] = s;
+/* ================= Harmonic editor ================= */
+const hc = $('harmCv'), h2 = hc.getContext('2d'), HP = {l: 34, r: 8, t: 8, b: 20};
+function drawHarm() {
+  const d = dpr(), W = hc.width / d, H = hc.height / d; if (W < 50) return;
+  const n = state.nHarm, bw = (W - HP.l - HP.r) / n, lim = (ctx ? ctx.sampleRate : 44100) * 0.4, f0 = midiToHz(state.midi), ih = H - HP.t - HP.b;
+  h2.setTransform(d, 0, 0, d, 0, 0); h2.clearRect(0, 0, W, H);
+  h2.font = '10px sans-serif'; h2.strokeStyle = '#222a39'; h2.fillStyle = '#6b778f'; h2.textAlign = 'right'; h2.textBaseline = 'middle';
+  for (let db = 0; db >= DB_FLOOR; db -= 12) { const y = HP.t + (db / DB_FLOOR) * ih; h2.beginPath(); h2.moveTo(HP.l, y); h2.lineTo(W - HP.r, y); h2.stroke(); h2.fillText(db, HP.l - 4, y); }
+  h2.textAlign = 'center'; h2.textBaseline = 'top';
+  for (let i = 0; i < n; i++) {
+    const db = state.harmDb[i], h = (db - DB_FLOOR) / -DB_FLOOR * ih, x = HP.l + i * bw;
+    h2.fillStyle = f0 * (i + 1) >= lim ? '#e05656' : '#4f9fe8';
+    h2.fillRect(x + 1, HP.t + ih - h, Math.max(1, bw - 2), h);
+    if ((i + 1) % 5 === 0 || i === 0) { h2.fillStyle = '#6b778f'; h2.fillText(i + 1, x + bw / 2, H - HP.b + 3); }
   }
-  let run = 0; d[0] = 1;
-  for (let t = 1; t <= tMax + 1; t++) { run += d[t]; d[t] = run > 0 ? d[t] * t / run : 1; }
-  for (let t = tMin; t <= tMax; t++) {
-    if (d[t] < thr) {
-      while (t + 1 <= tMax && d[t + 1] < d[t]) t++;
-      const a = d[t - 1], b = d[t], c = d[t + 1], den = a - 2 * b + c;
-      const tt = t + (den !== 0 ? 0.5 * (a - c) / den : 0);
-      return {f: sr / tt, clarity: 1 - b};
+}
+function updateHarmInfo() {
+  const f0 = midiToHz(state.midi), lim = (ctx ? ctx.sampleRate : 44100) * 0.4;
+  let top = 0, muted = 0;
+  for (let i = 0; i < state.nHarm; i++) { if (f0 * (i + 1) >= lim) muted++; else if (harmLevel(i) > 0) top = i + 1; }
+  $('harmInfo').textContent = `${state.nHarm} harmonics · f0 ${f0.toFixed(1)} Hz · highest audible H${top} (${Math.round(top * f0)} Hz)` + (muted ? ` · ${muted} above 40% of the sample rate muted` : '');
+}
+let hDrag = false, hLast = null;
+function harmAt(e) {
+  const r = hc.getBoundingClientRect(), n = state.nHarm;
+  const i = clamp(Math.floor((e.clientX - r.left - HP.l) / ((r.width - HP.l - HP.r) / n)), 0, n - 1);
+  let db = DB_FLOOR + (1 - (e.clientY - r.top - HP.t) / (r.height - HP.t - HP.b)) * -DB_FLOOR;
+  db = clamp(db, DB_FLOOR, 0); if (db < DB_FLOOR + 1) db = DB_FLOOR;
+  return {i, db};
+}
+function harmSet(p) {
+  if (hLast && hLast.i !== p.i) {
+    const a = hLast, s = Math.sign(p.i - a.i);
+    for (let k = a.i; k !== p.i + s; k += s) state.harmDb[k] = a.db + (p.db - a.db) * (k - a.i) / (p.i - a.i);
+  } else state.harmDb[p.i] = p.db;
+  hLast = p; applyHarmonics(false); drawHarm(); updateHarmInfo();
+}
+hc.addEventListener('pointerdown', e => { hDrag = true; hLast = null; hc.setPointerCapture(e.pointerId); harmSet(harmAt(e)); e.preventDefault(); });
+hc.addEventListener('pointermove', e => { if (hDrag) harmSet(harmAt(e)); });
+['pointerup', 'pointercancel'].forEach(t => hc.addEventListener(t, () => { hDrag = false; hLast = null; }));
+function setNH(v) {
+  v = clamp(Math.round(v), H_MIN, H_MAX); if (!isFinite(v)) return;
+  $('hCount').value = v; $('hCountNum').value = v;
+  if (v === state.nHarm) return;
+  state.nHarm = v; rebuildVoices(); applyHarmonics(false); drawHarm(); updateHarmInfo();
+}
+$('hCount').addEventListener('input', e => setNH(+e.target.value));
+$('hCountNum').addEventListener('change', e => setNH(+e.target.value));
+$('hMax').onclick = () => { state.harmDb.fill(0); applyHarmonics(false); drawHarm(); updateHarmInfo(); };
+$('hZero').onclick = () => { state.harmDb.fill(DB_FLOOR); applyHarmonics(false); drawHarm(); updateHarmInfo(); };
+$('hTiltBtn').onclick = () => {
+  const t = clamp(parseFloat($('hTilt').value) || 0, -24, 0);
+  state.harmDb.forEach((_, i) => { state.harmDb[i] = Math.max(DB_FLOOR, t * Math.log2(i + 1)); });
+  applyHarmonics(false); drawHarm(); updateHarmInfo();
+};
+
+/* ================= Sing-along ================= */
+const sing = {on: false, stream: null, ctx: null, an: null, buf: null, timer: 0, interval: 1000, win: 150, thr: -50, guard: true};
+safe('sing settings', () => {
+  const h = $('singSet');
+  slider(h, {label: 'Analysis interval', min: 250, max: 3000, step: 50, value: sing.interval, fmt: v => v + ' ms', oninput: v => { sing.interval = v; if (sing.on) schedSing(); }});
+  slider(h, {label: 'Analysis window', min: 100, max: 200, step: 5, value: sing.win, fmt: v => v + ' ms', oninput: v => { sing.win = v; }});
+  slider(h, {label: 'Level threshold', min: -70, max: -20, step: 1, value: sing.thr, fmt: v => v + ' dB', oninput: v => { sing.thr = v; }});
+  const l = document.createElement('label'); l.className = 'chk';
+  l.innerHTML = '<input type="checkbox" id="singGuard" checked> Octave guard (ignore octave jumps)'; h.append(l);
+  $('singGuard').addEventListener('change', e => { sing.guard = e.target.checked; });
+});
+function detectF0(x, sr) {
+  const n = x.length; let e0 = 0;
+  for (let i = 0; i < n; i++) e0 += x[i] * x[i];
+  const lvl = 20 * Math.log10(Math.sqrt(e0 / n) + 1e-9);
+  const minL = Math.max(2, Math.floor(sr / 1100)), maxL = Math.min(Math.floor(sr / 70), (n >> 1) - 2);
+  const nsdf = new Float32Array(maxL + 2); let mx = 0;
+  for (let L = minL - 1; L <= maxL + 1; L++) {
+    let ac = 0, en = 0;
+    for (let i = 0; i < n - L; i++) { ac += x[i] * x[i + L]; en += x[i] * x[i] + x[i + L] * x[i + L]; }
+    nsdf[L] = en > 0 ? 2 * ac / en : 0;
+    if (L >= minL && L <= maxL && nsdf[L] > mx) mx = nsdf[L];
+  }
+  if (mx < 0.5) return {lvl, f: 0};
+  for (let L = minL; L <= maxL; L++) {
+    if (nsdf[L] >= 0.85 * mx && nsdf[L] >= nsdf[L - 1] && nsdf[L] >= nsdf[L + 1]) {
+      const a = nsdf[L - 1], b = nsdf[L], c = nsdf[L + 1], den = a - 2 * b + c;
+      return {lvl, f: sr / (L + (den ? (a - c) / (2 * den) : 0))};
     }
   }
-  return null;
+  return {lvl, f: 0};
 }
 function singTick() {
-  if (!sing.on || !sing.an) return;
-  if (!running || ctx.state !== 'running') { singStatus('Paused while sound is off. Press Space to start.'); return; }
+  if (!sing.on) return;
   sing.an.getFloatTimeDomainData(sing.buf);
-  const N = Math.min(sing.buf.length, Math.round(sing.winMs / 1000 * ctx.sampleRate));
-  const x = sing.buf.subarray(sing.buf.length - N);       // the most recent window
-  let s = 0; for (let i = 0; i < N; i++) s += x[i] * x[i];
-  const db = 10 * Math.log10(s / N + 1e-12);
-  $('singLvl').textContent = db.toFixed(0) + ' dB';
-  if (db < sing.minDb) { singStatus('Listening… (signal below the level gate)'); return; }
-  const r = yin(x, ctx.sampleRate, sing.lo, sing.hi, sing.thr);
-  if (!r) { singStatus('Listening… (no clear pitch)'); return; }
-  const m = hzToMidi(r.f), target = clamp(Math.round(m), MIDI_MIN, MIDI_MAX), cents = Math.round((m - Math.round(m)) * 100);
-  $('singHz').textContent = r.f.toFixed(1) + ' Hz'; $('singNote').textContent = noteName(target);
-  $('singCents').textContent = (cents >= 0 ? '+' : '') + cents + ' ¢';
-  if (Math.abs(state.midi - target) > 0.005) { setMidi(target, false); singStatus('Moved to ' + noteName(target) + ' (equal temperament).'); }
-  else singStatus('Matching ' + noteName(target) + '.');
+  const sr = sing.ctx.sampleRate, N = Math.min(sing.buf.length, Math.round(sing.win / 1000 * sr));
+  const r = detectF0(sing.buf.subarray(sing.buf.length - N), sr);
+  $('singLvl').textContent = Math.round(r.lvl) + ' dB';
+  if (r.lvl < sing.thr || !r.f) { $('singHz').textContent = $('singNote').textContent = $('singCents').textContent = '—'; return; }
+  const m = hzToMidi(r.f), near = Math.round(m), c = Math.round((m - near) * 100);
+  $('singHz').textContent = r.f.toFixed(1) + ' Hz'; $('singNote').textContent = noteName(near);
+  $('singCents').textContent = (c >= 0 ? '+' : '') + c + ' ¢';
+  const cur = Math.round(state.midi);
+  if (near === cur || near < MIDI_MIN || near > MIDI_MAX) return;
+  if (sing.guard && (near - cur) % 12 === 0) return;
+  setMidi(near, false);
 }
-function singRestartTimer() { clearInterval(sing.timer); if (sing.on) sing.timer = setInterval(singTick, sing.intMs); }
-async function singEnable() {
-  if (sing.on || sing.busy) return;
-  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { singStatus('Microphone unavailable: this page must be served over HTTPS or from localhost.', true); return; }
-  const pp = document.permissionsPolicy || document.featurePolicy;
-  if (pp && pp.allowsFeature && !pp.allowsFeature('microphone')) { singStatus('The embedding page blocks microphone access. Open this file in its own browser tab.', true); return; }
-  sing.busy = true; singStatus('Requesting microphone access…');
+function schedSing() { clearInterval(sing.timer); sing.timer = setInterval(singTick, sing.interval); }
+async function singStart() {
   try {
-    if (!(await startAudio())) throw new Error('Audio could not start.');
-    sing.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: false, autoGainControl: true}, video: false});
-    sing.src = ctx.createMediaStreamSource(sing.stream);
-    sing.an = ctx.createAnalyser(); sing.an.fftSize = 16384;        // ≥ 200 ms at up to 81.9 kHz
-    sing.src.connect(sing.an);                                       // analysis only, not routed to the speakers
+    sing.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
+    const AC = window.AudioContext || window.webkitAudioContext;
+    sing.ctx = new AC(); await sing.ctx.resume();
+    sing.an = sing.ctx.createAnalyser(); sing.an.fftSize = 16384;
+    sing.ctx.createMediaStreamSource(sing.stream).connect(sing.an);
     sing.buf = new Float32Array(sing.an.fftSize);
-    sing.on = true; setSingBtn(); singRestartTimer(); singStatus('Listening…');
-  } catch (e) {
-    const n = e && e.name;
-    singStatus(n === 'NotAllowedError' || n === 'SecurityError' ? 'Microphone permission denied. Allow microphone access in the browser settings and try again.'
-      : n === 'NotFoundError' ? 'No microphone found.' : 'Microphone error: ' + (e && e.message || e), true);
-    singDisable(true);
-  } finally { sing.busy = false; }
+    sing.on = true; schedSing(); setSingUI(true);
+  } catch (e) { showMsg('Microphone error: ' + (e && e.message || e)); singStop(); }
 }
-function singDisable(keepMsg) {
-  clearInterval(sing.timer); sing.timer = 0;
-  try { if (sing.src) sing.src.disconnect(); } catch (e) {}
+function singStop() {
+  sing.on = false; clearInterval(sing.timer);
   if (sing.stream) sing.stream.getTracks().forEach(t => t.stop());
-  sing.stream = sing.src = sing.an = null; sing.on = false; setSingBtn();
-  if (!keepMsg) singStatus('The microphone is off.');
+  if (sing.ctx) try { sing.ctx.close(); } catch (e) {}
+  sing.stream = sing.ctx = sing.an = null; setSingUI(false);
 }
-safe('sing-along', () => {
-  $('singBtn').onclick = () => sing.on ? singDisable() : singEnable();
-  const p = $('singSet');
-  slider(p, {label: 'Analysis window', min: 100, max: 200, step: 10, value: sing.winMs, fmt: v => v + ' ms', oninput: v => { sing.winMs = v; }});
-  slider(p, {label: 'Update interval', min: 0.5, max: 3, step: 0.1, value: sing.intMs / 1000, fmt: v => v.toFixed(1) + ' s', oninput: v => { sing.intMs = v * 1000; singRestartTimer(); }});
-  slider(p, {label: 'Level gate', min: -80, max: -20, step: 1, value: sing.minDb, fmt: v => v + ' dBFS', oninput: v => { sing.minDb = v; }});
-  slider(p, {label: 'Pitch clarity threshold', min: 0.05, max: 0.4, step: 0.01, value: sing.thr, fmt: v => v.toFixed(2) + ' (lower = stricter)', oninput: v => { sing.thr = v; }});
-  slider(p, {label: 'Lowest voice pitch', min: 50, max: 300, step: 5, value: sing.lo, fmt: v => v + ' Hz', oninput: v => { sing.lo = v; }});
-  slider(p, {label: 'Highest voice pitch', min: 300, max: 1600, step: 10, value: sing.hi, fmt: v => v + ' Hz', oninput: v => { sing.hi = v; }});
+function setSingUI(on) {
+  const b = $('singBtn'); b.textContent = on ? 'Disable sing-along' : 'Enable sing-along';
+  b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+  $('singStat').textContent = on ? 'Listening…' : 'The microphone is off.';
+}
+$('singBtn').onclick = () => sing.on ? singStop() : singStart();
+
+/* ================= Camera ================= */
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const FACE_M = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const HAND_M = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+const vid = $('vid'), cc = $('camCv'), c2 = cc.getContext('2d');
+const BROW_L = [70, 63, 105, 66, 107], BROW_R = [300, 293, 334, 296, 336];
+const FACE_DOTS = [13, 14, 61, 291, 1, 159, 145, 386, 374, 33, 133, 362, 263, ...BROW_L, ...BROW_R];
+const HAND_BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+const FACE_KEYS = ['jaw', 'lips', 'yaw', 'eye', 'brow'];
+let faceCal = null, handCalSt = null;
+const camStatus = t => { $('camStat').textContent = t; };
+
+/* Meters */
+const METERS = [['jaw', 'Jaw → F1'], ['lips', 'Lips → F2'], ['head', 'Head → pitch'], ['eye', 'Eye closure'], ['brow', 'Brow lowering'],
+  ['vol', 'Eyes/brows → volume'], ['s', 'Spread → F3'], ['e', 'Extension → F4']];
+const mEls = {};
+METERS.forEach(([k, t]) => {
+  const r = document.createElement('div'); r.className = 'meter';
+  r.innerHTML = `<span>${t}</span><div class="mbar"><i></i></div>`; $('meters').append(r); mEls[k] = r.querySelector('i');
 });
-
-/* ================= Camera: MediaPipe face + hand ================= */
-const MP_SOURCES = ['https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14', 'https://unpkg.com/@mediapipe/tasks-vision@0.10.14', './mediapipe'];
-const FACE_MODELS = ['https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', './face_landmarker.task'];
-const HAND_MODELS = ['https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', './hand_landmarker.task'];
-const FULL = {jaw: 0.30, lips: 0.10, yaw: 0.35};
-const vid = $('vid'), ov = $('camCv'), octx = ov.getContext('2d');
-let mp = null, lastStat = '';
-const meters = {};
-
-function camStatus(t, err) {
-  if (t + !!err === lastStat) return; lastStat = t + !!err;
-  const el = $('camStat'); el.textContent = t; el.classList.toggle('err', !!err);
-  if (err) showMsg(t);
-}
-function setCamBtn() {
-  const b = $('camBtn');
-  b.textContent = cam.on ? 'Disable camera' : cam.busy ? 'Cancel' : 'Enable camera';
-  b.classList.toggle('on', cam.on); b.setAttribute('aria-pressed', cam.on);
-  $('camCal').disabled = !cam.on; $('handCal').disabled = !cam.on || !cam.hand;
-}
-async function loadMP() {
-  if (mp) return mp; let last = null;
-  for (const b of MP_SOURCES) {
-    try {
-      camStatus('Loading MediaPipe (' + new URL(b, location.href).host + ')…');
-      const mod = await import(b + '/vision_bundle.mjs');
-      const fs = await mod.FilesetResolver.forVisionTasks(b + '/wasm');
-      return (mp = {mod, fs});
-    } catch (e) { last = e; console.error('MediaPipe source failed', b, e); }
-  }
-  throw {name: 'MPLoad', message: 'library: ' + (last && last.message || last)};
-}
-async function fetchModel(list, what) {
-  let last = null;
-  for (const u of list) {
-    try { camStatus('Downloading ' + what + ' model…'); const r = await fetch(u); if (!r.ok) throw new Error('HTTP ' + r.status); return new Uint8Array(await r.arrayBuffer()); }
-    catch (e) { last = e; console.error(what + ' model failed', u, e); }
-  }
-  throw {name: 'MPLoad', message: what + ' model: ' + (last && last.message || last)};
-}
-async function makeTask(Cls, buf, opts) {
-  let last = null;
-  for (const delegate of ['GPU', 'CPU']) {
-    try { return await Cls.createFromOptions(mp.fs, {baseOptions: {modelAssetBuffer: buf.slice(), delegate}, runningMode: 'VIDEO', ...opts}); }
-    catch (e) { last = e; console.warn(delegate + ' delegate failed', e); }
-  }
-  throw {name: 'MPLoad', message: 'init: ' + (last && last.message || last)};
-}
-async function openCamera() {
-  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw {name: 'InsecureContext'};
-  const pp = document.permissionsPolicy || document.featurePolicy;
-  if (pp && pp.allowsFeature && !pp.allowsFeature('camera')) throw {name: 'IframeBlocked'};
-  const s = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 640}, height: {ideal: 480}, facingMode: 'user'}, audio: false});
-  vid.srcObject = s;
-  try { await vid.play(); } catch (e) { s.getTracks().forEach(t => t.stop()); throw e; }
-  return s;
-}
-function camErrText(e) {
-  const n = e && e.name;
-  if (n === 'InsecureContext') return 'Camera unavailable: this page must be served over HTTPS or from localhost.';
-  if (n === 'NotAllowedError' || n === 'PermissionDeniedError' || n === 'SecurityError') return 'Camera permission denied. Allow camera access in the browser settings and try again.';
-  if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No camera found.';
-  if (n === 'NotReadableError' || n === 'AbortError') return 'The camera is being used by another application or cannot be read.';
-  if (n === 'IframeBlocked') return 'The embedding page blocks camera access. Open this file in its own browser tab.';
-  if (n === 'MPLoad') return 'MediaPipe could not load (' + e.message + '). Check your network connection and any content blockers.';
-  return 'Camera error: ' + (e && e.message || e);
-}
-function setMeter(el, v) { v = clamp(v, -1, 1); el.style.left = (v < 0 ? 50 + v * 50 : 50) + '%'; el.style.width = Math.abs(v) * 50 + '%'; }
-const bipolar = (base, v, lo, hi) => v >= 0 ? base + v * (hi - base) : base + v * (base - lo);
-const dist = (a, b, w, h) => Math.hypot((a.x - b.x) * w, (a.y - b.y) * h);
-const smoothA = (s, dt) => 1 - Math.pow(s * 0.95, dt * 30);          // frame-rate independent EMA factor
-function faceFeatures(L, w, h) {
-  if (L.length < 400) return null;
-  const sc = dist(L[33], L[263], w, h); if (!(sc > 8)) return null;
-  const ex = (L[33].x + L[263].x) / 2 * w;
-  return {jaw: (dist(L[13], L[14], w, h) + dist(L[1], L[152], w, h)) / sc,
-          lips: dist(L[61], L[291], w, h) / sc,
-          yaw: (L[1].x * w - ex) / sc};
+function setMeter(k, v, uni) {
+  const el = mEls[k]; if (!el) return;
+  if (uni) { el.style.left = '0'; el.style.width = clamp(v, 0, 1) * 100 + '%'; }
+  else { v = clamp(v, -1, 1); el.style.left = (v < 0 ? 50 + v * 50 : 50) + '%'; el.style.width = Math.abs(v) * 50 + '%'; }
 }
 
-/* Revised right-hand features (3D, angle-based → invariant to hand position, size and rotation):
-   - extension e: 180° minus the mean summed flexion of MCP+PIP+DIP joints of index..pinky
-     (straightening the fingers lowers joint flexion → e rises → F4 rises)
-   - spread s: mean angle between neighbouring proximal phalanges, projected into the palm plane
-     (projection removes the flexion component, so curling fingers barely changes s → F3 independent) */
-const V3 = (p, w, h) => [p.x * w, p.y * h, p.z * w];
-const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const ang3 = (a, b) => { const n = Math.sqrt(dot3(a, a) * dot3(b, b)); return n > 0 ? Math.acos(clamp(dot3(a, b) / n, -1, 1)) : 0; };
-const FINGERS = [[5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]];
-function handFeatures(P, w, h) {
-  const Q = P.map(p => V3(p, w, h)), W0 = Q[0];
-  if (Math.hypot(...sub3(Q[9], W0)) < 15) return null;              // hand too small / unreliable
-  const nrm = cross3(sub3(Q[5], W0), sub3(Q[17], W0)), nn = dot3(nrm, nrm); if (!(nn > 0)) return null;
-  const proj = v => { const k = dot3(v, nrm) / nn; return [v[0] - nrm[0] * k, v[1] - nrm[1] * k, v[2] - nrm[2] * k]; };
-  let flex = 0; const dirs = [];
-  FINGERS.forEach(([m, p, d, t]) => {
-    const a = sub3(Q[m], W0), b = sub3(Q[p], Q[m]), c = sub3(Q[d], Q[p]), e = sub3(Q[t], Q[d]);
-    flex += ang3(a, b) + ang3(b, c) + ang3(c, e);
-    dirs.push(proj(b));
-  });
-  let spread = 0; for (let i = 0; i < 3; i++) spread += ang3(dirs[i], dirs[i + 1]);
-  const R2D = 180 / Math.PI;
-  return {s: spread / 3 * R2D, e: 180 - flex / 4 * R2D};
+function calFace(k) { if (cam.on) faceCal = {keys: k, until: performance.now() + 1500, n: 0, sum: {}}; }
+function calHand(k) { if (cam.on) handCalSt = {keys: k, until: performance.now() + 1500, n: 0, sum: {}}; }
+function calStep(c, feat, done) {
+  c.keys.forEach(k => { c.sum[k] = (c.sum[k] || 0) + feat[k]; }); c.n++;
+  if (performance.now() < c.until) return c;
+  if (!c.n) { c.until = performance.now() + 1500; return c; }
+  done(c); return null;
+}
+function faceCalDone(c) {
+  c.keys.forEach(k => { cam.ref[k] = c.sum[k] / c.n; });
+  const b = faceCtl.base || [state.formants[0].f, state.formants[1].f];
+  if (c.keys.includes('jaw')) { b[0] = state.formants[0].f; faceCtl.sig.jaw = 0; }
+  if (c.keys.includes('lips')) { b[1] = state.formants[1].f; faceCtl.sig.lips = 0; }
+  faceCtl.base = b;
+  if (c.keys.includes('yaw')) { headCtl.base = state.midi; headCtl.sig = 0; headCtl.lastNote = null; }
+  if (c.keys.includes('eye')) { eyeCtl.vol = 1; eyeCtl.sig = {eye: 0, brow: 0}; applyOutput(false); }
+  drawGraph();
+}
+function handCalDone(c) {
+  c.keys.forEach(k => { handCtl.ref[k] = c.sum[k] / c.n; });
+  const b = handCtl.base || [state.formants[2].f, state.formants[3].f];
+  if (c.keys.includes('s')) { b[0] = state.formants[2].f; handCtl.sig.s = 0; }
+  if (c.keys.includes('e')) { b[1] = state.formants[3].f; handCtl.sig.e = 0; }
+  handCtl.base = b;
 }
 
-/* Calibration helpers: face features and hand features calibrate independently, per parameter */
-function startCal(fkeys) {
-  cam.cal = {t0: performance.now(), n: 0, sum: {jaw: 0, lips: 0, yaw: 0}, keys: fkeys};
-  fkeys.forEach(k => { delete cam.ref[k]; if (k === 'jaw') faceCtl.sig.jaw = 0; if (k === 'lips') faceCtl.sig.lips = 0; if (k === 'yaw') { headCtl.sig = 0; headCtl.lastNote = null; } });
-  if (fkeys.includes('jaw')) { if (!faceCtl.base) faceCtl.base = [state.formants[0].f, state.formants[1].f]; faceCtl.base[0] = state.formants[0].f; }
-  if (fkeys.includes('lips')) { if (!faceCtl.base) faceCtl.base = [state.formants[0].f, state.formants[1].f]; faceCtl.base[1] = state.formants[1].f; }
-  if (fkeys.includes('yaw')) headCtl.base = state.midi;
-}
-const calibrating = k => !!(cam.cal && cam.cal.keys.includes(k));
-function startHandCal(hkeys) {
-  if (!cam.on || !cam.hand) return;
-  handCtl.cal = {t0: 0, n: 0, s: 0, e: 0, keys: hkeys};
-  hkeys.forEach(k => { delete handCtl.ref[k]; handCtl.sig[k] = 0; });
-  if (!handCtl.base) handCtl.base = [state.formants[2].f, state.formants[3].f];
-  if (hkeys.includes('s')) handCtl.base[0] = state.formants[2].f;
-  if (hkeys.includes('e')) handCtl.base[1] = state.formants[3].f;
-}
-
-function camStop() {
-  cancelAnimationFrame(cam.loop); cam.loop = 0;
-  if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
-  cam.stream = null; vid.srcObject = null;
-  [cam.face, cam.hand].forEach(t => { if (t) try { t.close(); } catch (e) {} });
-  cam.face = cam.hand = null; cam.on = cam.busy = false; cam.ref = {}; cam.cal = null;
-  faceCtl.base = null; handCtl.base = null; handCtl.ref = {}; handCtl.cal = null;
-  octx.clearRect(0, 0, ov.width, ov.height); setCamBtn(); drawGraph();
-}
-async function camEnable() {
-  if (cam.on || cam.busy) return;
-  const my = ++cam.token; cam.busy = true; setCamBtn(); camStatus('Requesting camera access…');
+async function camStart() {
+  if (cam.busy) return; cam.busy = true; const tok = ++cam.token;
+  $('camBtn').disabled = true; camStatus('Loading models…');
   try {
-    cam.stream = await openCamera(); if (my !== cam.token) return camStop();
-    await loadMP();
-    const fb = await fetchModel(FACE_MODELS, 'face');
-    cam.face = await makeTask(mp.mod.FaceLandmarker, fb, {numFaces: 1, minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5});
-    let handNote = '';
-    try {
-      const hb = await fetchModel(HAND_MODELS, 'hand');
-      cam.hand = await makeTask(mp.mod.HandLandmarker, hb, {numHands: 2, minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5});
-    } catch (e) { console.warn(e); handNote = 'Hand tracking is unavailable: ' + camErrText(e); }
-    if (my !== cam.token) return camStop();
-    cam.on = true; cam.busy = false;
-    cam.lastVT = -1; cam.lastTs = 0; cam.prevT = cam.lastFace = performance.now();
-    setCamBtn(); startCal(['jaw', 'lips', 'yaw']); startHandCal(['s', 'e']);
-    if (handNote) showMsg(handNote);
-    cam.loop = requestAnimationFrame(camTick);
-  } catch (e) {
-    if (my !== cam.token) return;
-    console.error(e); camStop(); camStatus(camErrText(e), true);
-  }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('This browser does not support camera access.');
+    if (!cam.face) {
+      const V = await import(MP);
+      const fs = await V.FilesetResolver.forVisionTasks(MP + '/wasm');
+      const mk = async (C, url, o) => {
+        try { return await C.createFromOptions(fs, {baseOptions: {modelAssetPath: url, delegate: 'GPU'}, runningMode: 'VIDEO', ...o}); }
+        catch (e) { return await C.createFromOptions(fs, {baseOptions: {modelAssetPath: url, delegate: 'CPU'}, runningMode: 'VIDEO', ...o}); }
+      };
+      cam.face = await mk(V.FaceLandmarker, FACE_M, {numFaces: 1});
+      cam.hand = await mk(V.HandLandmarker, HAND_M, {numHands: 2});
+    }
+    camStatus('Requesting camera…');
+    const st = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 640}, height: {ideal: 480}, facingMode: 'user'}, audio: false});
+    if (tok !== cam.token) { st.getTracks().forEach(t => t.stop()); return; }
+    cam.stream = st; vid.srcObject = st; await vid.play();
+    cam.on = true; cam.lastVT = -1; headCtl.base = state.midi; headCtl.lastNote = null;
+    setCamUI(true); calFace(FACE_KEYS); calHand(['s', 'e']);
+    cam.loop = requestAnimationFrame(camLoop);
+  } catch (e) { showMsg('Camera error: ' + (e && e.message || e)); camStop(); }
+  finally { cam.busy = false; $('camBtn').disabled = false; }
 }
-function camTick() {
+function camStop() {
+  cam.token++; cam.on = false; cancelAnimationFrame(cam.loop);
+  if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+  cam.stream = null; vid.srcObject = null; faceCal = handCalSt = null;
+  eyeCtl.vol = 1; eyeCtl.applied = 1; applyOutput(false);
+  setCamUI(false); camStatus('The camera is off.');
+  c2.clearRect(0, 0, cc.width, cc.height); drawGraph();
+}
+function setCamUI(on) {
+  const b = $('camBtn'); b.textContent = on ? 'Disable camera' : 'Enable camera';
+  b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+  $('camCal').disabled = !on; $('handCal').disabled = !on;
+}
+$('camBtn').onclick = () => cam.on ? camStop() : camStart();
+$('camCal').onclick = () => calFace(FACE_KEYS);
+$('handCal').onclick = $('hcalBoth').onclick = () => calHand(['s', 'e']);
+$('hcal3').onclick = () => calHand(['s']);
+$('hcal4').onclick = () => calHand(['e']);
+$('cal1').onclick = () => calFace(['jaw']);
+$('cal2').onclick = () => calFace(['lips']);
+$('eyeCal').onclick = () => calFace(['eye', 'brow']);
+
+function camLoop() {
   if (!cam.on) return;
-  cam.loop = requestAnimationFrame(camTick);
+  cam.loop = requestAnimationFrame(camLoop);
   if (vid.readyState < 2 || vid.currentTime === cam.lastVT) return;
   cam.lastVT = vid.currentTime;
   let ts = performance.now(); if (ts <= cam.lastTs) ts = cam.lastTs + 1; cam.lastTs = ts;
-  const dt = Math.min(0.1, (ts - cam.prevT) / 1000); cam.prevT = ts;
-  const w = vid.videoWidth, h = vid.videoHeight; if (!w || !h) return;
-  if (ov.width !== w) ov.width = w; if (ov.height !== h) ov.height = h;
-  octx.save(); octx.setTransform(-1, 0, 0, 1, w, 0); octx.drawImage(vid, 0, 0, w, h);
-  let fr = null, hr = null;
+  const vw = vid.videoWidth, vh = vid.videoHeight; if (!vw) return;
+  if (cc.width !== vw || cc.height !== vh) { cc.width = vw; cc.height = vh; }
+  c2.save(); c2.translate(vw, 0); c2.scale(-1, 1); c2.drawImage(vid, 0, 0, vw, vh); c2.restore();
   try {
-    if ((faceCtl.enabled || headCtl.enabled || cam.cal) && cam.face) fr = cam.face.detectForVideo(vid, ts);
-    if (handCtl.enabled && cam.hand) hr = cam.hand.detectForVideo(vid, ts);
+    const fr = (faceCtl.enabled || headCtl.enabled || eyeCtl.enabled) ? cam.face.detectForVideo(vid, ts) : null;
+    processFace(fr, vw, vh);
+    const hr = handCtl.enabled ? cam.hand.detectForVideo(vid, ts) : null;
+    processHand(hr, vw, vh);
   } catch (e) { console.error(e); }
-  const msgs = [];
-
-  /* ---- Face: F1 (jaw) and F2 (lips), fully independent gain/smoothing/calibration; head yaw ---- */
-  const L = fr && fr.faceLandmarks && fr.faceLandmarks[0], ft = L && faceFeatures(L, w, h);
-  if (ft) {
-    cam.lastFace = ts;
-    octx.fillStyle = cam.cal ? '#ffd24c' : '#46c483';
-    [61, 291, 13, 14, 1, 152, 33, 263].forEach(i => { octx.beginPath(); octx.arc(L[i].x * w, L[i].y * h, 3, 0, 7); octx.fill(); });
-    if (cam.cal) {
-      const c = cam.cal; c.n++; c.sum.jaw += ft.jaw; c.sum.lips += ft.lips; c.sum.yaw += ft.yaw;
-      if (ts - c.t0 >= 1500 && c.n >= 5) { c.keys.forEach(k => { cam.ref[k] = c.sum[k] / c.n; }); cam.cal = null; }
-    }
-    if (faceCtl.enabled && faceCtl.base) {
-      const s = faceCtl.sig;
-      if (cam.ref.jaw !== undefined && !calibrating('jaw')) {
-        let t = clamp((ft.jaw - cam.ref.jaw) / FULL.jaw * faceCtl.g1, -1, 1); if ($('inv1').checked) t = -t;
-        s.jaw += (t - s.jaw) * smoothA(faceCtl.s1, dt); setMeter(meters.jaw, s.jaw);
-        setFormantFreq(0, bipolar(faceCtl.base[0], s.jaw, R[0].min, R[0].max), 'cam');
-        msgs.push('F1');
-      }
-      if (cam.ref.lips !== undefined && !calibrating('lips')) {
-        let t = clamp((ft.lips - cam.ref.lips) / FULL.lips * faceCtl.g2, -1, 1); if ($('inv2').checked) t = -t;
-        s.lips += (t - s.lips) * smoothA(faceCtl.s2, dt); setMeter(meters.lips, s.lips);
-        setFormantFreq(1, bipolar(faceCtl.base[1], s.lips, R[1].min, R[1].max), 'cam');
-        msgs.push('F2');
-      }
-    }
-    if (headCtl.enabled && cam.ref.yaw !== undefined && !calibrating('yaw')) {
-      let t = clamp(-(ft.yaw - cam.ref.yaw) / FULL.yaw, -1, 1);
-      if ($('headInv').checked) t = -t;
-      headCtl.sig += (t - headCtl.sig) * smoothA(headCtl.smooth, dt); setMeter(meters.yaw, headCtl.sig);
-      let m = headCtl.base + headCtl.sig * headCtl.range;
-      if (tonic.enabled) {
-        const cand = snapScale(m), ln = headCtl.lastNote;
-        m = (ln !== null && cand !== ln && Math.abs(m - ln) < Math.abs(m - cand) + 0.3) ? ln : cand; headCtl.lastNote = m;
-      } else if ($('headMode').value === 'chromatic') m = Math.round(m);
-      if (Math.abs(m - state.midi) > 0.001) { headDriving = true; try { setMidi(m, false); } finally { headDriving = false; } }
-      msgs.push('pitch');
-    }
-  }
-
-  /* ---- Right hand: F3 = spread (abduction), F4 = extension; calibrated reference, independent channels ---- */
-  let handSeen = false;
-  if (hr && hr.landmarks && hr.landmarks.length) {
-    const hd = hr.handedness || hr.handednesses || [], want = $('handSwap').checked ? 'Left' : 'Right';
-    let k = -1;
-    hr.landmarks.forEach((P, j) => { const lab = hd[j] && hd[j][0] && hd[j][0].categoryName; if (lab === want && k < 0) k = j; });
-    hr.landmarks.forEach((P, j) => { octx.fillStyle = j === k ? (handCtl.cal ? '#ffd24c' : '#46c483') : '#666c7a'; P.forEach(p => { octx.beginPath(); octx.arc(p.x * w, p.y * h, 2.5, 0, 7); octx.fill(); }); });
-    const hf = k >= 0 && handFeatures(hr.landmarks[k], w, h);
-    if (hf) {
-      handSeen = true; handCtl.raw = hf;
-      const c = handCtl.cal;
-      $('handRaw').textContent = `Raw: spread ${hf.s.toFixed(1)}° · extension ${hf.e.toFixed(1)}°` +
-        (handCtl.ref.s !== undefined ? ` · ref ${handCtl.ref.s.toFixed(1)}° / ${handCtl.ref.e !== undefined ? handCtl.ref.e.toFixed(1) : '—'}°` : '');
-      if (c) {
-        if (c.n === 0) c.t0 = ts;
-        c.n++; c.s += hf.s; c.e += hf.e;
-        if (ts - c.t0 >= 1500 && c.n >= 8) { c.keys.forEach(q => { handCtl.ref[q] = c[q] / c.n; }); handCtl.cal = null; }
-      }
-      const ref = handCtl.ref, S = handCtl.sig, dz = handCtl.dz;
-      const dead = v => Math.abs(v) <= dz ? 0 : (v - Math.sign(v) * dz) / (1 - dz);
-      const de = ref.e !== undefined ? (hf.e - ref.e) / handCtl.fe : 0;
-      if (handCtl.base && ref.s !== undefined && !(c && c.keys.includes('s'))) {
-        const ds = (hf.s - ref.s) / handCtl.fs - handCtl.xc * de;      // optional removal of extension cross-talk
-        S.s += (clamp(dead(ds) * handCtl.g3, -1, 1) - S.s) * smoothA(handCtl.s3, dt);
-        setMeter(meters.spread, S.s);
-        setFormantFreq(2, bipolar(handCtl.base[0], S.s, R[2].min, R[2].max), 'cam');
-        msgs.push('F3');
-      }
-      if (handCtl.base && ref.e !== undefined && !(c && c.keys.includes('e'))) {
-        S.e += (clamp(dead(de) * handCtl.g4, -1, 1) - S.e) * smoothA(handCtl.s4, dt);
-        setMeter(meters.ext, S.e);
-        setFormantFreq(3, bipolar(handCtl.base[1], S.e, R[3].min, R[3].max), 'cam');
-        msgs.push('F4');
-      }
-    }
-  }
-  octx.restore();
-  if (cam.dirty) { cam.dirty = false; refreshFormantUI(); }       // one UI refresh per frame
-
-  const parts = [];
-  if (cam.cal) parts.push('Calibrating face: hold a neutral expression and look straight ahead…');
-  if (handCtl.cal) parts.push(handSeen ? 'Calibrating hand: hold your right hand relaxed and still…' : 'Hand calibration: show your right hand to the camera.');
-  if (!parts.length) {
-    if (!ft && ts - cam.lastFace > 500 && (faceCtl.enabled || headCtl.enabled)) parts.push('No face detected.');
-    parts.push(msgs.length ? 'Tracking: ' + msgs.join(', ') : 'Camera on. No control is active.');
-  }
-  camStatus(parts.join(' '));
+  if (faceCal || handCalSt) {
+    c2.fillStyle = 'rgba(0,0,0,.55)'; c2.fillRect(0, 0, vw, 34);
+    c2.fillStyle = '#fff'; c2.font = '18px sans-serif'; c2.textAlign = 'left'; c2.textBaseline = 'middle';
+    c2.fillText('Calibrating: neutral face, eyes open, brows relaxed, relaxed hand…', 10, 17);
+    camStatus('Calibrating…');
+  } else camStatus(performance.now() - cam.lastFace < 500 ? 'Tracking.' : 'No face detected.');
+}
+function dots(lm, idx, vw, vh, col) {
+  c2.fillStyle = col;
+  idx.forEach(i => { c2.beginPath(); c2.arc((1 - lm[i].x) * vw, lm[i].y * vh, 2.5, 0, 7); c2.fill(); });
 }
 
-safe('camera UI', () => {
-  [['jaw', 'Jaw opening → F1'], ['lips', 'Lip spread → F2'], ['yaw', 'Head yaw → pitch'], ['spread', 'Finger spread → F3'], ['ext', 'Finger extension → F4']].forEach(([k, t]) => {
-    const r = document.createElement('div'); r.className = 'meter'; r.innerHTML = `<span>${t}</span><div class="mbar"><i></i></div>`;
-    meters[k] = r.querySelector('i'); $('meters').append(r);
-  });
-  $('camBtn').onclick = () => { if (cam.on || cam.busy) { cam.token++; camStop(); camStatus('The camera is off.'); } else camEnable(); };
-  $('camCal').onclick = () => { if (cam.on) startCal(['jaw', 'lips', 'yaw']); };
-  $('handCal').onclick = () => startHandCal(['s', 'e']);
-  $('hcalBoth').onclick = () => cam.on ? startHandCal(['s', 'e']) : showMsg('Enable the camera first.');
-  $('hcal3').onclick = () => cam.on ? startHandCal(['s']) : showMsg('Enable the camera first.');
-  $('hcal4').onclick = () => cam.on ? startHandCal(['e']) : showMsg('Enable the camera first.');
-  $('cal1').onclick = () => cam.on ? startCal(['jaw']) : showMsg('Enable the camera first.');
-  $('cal2').onclick = () => cam.on ? startCal(['lips']) : showMsg('Enable the camera first.');
-  $('useFace').onchange = e => { faceCtl.enabled = e.target.checked; if (e.target.checked && cam.on) faceCtl.base = [state.formants[0].f, state.formants[1].f]; drawGraph(); };
-  $('useHead').onchange = e => { headCtl.enabled = e.target.checked; headCtl.base = state.midi; headCtl.lastNote = null; };
-  $('useHand').onchange = e => { handCtl.enabled = e.target.checked; handCtl.sig = {s: 0, e: 0}; if (cam.on) handCtl.base = [state.formants[2].f, state.formants[3].f]; };
-  // F1 and F2: separate sensitivity and smoothing
-  slider($('f1Set'), {label: 'F1 sensitivity', min: 0.2, max: 4, step: 0.05, value: faceCtl.g1, fmt: pct, oninput: v => { faceCtl.g1 = v; }});
-  slider($('f1Set'), {label: 'F1 smoothing', min: 0, max: 1, step: 0.01, value: faceCtl.s1, fmt: pct, oninput: v => { faceCtl.s1 = v; }});
-  slider($('f2Set'), {label: 'F2 sensitivity', min: 0.2, max: 4, step: 0.05, value: faceCtl.g2, fmt: pct, oninput: v => { faceCtl.g2 = v; }});
-  slider($('f2Set'), {label: 'F2 smoothing', min: 0, max: 1, step: 0.01, value: faceCtl.s2, fmt: pct, oninput: v => { faceCtl.s2 = v; }});
-  const hs = $('headSet');
-  slider(hs, {label: 'Pitch range (sensitivity)', min: 1, max: 24, step: 1, value: headCtl.range, fmt: v => '±' + v + ' st', oninput: v => { headCtl.range = v; }});
-  slider(hs, {label: 'Smoothing', min: 0, max: 1, step: 0.01, value: headCtl.smooth, fmt: pct, oninput: v => { headCtl.smooth = v; }});
-  // F3 / F4: independent sensitivity, smoothing and full-scale angle
-  slider($('f3Set'), {label: 'F3 sensitivity', min: 0.2, max: 4, step: 0.05, value: handCtl.g3, fmt: pct, oninput: v => { handCtl.g3 = v; }});
-  slider($('f3Set'), {label: 'F3 smoothing', min: 0, max: 1, step: 0.01, value: handCtl.s3, fmt: pct, oninput: v => { handCtl.s3 = v; }});
-  slider($('f3Set'), {label: 'Full-scale spread change', min: 3, max: 40, step: 0.5, value: handCtl.fs, fmt: v => v + '°', oninput: v => { handCtl.fs = v; }});
-  slider($('f4Set'), {label: 'F4 sensitivity', min: 0.2, max: 4, step: 0.05, value: handCtl.g4, fmt: pct, oninput: v => { handCtl.g4 = v; }});
-  slider($('f4Set'), {label: 'F4 smoothing', min: 0, max: 1, step: 0.01, value: handCtl.s4, fmt: pct, oninput: v => { handCtl.s4 = v; }});
-  slider($('f4Set'), {label: 'Full-scale extension change', min: 10, max: 120, step: 1, value: handCtl.fe, fmt: v => v + '°', oninput: v => { handCtl.fe = v; }});
-  slider($('xSet'), {label: 'Dead zone (both)', min: 0, max: 0.3, step: 0.01, value: handCtl.dz, fmt: pct, oninput: v => { handCtl.dz = v; }});
-  slider($('xSet'), {label: 'Extension → spread compensation', min: 0, max: 1, step: 0.01, value: handCtl.xc, fmt: pct, oninput: v => { handCtl.xc = v; }});
-  window.addEventListener('pagehide', () => { if (cam.on || cam.busy) { cam.token++; camStop(); } if (sing.on) singDisable(); });
-});
+function processFace(fr, vw, vh) {
+  const lm = fr && fr.faceLandmarks && fr.faceLandmarks[0];
+  if (!lm) return;
+  cam.lastFace = performance.now();
+  const P = i => ({x: lm[i].x * vw, y: lm[i].y * vh});
+  const D = (a, b) => { const p = P(a), q = P(b); return Math.hypot(p.x - q.x, p.y - q.y); };
+  const fh = D(10, 152) || 1, fw = D(234, 454) || 1;
+  const browH = (idx, top) => P(top).y - idx.reduce((s, i) => s + P(i).y, 0) / idx.length;
+  const feat = {
+    jaw: D(13, 14) / fh,
+    lips: D(61, 291) / fw,
+    yaw: (P(1).x - (P(234).x + P(454).x) / 2) / fw,
+    eye: (D(159, 145) / (D(33, 133) || 1) + D(386, 374) / (D(362, 263) || 1)) / 2,   // both eyes
+    brow: (browH(BROW_L, 159) + browH(BROW_R, 386)) / 2 / fh                          // both eyebrows
+  };
+  dots(lm, FACE_DOTS, vw, vh, '#46c483');
+  if (faceCal) { faceCal = calStep(faceCal, feat, faceCalDone); return; }
+  const ref = cam.ref; if (ref.jaw === undefined) return;
 
-/* ================= Init ================= */
+  /* Face → F1/F2 */
+  if (faceCtl.enabled && faceCtl.base) {
+    let sj = clamp((feat.jaw - ref.jaw) / 0.12, -1, 1), sl = clamp((feat.lips - ref.lips) / 0.08, -1, 1);
+    if ($('inv1').checked) sj = -sj; if ($('inv2').checked) sl = -sl;
+    faceCtl.sig.jaw += (1 - faceCtl.s1) * (sj - faceCtl.sig.jaw);
+    faceCtl.sig.lips += (1 - faceCtl.s2) * (sl - faceCtl.sig.lips);
+    const f1 = faceCtl.base[0] + faceCtl.sig.jaw * faceCtl.g1 * (R[0].max - R[0].min) * 0.5;
+    const f2 = faceCtl.base[1] + faceCtl.sig.lips * faceCtl.g2 * (R[1].max - R[1].min) * 0.5;
+    if (Math.abs(f1 - state.formants[0].f) >= 1) setFormantFreq(0, f1, 'cam');
+    if (Math.abs(f2 - state.formants[1].f) >= 1) setFormantFreq(1, f2, 'cam');
+    setMeter('jaw', faceCtl.sig.jaw); setMeter('lips', faceCtl.sig.lips);
+  }
+
+  /* Head rotation → pitch (up to ±72 semitones) */
+  if (headCtl.enabled) {
+    let s = clamp((feat.yaw - ref.yaw) / headCtl.fs, -1, 1); if ($('headInv').checked) s = -s;
+    headCtl.sig += (1 - headCtl.smooth) * (s - headCtl.sig);
+    const m = clamp(headCtl.base + headCtl.sig * headCtl.range, MIDI_MIN, MIDI_MAX);
+    const mode = tonic.enabled ? 'tonic' : $('headMode').value;
+    const drive = v => { headDriving = true; setMidi(v, false); headDriving = false; };
+    if (mode !== 'continuous') {
+      const n = mode === 'tonic' ? snapScale(m) : Math.round(m);
+      if (n !== headCtl.lastNote) { headCtl.lastNote = n; drive(n); }
+    } else if (Math.abs(m - state.midi) > 0.005) drive(m);
+    setMeter('head', headCtl.sig);
+  }
+
+  /* Eyes + eyebrows → volume (collaborative attenuation) */
+  if (eyeCtl.enabled && ref.eye !== undefined && ref.brow !== undefined) {
+    const ce = clamp((ref.eye - feat.eye) / (ref.eye * eyeCtl.er || 1e-6), 0, 1);
+    const cb = clamp((ref.brow - feat.brow) / (Math.abs(ref.brow) * eyeCtl.br || 1e-6), 0, 1);
+    const dz = eyeCtl.dz, dzf = v => v <= dz ? 0 : (v - dz) / (1 - dz);
+    const de = dzf(ce), db = dzf(cb);
+    eyeCtl.sig.eye = de; eyeCtl.sig.brow = db;
+    const att = clamp(eyeCtl.w * de + (1 - eyeCtl.w) * db, 0, 1);
+    const target = Math.pow(1 - att, eyeCtl.curve);
+    eyeCtl.vol += (1 - eyeCtl.smooth) * (target - eyeCtl.vol);
+    if (target === 0 && eyeCtl.vol < 0.003) eyeCtl.vol = 0;
+    if (target === 1 && eyeCtl.vol > 0.997) eyeCtl.vol = 1;
+    if (Math.abs(eyeCtl.vol - eyeCtl.applied) > 0.002 || (eyeCtl.vol !== eyeCtl.applied && (eyeCtl.vol === 0 || eyeCtl.vol === 1))) {
+      eyeCtl.applied = eyeCtl.vol; applyOutput(false);
+    }
+    setMeter('eye', de, true); setMeter('brow', db, true); setMeter('vol', eyeCtl.vol, true);
+  }
+}
+
+function processHand(hr, vw, vh) {
+  const want = $('handRight').checked ? 'Right' : 'Left', swap = $('handSwap').checked;
+  let idx = -1;
+  if (hr && hr.landmarks) hr.landmarks.forEach((_, i) => {
+    let c = hr.handedness && hr.handedness[i] && hr.handedness[i][0] && hr.handedness[i][0].categoryName;
+    if (swap) c = c === 'Left' ? 'Right' : 'Left';
+    if (c === want && idx < 0) idx = i;
+  });
+  if (idx < 0) { $('handRaw').textContent = 'Raw: — (selected hand not detected)'; return; }
+  const L = hr.landmarks[idx], W = (hr.worldLandmarks && hr.worldLandmarks[idx]) || L;
+  c2.strokeStyle = '#4f9fe8'; c2.lineWidth = 2;
+  HAND_BONES.forEach(([a, b]) => { c2.beginPath(); c2.moveTo((1 - L[a].x) * vw, L[a].y * vh); c2.lineTo((1 - L[b].x) * vw, L[b].y * vh); c2.stroke(); });
+  dots(L, [...Array(21).keys()], vw, vh, '#f08a5d');
+  const v = (a, b) => [W[b].x - W[a].x, W[b].y - W[a].y, W[b].z - W[a].z];
+  const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+  const ang = (p, q) => Math.acos(clamp(dot(p, q) / (Math.sqrt(dot(p, p) * dot(q, q)) || 1e-9), -1, 1)) * 180 / Math.PI;
+  const a = v(0, 5), b = v(0, 17);
+  const nrm = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const nn = Math.sqrt(dot(nrm, nrm)) || 1e-9, nh = nrm.map(x => x / nn);
+  const proj = u => { const k = dot(u, nh); return [u[0] - k * nh[0], u[1] - k * nh[1], u[2] - k * nh[2]]; };
+  const dirs = [[5, 8], [9, 12], [13, 16], [17, 20]].map(([p, q]) => proj(v(p, q)));
+  const s = (ang(dirs[0], dirs[1]) + ang(dirs[1], dirs[2]) + ang(dirs[2], dirs[3])) / 3;
+  let e = 0;
+  [[5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]].forEach(([m, p, d, t]) => { e += ang(v(p, m), v(p, d)) + ang(v(d, p), v(d, t)); });
+  e /= 8;
+  $('handRaw').textContent = `Raw: spread ${s.toFixed(1)}° · extension ${e.toFixed(1)}°`;
+  if (handCalSt) { handCalSt = calStep(handCalSt, {s, e}, handCalDone); return; }
+  const ref = handCtl.ref; if (ref.s === undefined || ref.e === undefined || !handCtl.base) return;
+  const dz = handCtl.dz, dzf = x => Math.abs(x) < dz ? 0 : Math.sign(x) * (Math.abs(x) - dz) / (1 - dz);
+  const de0 = (e - ref.e) / handCtl.fe, ds = clamp(dzf((s - ref.s) / handCtl.fs - handCtl.xc * de0), -1, 1), de = clamp(dzf(de0), -1, 1);
+  handCtl.sig.s += (1 - handCtl.s3) * (ds - handCtl.sig.s);
+  handCtl.sig.e += (1 - handCtl.s4) * (de - handCtl.sig.e);
+  const f3 = handCtl.base[0] + handCtl.sig.s * handCtl.g3 * (R[2].max - R[2].min) * 0.5;
+  const f4 = handCtl.base[1] + handCtl.sig.e * handCtl.g4 * (R[3].max - R[3].min) * 0.5;
+  if (Math.abs(f3 - state.formants[2].f) >= 1) setFormantFreq(2, f3, 'cam');
+  if (Math.abs(f4 - state.formants[3].f) >= 1) setFormantFreq(3, f4, 'cam');
+  setMeter('s', handCtl.sig.s); setMeter('e', handCtl.sig.e);
+}
+
+/* Camera settings */
+safe('camera settings', () => {
+  const x2 = v => v.toFixed(2) + '×', f2 = v => v.toFixed(2);
+  slider($('f1Set'), {label: 'Sensitivity', min: 0.1, max: 3, step: 0.05, value: faceCtl.g1, fmt: x2, oninput: v => { faceCtl.g1 = v; }});
+  slider($('f1Set'), {label: 'Smoothing', min: 0, max: 0.95, step: 0.05, value: faceCtl.s1, fmt: f2, oninput: v => { faceCtl.s1 = v; }});
+  slider($('f2Set'), {label: 'Sensitivity', min: 0.1, max: 3, step: 0.05, value: faceCtl.g2, fmt: x2, oninput: v => { faceCtl.g2 = v; }});
+  slider($('f2Set'), {label: 'Smoothing', min: 0, max: 0.95, step: 0.05, value: faceCtl.s2, fmt: f2, oninput: v => { faceCtl.s2 = v; }});
+  const hs = $('headSliders');
+  slider(hs, {label: 'Range (±)', min: 1, max: HEAD_RANGE_MAX, step: 1, value: headCtl.range,
+    fmt: v => `±${v} st (${(v / 12).toFixed(2)} oct)`, oninput: v => { headCtl.range = v; headCtl.lastNote = null; }});
+  slider(hs, {label: 'Rotation for full range', min: 0.08, max: 0.4, step: 0.01, value: headCtl.fs, fmt: f2, oninput: v => { headCtl.fs = v; }});
+  slider(hs, {label: 'Smoothing', min: 0, max: 0.95, step: 0.05, value: headCtl.smooth, fmt: f2, oninput: v => { headCtl.smooth = v; }});
+  const es = $('eyeSliders');
+  slider(es, {label: 'Eye weight (brows = 1 − w)', min: 0, max: 1, step: 0.05, value: eyeCtl.w, fmt: v => `eyes ${pct(v)} · brows ${pct(1 - v)}`, oninput: v => { eyeCtl.w = v; }});
+  slider(es, {label: 'Eye closure for full effect', min: 0.3, max: 1, step: 0.05, value: eyeCtl.er, fmt: pct, oninput: v => { eyeCtl.er = v; }});
+  slider(es, {label: 'Brow lowering for full effect', min: 0.1, max: 0.8, step: 0.05, value: eyeCtl.br, fmt: pct, oninput: v => { eyeCtl.br = v; }});
+  slider(es, {label: 'Dead zone', min: 0, max: 0.3, step: 0.01, value: eyeCtl.dz, fmt: pct, oninput: v => { eyeCtl.dz = v; }});
+  slider(es, {label: 'Response curve', min: 0.5, max: 3, step: 0.1, value: eyeCtl.curve, fmt: v => v.toFixed(1), oninput: v => { eyeCtl.curve = v; }});
+  slider(es, {label: 'Smoothing', min: 0, max: 0.95, step: 0.05, value: eyeCtl.smooth, fmt: f2, oninput: v => { eyeCtl.smooth = v; }});
+  slider($('f3Set'), {label: 'Sensitivity', min: 0.1, max: 3, step: 0.05, value: handCtl.g3, fmt: x2, oninput: v => { handCtl.g3 = v; }});
+  slider($('f3Set'), {label: 'Smoothing', min: 0, max: 0.95, step: 0.05, value: handCtl.s3, fmt: f2, oninput: v => { handCtl.s3 = v; }});
+  slider($('f3Set'), {label: 'Full-scale spread', min: 4, max: 30, step: 1, value: handCtl.fs, fmt: v => v + '°', oninput: v => { handCtl.fs = v; }});
+  slider($('f4Set'), {label: 'Sensitivity', min: 0.1, max: 3, step: 0.05, value: handCtl.g4, fmt: x2, oninput: v => { handCtl.g4 = v; }});
+  slider($('f4Set'), {label: 'Smoothing', min: 0, max: 0.95, step: 0.05, value: handCtl.s4, fmt: f2, oninput: v => { handCtl.s4 = v; }});
+  slider($('f4Set'), {label: 'Full-scale extension', min: 15, max: 90, step: 1, value: handCtl.fe, fmt: v => v + '°', oninput: v => { handCtl.fe = v; }});
+  slider($('xSet'), {label: 'Dead zone', min: 0, max: 0.3, step: 0.01, value: handCtl.dz, fmt: pct, oninput: v => { handCtl.dz = v; }});
+  slider($('xSet'), {label: 'Cross-talk compensation (F4 → F3)', min: 0, max: 1, step: 0.05, value: handCtl.xc, fmt: pct, oninput: v => { handCtl.xc = v; }});
+});
+$('useFace').addEventListener('change', e => { faceCtl.enabled = e.target.checked; drawGraph(); });
+$('useHead').addEventListener('change', e => { headCtl.enabled = e.target.checked; headCtl.base = state.midi; headCtl.sig = 0; headCtl.lastNote = null; });
+$('useEyes').addEventListener('change', e => { eyeCtl.enabled = e.target.checked; eyeCtl.vol = 1; eyeCtl.applied = 1; applyOutput(false); });
+$('useHand').addEventListener('change', e => { handCtl.enabled = e.target.checked; });
+$('handRight').addEventListener('change', e => {
+  $('handTitle').textContent = (e.target.checked ? 'Right' : 'Left') + ' hand → F3 / F4';
+  calHand(['s', 'e']);
+});
+$('headMode').addEventListener('change', () => { headCtl.lastNote = null; });
+
+/* ================= Layout, loop, init ================= */
+function resizeCanvases() {
+  [sc, gc, hc].forEach(c => {
+    const r = c.getBoundingClientRect(); if (r.width < 10) return;
+    const w = Math.round(r.width * dpr()), h = Math.round(r.height * dpr());
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  });
+  drawGraph(); drawSpectrum(); drawHarm();
+}
+let lastHarmMidi = null;
+function tick() {
+  if (cam.dirty) { cam.dirty = false; refreshFormantUI(); }
+  drawSpectrum();
+  if ($('tab-set').classList.contains('active') && lastHarmMidi !== state.midi) { lastHarmMidi = state.midi; drawHarm(); updateHarmInfo(); }
+  rafId = requestAnimationFrame(tick);
+}
 safe('init', () => {
   $('hCount').value = state.nHarm; $('hCountNum').value = state.nHarm;
-  setMidi(state.midi, false);
-  const fs = state.formants.map((F, j) => clamp(F.f, R[j].min, R[j].max)); fixOrder(fs, 0); commitFreqs(fs, 'init');
-  renderTonic(); updateHarmInfo();
-  resizeCanvases(); requestAnimationFrame(resizeCanvases);
+  renderTonic(); refreshFormantUI(); setMidi(state.midi, false);
+  resizeCanvases(); updateHarmInfo(); applyOutput(false);
+  window.addEventListener('resize', resizeCanvases);
+  tick();
 });
-setInterval(() => { if ($('tab-set').classList.contains('active')) { updateHarmInfo(); drawHarm(); } }, 300);
 })();
 </script>
 </body>
