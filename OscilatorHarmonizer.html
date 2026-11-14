@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121316">
+<title>ResonanceFinder</title>
+<style>
+:root{--bg:#121316;--pn:#1d2025;--pn2:#2a2e35;--y:#ffc400;--w:#f2f2f2;--m:#8b919a;--r:#ff3b30;--g:#35d07f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--y);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px}
+body{padding:0 12px calc(120px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 4px 6px}
+h1{margin:0;font-weight:400;font-size:1.9rem;letter-spacing:.5px}h1 span{color:var(--w)}
+button{font:inherit;color:var(--y);background:var(--pn2);border:0;border-radius:14px;min-height:48px;padding:0 14px;cursor:pointer}
+button:active{filter:brightness(1.3)}button:disabled{opacity:.35}
+.pri{background:var(--y);color:#111;font-weight:700}.danger{background:var(--r);color:#fff;font-weight:800}
+.icon{width:48px;height:48px;border-radius:50%;padding:0;font-size:1.3rem}
+.wide{width:100%;margin:6px 0}
+.status{border-radius:12px;padding:10px 12px;margin:6px 0;font-size:.92rem;background:var(--pn);color:var(--w);border-left:4px solid var(--y)}
+.status.warn{border-color:#ff9500}.status.err{border-color:var(--r)}.status.ok{border-color:var(--g)}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.tabs button{background:var(--pn);font-size:.95rem;padding:0 4px}.tabs button.on{background:var(--y);color:#111;font-weight:700}
+.tabs span{display:inline-block;min-width:20px;border-radius:10px;background:#0006;padding:0 5px;font-size:.8rem}
+.card{background:var(--pn);border-radius:18px;padding:14px;margin:10px 0}
+.display{text-align:center}
+#modeLbl{font-size:.8rem;letter-spacing:2px;color:var(--m)}
+.freq{color:var(--w);font-size:min(19vw,96px);font-weight:300;line-height:1.05;font-variant-numeric:tabular-nums;margin-top:6px}
+.hz{font-size:2rem;margin-top:-4px}
+#sub{color:var(--w);opacity:.85;min-height:1.4em;font-size:.9rem;margin:4px 0}
+.meter{height:14px;background:#000;border-radius:7px;position:relative;overflow:hidden;margin:10px 0 4px}
+#meterFill{height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--y) 70%,var(--r))}
+#meterPeak{position:absolute;top:0;width:3px;height:100%;background:var(--w);left:0}
+.mrow{display:flex;justify-content:space-between;font-size:.8rem;color:var(--m);gap:6px}.mrow b{color:var(--w);font-variant-numeric:tabular-nums}
+.prog{height:4px;background:#000;border-radius:2px;margin:10px 0 4px}#progFill{height:100%;width:0;background:var(--y);border-radius:2px}
+.lvl{display:flex;align-items:center;gap:10px;margin-top:12px}.lvl input{flex:1}.lvl b{color:var(--w);min-width:48px}
+input[type=range]{accent-color:var(--y);height:32px}
+label{display:block;font-size:.82rem;color:var(--m);margin:6px 0}
+input[type=number],input[type=text],select,textarea{width:100%;background:#000;color:var(--w);border:1px solid var(--pn2);border-radius:10px;min-height:46px;padding:8px 10px;font-size:1rem;margin-top:4px;font-family:inherit}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}.row>*{flex:1}
+.waves{display:flex;gap:10px;margin:6px 0 10px}
+.waves button{flex:1;height:58px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.7rem;gap:2px;padding:0}
+.waves button.on{outline:2px solid var(--y);background:#3a3320}
+.waves svg{width:30px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2}
+.hidden{display:none!important}
+.cand{border:2px solid var(--y)}.ch{display:flex;justify-content:space-between;align-items:center;font-size:1.05rem}
+#cTimer{color:var(--w);font-variant-numeric:tabular-nums}#cInfo{color:var(--w);font-size:.88rem;margin:6px 0;line-height:1.45}
+.adj button{flex:1;min-width:0;padding:0 4px;font-size:.9rem}
+.item{display:flex;gap:10px;align-items:center;background:var(--pn2);border-radius:14px;padding:10px;margin:8px 0}
+.item.playing{outline:2px solid var(--y)}.num{width:34px;height:34px;border-radius:50%;background:var(--y);color:#111;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.meta{flex:1;min-width:0;color:var(--w);display:flex;flex-direction:column;gap:2px}.meta b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta .f{color:var(--y);font-size:1.15rem;font-variant-numeric:tabular-nums}.meta small{color:var(--m)}
+.badge{align-self:flex-start;font-size:.7rem;padding:1px 8px;border-radius:8px;background:#000;color:var(--y);text-transform:uppercase;letter-spacing:1px}.badge.vocal{color:#7fd6ff}
+.acts{display:flex;gap:6px}.acts button{width:46px;padding:0}
+.ed{flex-direction:column;align-items:stretch}
+.muted{color:var(--m);font-size:.9rem;line-height:1.45}
+table{width:100%;border-collapse:collapse;font-size:.78rem;color:var(--w)}th,td{border-bottom:1px solid var(--pn2);padding:5px 4px;text-align:left;white-space:nowrap}th{color:var(--y)}
+.tw{overflow-x:auto;margin:8px 0}
+.kv{color:var(--w);font-size:.82rem;line-height:1.6}.kv b{color:var(--y)}
+.vstate{display:flex;justify-content:space-around;color:var(--w);font-size:.85rem;margin:6px 0;text-align:center}.vstate b{display:block;color:var(--y);font-size:1.1rem}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--m);margin-right:6px;vertical-align:middle}.dot.on{background:var(--g);box-shadow:0 0 10px var(--g)}.dot.mid{background:#ff9500}
+details{color:var(--w);font-size:.9rem;line-height:1.5}summary{color:var(--y);font-size:1rem;min-height:40px;cursor:pointer}
+.bar{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(transparent,var(--bg) 25%);padding:14px 14px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rb{width:52px;height:52px;border-radius:50%;background:var(--y);color:#111;font-size:2rem;font-weight:700;padding:0;line-height:1}
+.playb{width:78px;height:78px;border-radius:50%;background:var(--y);padding:0;display:flex;align-items:center;justify-content:center}
+.playb svg{width:34px;height:34px;fill:#fff}
+#stopBtn{height:56px;border-radius:28px;padding:0 16px;font-size:1rem}
+#stepSel{width:74px;min-height:40px;margin:0;font-size:.85rem;padding:4px}
+</style>
+</head>
+<body>
+<header><h1>Resonance<span>Finder</span></h1><button class="icon" id="helpBtn" aria-label="Help">?</button></header>
+
+<div id="status" class="status">Tap <b>Enable audio &amp; microphone</b> to begin. Browsers require a tap before sound or microphone access can start.</div>
+<button id="enableBtn" class="wide pri">Enable audio &amp; microphone</button>
+
+<section id="p-help" class="card hidden">
+<details open><summary>Safety</summary><ul>
+<li>Output starts at 10% and always fades in gradually. Increase it slowly.</li>
+<li>The red <b>STOP</b> button silences everything immediately.</li>
+<li>Avoid high volume and long sessions near your ears; take breaks. Square and sawtooth waves sound louder and harsher.</li>
+<li>Speaker-to-microphone feedback can become loud or unstable. If the mic overloads, output is reduced automatically; if it continues, output stops.</li>
+<li>Audio stops when the app goes to the background.</li></ul></details>
+<details><summary>Accuracy &amp; levels</summary><ul>
+<li>Frequencies are shown and set with 0.01 Hz <b>resolution</b>. That is <b>not</b> acoustic accuracy: results depend on speaker, mic, room, browser processing and FFT bin width (see report, typically ≈5.9 Hz).</li>
+<li>Levels are uncalibrated <b>dBFS</b> (decibels relative to digital full scale, 0 = maximum). "@f" is the FFT level at the output frequency; "rise" is the jump above the recent median. They are relative values, not SPL dB.</li>
+<li>Phone speakers produce little output below ~200 Hz, so low resonances may be missed.</li></ul></details>
+<details><summary>Requirements</summary><p>Use Chrome or Samsung Internet over https:// (or localhost). Allow microphone access. If denied: lock icon → Permissions → Microphone → Allow, then reload.</p></details>
+</section>
+
+<nav class="tabs">
+  <button data-tab="sweep" class="on">Sweep</button>
+  <button data-tab="vocal">Vocal</button>
+  <button data-tab="list">List <span id="cnt">0</span></button>
+  <button data-tab="report">Report</button>
+</nav>
+
+<section class="card display">
+  <div id="modeLbl">SWEEP · SINE · IDLE</div>
+  <div id="freq" class="freq">440.00</div>
+  <div class="hz">Hz</div>
+  <div id="sub">0.01 Hz display resolution — not measurement accuracy</div>
+  <div class="meter"><div id="meterFill"></div><div id="meterPeak"></div></div>
+  <div class="mrow"><span>Mic RMS <b id="rms">—</b> dBFS</span><span>Peak <b id="pk">—</b></span><span>@f <b id="bin">—</b> dB</span></div>
+  <div class="prog"><div id="progFill"></div></div>
+  <div class="mrow"><span id="pmin">60 Hz</span><span id="pdur"></span><span id="pmax">3000 Hz</span></div>
+  <div class="lvl"><button class="icon" id="muteBtn" aria-label="Mute">🔈</button><input id="sLevel" type="range" min="0" max="100" value="10" aria-label="Output level"><b id="lvlTxt">10%</b></div>
+</section>
+
+<section id="cand" class="card cand hidden">
+  <div class="ch"><b id="cTitle">Candidate</b><span id="cTimer"></span></div>
+  <div id="cInfo"></div>
+  <label>Frequency (Hz, 0.01 step)<input id="cFreq" type="number" step="0.01" min="20" max="10000" inputmode="decimal"></label>
+  <div class="row adj"><button data-d="-1">−1</button><button data-d="-0.1">−.1</button><button data-d="-0.01">−.01</button><button data-d="0.01">+.01</button><button data-d="0.1">+.1</button><button data-d="1">+1</button></div>
+  <div class="row"><button id="cProbe">▶ Probe tone</button><button id="cVerify">Verify in sweep</button></div>
+  <div class="row"><button id="cDismiss">✕ Dismiss</button><button id="cConfirm" class="pri">✓ Confirm</button></div>
+</section>
+
+<section id="p-sweep" class="card panel">
+  <label>Waveform</label>
+  <div class="waves" id="waves">
+    <button data-w="sine" class="on"><svg viewBox="0 0 24 24"><path d="M2 12 Q7 1 12 12 T22 12"/></svg>Sine</button>
+    <button data-w="triangle"><svg viewBox="0 0 24 24"><path d="M2 12 L7 4 L17 20 L22 12"/></svg>Triangle</button>
+    <button data-w="sawtooth"><svg viewBox="0 0 24 24"><path d="M2 18 L12 5 V18 L22 5 V18"/></svg>Saw</button>
+    <button data-w="square"><svg viewBox="0 0 24 24"><path d="M2 18 V6 H12 V18 H22 V6"/></svg>Square</button>
+  </div>
+  <div class="grid">
+    <label>Min (Hz)<input id="sMin" type="number" value="60" min="20" max="10000" step="0.01" inputmode="decimal"></label>
+    <label>Max (Hz)<input id="sMax" type="number" value="3000" min="20" max="10000" step="0.01" inputmode="decimal"></label>
+    <label>Start (Hz)<input id="sStart" type="number" value="60" min="20" max="10000" step="0.01" inputmode="decimal"></label>
+    <label>Speed (octaves/min)<input id="sSpeed" type="number" value="3" min="0.1" max="60" step="0.1" inputmode="decimal"></label>
+    <label>Detect rise (dB)<input id="sThr" type="number" value="6" min="1" max="40" step="0.5" inputmode="decimal"></label>
+    <label>Hold (s, ≥10)<input id="sHold" type="number" value="10" min="10" max="120" step="1" inputmode="numeric"></label>
+  </div>
+  <div class="row"><button id="swStart" class="pri">▶ Start</button><button id="swPause">❚❚ Pause</button><button id="swStop">■ Stop</button></div>
+  <p class="muted">Place the phone's bottom speaker and mic close to (not touching) the drum head, in a quiet room. Sweep mode disables echo cancellation so the mic hears the speaker. A candidate is a sudden rise in mic level at the sweep frequency relative to the recent baseline.</p>
+</section>
+
+<section id="p-vocal" class="card panel hidden">
+  <div class="vstate">
+    <div><span class="dot" id="vDot"></span>Stability<b id="vStab">—</b></div>
+    <div>Confidence<b id="vConf">—</b></div>
+    <div>Note<b id="vNote">—</b></div>
+  </div>
+  <div class="row"><button id="vListen" class="pri">🎤 Start listening</button><button id="vCapture" disabled>◎ Capture pitch</button></div>
+  <p class="muted">Sing or hum a steady tone near the drum. A captured pitch is only a <b>candidate driving frequency</b>, not proof of resonance. Echo cancellation is enabled and pitch detection pauses while the speaker plays, so speaker output is not mistaken for your voice (not guaranteed on every device). For an objective check, use <b>Verify in sweep</b>.</p>
+</section>
+
+<section id="p-list" class="card panel hidden"><div id="list"></div></section>
+
+<section id="p-report" class="card panel hidden">
+  <div class="row"><button id="rCsv" class="pri">⇩ CSV</button><button id="rJson">⇩ JSON</button><button id="rCopy">⧉ Copy</button></div>
+  <div class="row"><button id="rClear">Clear detection log</button></div>
+  <div id="report"></div>
+</section>
+
+<div class="bar">
+  <button class="rb" id="minusBtn" aria-label="Decrease frequency">−</button>
+  <select id="stepSel" aria-label="Step size"><option>0.01</option><option>0.1</option><option selected>1</option><option>10</option><option>100</option></select>
+  <button class="playb" id="playBtn" aria-label="Play / pause"><svg viewBox="0 0 24 24"><path id="playIco" d="M7 4 L20 12 L7 20Z"/></svg></button>
+  <button class="rb" id="plusBtn" aria-label="Increase frequency">+</button>
+  <button class="danger" id="stopBtn">STOP</button>
+</div>
+
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f2=v=>(v==null||!isFinite(v))?'—':(+v).toFixed(2);
+const f1=v=>(v==null||!isFinite(v))?'—':(+v).toFixed(1);
+const median=a=>{const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const noteOf=f=>{const n=Math.round(12*Math.log2(f/440)+69);const c=1200*Math.log2(f/(440*2**((n-69)/12)));return NOTES[(n%12+12)%12]+(Math.floor(n/12)-1)+' '+(c>=0?'+':'')+c.toFixed(0)+'¢'};
+const WS={sine:1,triangle:.9,sawtooth:.55,square:.45}; // loudness compensation per waveform
+const MAXG=.5;                                         // absolute output gain cap (safety)
+const PAUSE='M6 4h4v16H6zM14 4h4v16h-4z',PLAY='M7 4 L20 12 L7 20Z';
+
+/* ---------- State ---------- */
+const st={ctx:null,osc:null,g:null,an:null,stream:null,src:null,ec:null,td:null,fd:null,yd:null,
+  mode:'sweep',phase:'idle',f:60,sw:null,wave:'sine',man:440,tone:null,muted:false,
+  lastT:0,startT:0,hist:[],trig:0,trigMax:null,cand:null,holdEnd:0,holdReady:false,
+  clip:0,reductions:[],oscSince:0,expWarned:false,lastOscOff:0,frame:0,editing:null,
+  listening:false,pHist:[],pitch:null,conf:0,stable:false,spread:null,rmsDb:-120,lastBin:null};
+let entries=load('rf_entries'),detections=load('rf_detections');
+function load(k){try{return JSON.parse(localStorage.getItem(k))||[]}catch{return[]}}
+function save(){try{localStorage.setItem('rf_entries',JSON.stringify(entries));localStorage.setItem('rf_detections',JSON.stringify(detections))}catch{}}
+function status(m,t=''){const s=$('status');s.className='status '+t;s.innerHTML=m}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ---------- Settings ---------- */
+function cfg(){
+  let min=clamp(+$('sMin').value||60,20,10000),max=clamp(+$('sMax').value||3000,20,10000);
+  if(max<=min+1)max=Math.min(10000,min+1);
+  return{min,max,start:clamp(+$('sStart').value||min,min,max),speed:clamp(+$('sSpeed').value||3,.1,60),
+    thr:clamp(+$('sThr').value||6,1,40),hold:Math.max(10,+$('sHold').value||10)};
+}
+function refreshRange(){const c=cfg();$('pmin').textContent=c.min.toFixed(0)+' Hz';$('pmax').textContent=c.max.toFixed(0)+' Hz';
+  $('pdur').textContent='≈'+(Math.log2(c.max/c.start)/c.speed).toFixed(1)+' min sweep'}
+
+/* ---------- Audio setup ---------- */
+async function enable(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC){status('Web Audio API is not supported in this browser. Use Chrome or Samsung Internet.','err');return false}
+    if(!st.ctx){
+      st.ctx=new AC({latencyHint:'interactive'});
+      st.g=st.ctx.createGain();st.g.gain.value=0;st.g.connect(st.ctx.destination);
+      st.an=st.ctx.createAnalyser();st.an.fftSize=8192;st.an.smoothingTimeConstant=0;
+      st.td=new Float32Array(st.an.fftSize);st.fd=new Float32Array(st.an.frequencyBinCount);st.yd=new Float32Array(1200);
+      st.ctx.onstatechange=()=>{if(st.ctx.state!=='running'){status('Audio was interrupted by the system (call, other app or power saving). Tap <b>Enable</b> to resume.','warn');$('enableBtn').classList.remove('hidden');if(st.phase==='run')swPause()}};
+      requestAnimationFrame(loop);
+    }
+    if(st.ctx.state!=='running')await st.ctx.resume();
+    if(!st.stream&&!await getMic(st.mode==='vocal'))return st.ctx.state==='running';
+    $('enableBtn').classList.add('hidden');
+    status('Audio and microphone ready. Sample rate '+st.ctx.sampleRate+' Hz.','ok');
+    return true;
+  }catch(e){status('Could not start audio: '+esc(e.message),'err');return false}
+}
+// (Re)acquire the mic. Sweep: echo cancellation OFF (must hear speaker). Vocal: ON (reject speaker).
+async function getMic(ec){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status('Microphone API unavailable. Open this page via https:// in Chrome or Samsung Internet.','err');return false}
+  stopMic();
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:ec,noiseSuppression:false,autoGainControl:false}});
+    st.stream=s;st.ec=ec;st.src=st.ctx.createMediaStreamSource(s);st.src.connect(st.an);
+    s.getAudioTracks()[0].onended=()=>{st.stream=null;status('Microphone stopped by the system or another app. Tap <b>Enable</b> to reconnect.','warn');$('enableBtn').classList.remove('hidden')};
+    return true;
+  }catch(e){
+    const m={NotAllowedError:'Microphone permission denied. Open site settings (lock icon) → Permissions → Microphone → Allow, then reload.',
+      NotFoundError:'No microphone found on this device.',NotReadableError:'The microphone is busy in another app. Close it and retry.'}[e.name]||('Microphone error: '+e.message);
+    status(esc(m),'err');$('enableBtn').classList.remove('hidden');return false;
+  }
+}
+function stopMic(){if(st.src)try{st.src.disconnect()}catch{}if(st.stream)st.stream.getTracks().forEach(t=>{t.onended=null;t.stop()});st.stream=null;st.src=null}
+async function ready(){if(st.ctx&&st.ctx.state==='running')return true;return enable()}
+async function ensureMic(){const want=st.mode==='vocal';if(!st.stream||st.ec!==want)return getMic(want);return true}
+
+/* ---------- Oscillator / output (always ramped, never sudden) ---------- */
+const target=()=>st.muted?0:((+$('sLevel').value/100)**2)*MAXG*WS[st.wave];
+function ramp(v,sec=.4){const t=st.ctx.currentTime,g=st.g.gain;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(v,t+sec)}
+function startOsc(f){
+  if(!st.osc){st.osc=st.ctx.createOscillator();st.osc.type=st.wave;st.osc.frequency.value=f;st.osc.connect(st.g);st.osc.start();st.oscSince=performance.now();st.expWarned=false}
+  else setFreq(f);
+  ramp(target());
+}
+function setFreq(f){if(st.osc)st.osc.frequency.setTargetAtTime(f,st.ctx.currentTime,.01)}
+function stopOsc(){if(!st.osc)return;const o=st.osc,t=st.ctx.currentTime;ramp(0,.05);try{o.stop(t+.08)}catch{}st.osc=null;st.lastOscOff=performance.now()}
+function playTone(f,id=null){if(st.phase!=='idle')swStop();st.tone={f,id};startOsc(f);renderList()}
+function stopTone(){st.tone=null;stopOsc();renderList()}
+function emergency(msg){swStop();stopTone();st.tone=null;stopOsc();if(st.g&&st.ctx){st.g.gain.cancelScheduledValues(0);st.g.gain.value=0}
+  status('■ '+(msg||'All output stopped.'),msg?'err':'');renderList()}
+const oscF=()=>st.phase==='hold'?st.cand?.f:(st.phase==='run'||st.phase==='paused')?st.f:st.tone?.f??null;
+
+/* ---------- Sweep: exponential (constant octaves/min) ---------- */
+async function swStart(){
+  if(!await ready())return;
+  if(!await ensureMic()){status('Sweep mode requires the microphone.','err');return}
+  stopTone();hideCand();st.sw=cfg();st.f=st.sw.start;startOsc(st.f);
+  st.phase='run';st.startT=performance.now();st.hist=[];st.trig=0;st.trigMax=null;st.lastT=0;
+  status('Sweeping '+st.sw.min.toFixed(0)+'–'+st.sw.max.toFixed(0)+' Hz. Keep the room quiet.','ok');ui();
+}
+function swPause(){
+  if(st.phase==='run'){st.phase='paused';ramp(0,.15);status('Sweep paused at '+f2(st.f)+' Hz.')}
+  else if(st.phase==='paused'){st.phase='run';st.startT=performance.now();st.hist=[];st.lastT=0;ramp(target());status('Sweep resumed.','ok')}
+  ui();
+}
+function swStop(){if(st.phase==='idle')return;if(st.cand?.source==='sweep')hideCand();st.phase='idle';stopOsc();ui()}
+function sweepStep(ts,bl,now){
+  if(!st.lastT){st.lastT=ts;return}
+  const dt=Math.min(.1,(ts-st.lastT)/1000);st.lastT=ts;
+  st.f*=2**(st.sw.speed/60*dt);
+  if(st.f>=st.sw.max){st.f=st.sw.max;finishSweep();return}
+  setFreq(st.f);if(bl!=null)detect(bl,now);
+}
+function finishSweep(){st.phase='idle';stopOsc();status('Sweep complete. '+entries.length+' confirmed resonance(s) in list.','ok');ui()}
+function resumeAfter(f){
+  st.f=Math.max(f*1.02,f+3);
+  if(st.f>=st.sw.max){finishSweep();return}
+  st.phase='run';st.startT=performance.now();st.hist=[];st.trig=0;st.lastT=0;setFreq(st.f);ramp(target());
+  status('Continuing sweep from '+f2(st.f)+' Hz…','ok');
+}
+
+/* ---------- Resonance detection: rise of level at sweep frequency vs. rolling median ---------- */
+function binLevel(f){
+  const bw=st.ctx.sampleRate/st.an.fftSize,k=Math.round(f/bw);let m=-200;
+  for(let i=Math.max(0,k-2);i<=Math.min(st.fd.length-1,k+2);i++)if(st.fd[i]>m)m=st.fd[i];return m;
+}
+function detect(l,now){
+  st.hist.push({t:now,l});while(st.hist.length&&st.hist[0].t<now-2000)st.hist.shift();
+  if(now-st.startT<1500)return;                       // warm-up after start/resume (gain ramp, latency)
+  const base=st.hist.filter(h=>h.t<now-200).map(h=>h.l);if(base.length<20)return;
+  const rise=l-median(base);
+  if(rise>=st.sw.thr&&l>-100){
+    st.trig++;if(!st.trigMax||l>st.trigMax.l)st.trigMax={l,rise,f:st.f};
+    if(st.trig>=3)onDetect(st.trigMax);                // require 3 consecutive frames (reject clicks)
+  }else{st.trig=0;st.trigMax=null}
+}
+function onDetect(m){
+  st.trig=0;st.trigMax=null;st.phase='hold';
+  const c=st.sw;
+  st.cand={id:uid(),f:m.f,detF:m.f,level:m.l,rise:m.rise,source:'sweep',wave:st.wave,min:c.min,max:c.max,speed:c.speed,thr:c.thr,level_pct:+$('sLevel').value,time:new Date().toISOString()};
+  detections.push({...st.cand,status:'pending'});save();
+  setFreq(m.f);st.holdEnd=performance.now()+c.hold*1000;st.holdReady=false;
+  showCand();navigator.vibrate?.(80);
+  status('Candidate detected at '+f2(m.f)+' Hz — holding tone for '+c.hold+' s.','warn');
+}
+function holdTick(now){
+  const r=Math.ceil((st.holdEnd-now)/1000);
+  if(r>0){$('cTimer').textContent='Hold '+r+' s'}
+  else if(!st.holdReady){st.holdReady=true;$('cTimer').textContent='Ready';$('cConfirm').disabled=$('cDismiss').disabled=false}
+}
+
+/* ---------- Candidate UI (shared) ---------- */
+function showCand(){
+  const c=st.cand,sw=c.source==='sweep';
+  $('cand').classList.remove('hidden');$('cTitle').textContent=sw?'Sweep candidate':'Vocal candidate (unconfirmed)';
+  $('cFreq').value=c.f.toFixed(2);
+  $('cInfo').innerHTML=sw
+    ?`Detected at <b>${f2(c.detF)} Hz</b> · level ${f1(c.level)} dBFS · rise +${f1(c.rise)} dB · ${c.wave}<br>Listen/feel the drum. Adjust the frequency to maximize response, then confirm or dismiss.`
+    :`Estimated vocal pitch <b>${f2(c.detF)} Hz</b> (${noteOf(c.detF)}) · confidence ${(c.conf*100).toFixed(0)}% · spread ±${f1(c.spread)}¢<br>This is a <b>driving frequency</b> only. Probe it or verify in sweep before confirming.`;
+  $('cConfirm').disabled=$('cDismiss').disabled=sw;$('cTimer').textContent='';
+  $('cProbe').disabled=sw;$('cProbe').textContent=sw?'Tone holding':'▶ Probe tone';
+  $('cand').scrollIntoView({behavior:'smooth',block:'center'});ui();
+}
+function hideCand(){st.cand=null;$('cand').classList.add('hidden')}
+function adjCand(f){
+  if(!st.cand)return;f=clamp(Math.round(f*100)/100,20,10000);st.cand.f=f;$('cFreq').value=f.toFixed(2);
+  if(st.phase==='hold'||st.tone?.id==='cand'){setFreq(f);if(st.tone)st.tone.f=f}ui();
+}
+function finishCand(ok){
+  const c=st.cand;if(!c)return;
+  const f=clamp(+$('cFreq').value||c.f,20,10000);
+  const d=detections.find(x=>x.id===c.id);if(d){d.status=ok?'confirmed':'dismissed';d.final_f=f}
+  if(ok){entries.push({...c,f,name:'Resonance '+(entries.length+1),notes:''});navigator.vibrate?.(40)}
+  save();renderList();hideCand();
+  if(st.tone?.id==='cand')stopTone();
+  if(c.source==='sweep'&&st.phase==='hold')resumeAfter(c.detF);
+  else status(ok?'Saved '+f2(f)+' Hz to the list.':'Candidate dismissed.',ok?'ok':'');
+}
+function verifySweep(f){
+  $('sMin').value=Math.max(20,f*.9).toFixed(2);$('sMax').value=Math.min(10000,f*1.1).toFixed(2);
+  $('sStart').value=$('sMin').value;$('sSpeed').value='1';refreshRange();
+  if(st.cand)finishCand(false);setTab('sweep');swStart();
+}
+
+/* ---------- Vocal pitch estimation (YIN) ---------- */
+function yin(x,sr){
+  const W=1536,tMin=Math.floor(sr/1100),tMax=Math.min(st.yd.length-1,Math.floor(sr/65)),d=st.yd;
+  let run=0;d[0]=1;
+  for(let t=1;t<=tMax;t++){let s=0;for(let i=0;i<W;i++){const v=x[i]-x[i+t];s+=v*v}run+=s;d[t]=run?s*t/run:1}
+  let tau=-1;
+  for(let t=tMin;t<=tMax;t++)if(d[t]<.15){while(t+1<=tMax&&d[t+1]<d[t])t++;tau=t;break}
+  if(tau<0){let m=1;for(let t=tMin;t<=tMax;t++)if(d[t]<m){m=d[t];tau=t}if(m>.35)return null}
+  const a=d[tau-1]??d[tau],b=d[tau],c=d[tau+1]??d[tau],den=a-2*b+c;
+  const tt=den?tau+(a-c)/(2*den):tau;
+  return{f:sr/tt,conf:clamp(1-b,0,1)};
+}
+function pitchTick(now){
+  if(st.osc||now-st.lastOscOff<400){st.pitch=null;st.pHist=[];st.stable=false;vUI('Paused (speaker)');return}
+  if(st.rmsDb<-55){st.pitch=null;st.pHist=[];st.stable=false;vUI('Too quiet');return}
+  const r=yin(st.td,st.ctx.sampleRate);
+  if(r&&r.conf>.7&&r.f>=65&&r.f<=1100){st.pitch=r.f;st.conf=r.conf;st.pHist.push({t:now,f:r.f,c:r.conf})}
+  else{st.conf=r?r.conf:0}
+  while(st.pHist.length&&st.pHist[0].t<now-700)st.pHist.shift();
+  // stability = std-dev in cents over last 0.7 s
+  if(st.pHist.length>=8){
+    const m=median(st.pHist.map(p=>p.f)),c=st.pHist.map(p=>1200*Math.log2(p.f/m));
+    st.spread=Math.sqrt(c.reduce((s,v)=>s+v*v,0)/c.length);
+    st.stable=st.spread<12&&median(st.pHist.map(p=>p.c))>.85;
+  }else{st.spread=null;st.stable=false}
+  vUI();
+}
+function vUI(msg){
+  $('vDot').className='dot'+(st.stable?' on':st.spread!=null?' mid':'');
+  $('vStab').textContent=msg||(st.spread!=null?'±'+st.spread.toFixed(1)+'¢':'—');
+  $('vConf').textContent=st.conf?(st.conf*100).toFixed(0)+'%':'—';
+  $('vNote').textContent=st.pitch?noteOf(st.pitch):'—';
+}
+async function vListen(){
+  if(st.listening){st.listening=false;st.pitch=null;$('vListen').textContent='🎤 Start listening';$('vCapture').disabled=true;vUI();ui();return}
+  if(!await ready())return;st.mode='vocal';if(!await ensureMic())return;
+  st.listening=true;$('vListen').textContent='■ Stop listening';$('vCapture').disabled=false;
+  status('Listening. Sing a steady tone; capture when the dot turns green.','ok');
+}
+function capture(){
+  if(!st.stable||st.pHist.length<8){status('Pitch not stable enough to capture'+(st.spread!=null?' (spread ±'+st.spread.toFixed(1)+'¢, need &lt;12¢)':'')+'. Sing louder and steadier, closer to the phone.','warn');return}
+  const f=median(st.pHist.map(p=>p.f));
+  st.cand={id:uid(),f:Math.round(f*100)/100,detF:f,level:st.rmsDb,rise:null,source:'vocal',wave:null,conf:median(st.pHist.map(p=>p.c)),spread:st.spread,time:new Date().toISOString()};
+  detections.push({...st.cand,status:'pending'});save();
+  st.listening=false;$('vListen').textContent='🎤 Start listening';$('vCapture').disabled=true;
+  showCand();status('Vocal pitch captured as a candidate. Probe or verify it before confirming.','warn');
+}
+
+/* ---------- Safety: overload / feedback monitor, exposure warning ---------- */
+function safety(peak,now){
+  if(peak>=.94){
+    if(++st.clip>=4&&st.osc){
+      st.clip=0;const s=$('sLevel'),v=Math.floor(+s.value/2);s.value=v;lvlUI();ramp(target(),.1);
+      st.reductions=st.reductions.filter(t=>t>now-8000);st.reductions.push(now);
+      if(st.reductions.length>=3||v<=1)emergency('Persistent mic overload / feedback — output stopped. Lower volume or move the phone.');
+      else status('Mic overload — output reduced to '+v+'%.','warn');
+    }
+  }else st.clip=0;
+  if(st.osc&&!st.expWarned&&now-st.oscSince>300000){st.expWarned=true;status('Tone has played for 5 minutes. Take a break to protect your hearing.','warn')}
+}
+
+/* ---------- Main loop ---------- */
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(!st.an)return;
+  const now=performance.now(),x=st.td;st.an.getFloatTimeDomainData(x);
+  let s=0,p=0;for(let i=0;i<x.length;i++){const v=x[i];s+=v*v;const a=v<0?-v:v;if(a>p)p=a}
+  st.rmsDb=st.stream?20*Math.log10(Math.sqrt(s/x.length)+1e-12):-120;const pk=st.stream?20*Math.log10(p+1e-12):-120;
+  if(st.stream)safety(p,now);
+  const of=oscF();st.lastBin=null;
+  if(of&&st.stream){st.an.getFloatFrequencyData(st.fd);st.lastBin=binLevel(of)}
+  if(st.phase==='run')sweepStep(ts,st.lastBin,now);
+  if(st.phase==='hold')holdTick(now);
+  if(st.listening&&st.stream&&(st.frame&1)===0)pitchTick(now);
+  if(++st.frame%3===0){
+    $('meterFill').style.width=clamp((st.rmsDb+80)/80,0,1)*100+'%';$('meterPeak').style.left=clamp((pk+80)/80,0,1)*100+'%';
+    $('rms').textContent=st.stream?f1(st.rmsDb):'—';$('pk').textContent=st.stream?f1(pk):'—';$('bin').textContent=st.lastBin!=null?f1(st.lastBin):'—';
+    ui();
+  }
+}
+function ui(){
+  const of=oscF(),ph={idle:'IDLE',run:'SWEEPING',paused:'PAUSED',hold:'HOLD'}[st.phase];
+  let f=of??st.cand?.f??(st.listening?st.pitch:null)??st.man,sub;
+  if(st.phase==='run')sub='Sweeping ↑ '+st.sw.speed+' oct/min';
+  else if(st.phase==='hold')sub='Holding candidate tone';
+  else if(st.tone)sub='Tone output (set frequency)';
+  else if(st.listening)sub=st.pitch?'Estimated vocal pitch — not a confirmed resonance':'Listening…';
+  else if(st.cand)sub='Candidate frequency';
+  else sub='Manual tone frequency — tap ▶';
+  $('freq').textContent=(st.listening&&!of&&!st.pitch)?'—':f2(f);$('sub').textContent=sub;
+  $('modeLbl').textContent=st.mode.toUpperCase()+' · '+st.wave.toUpperCase()+' · '+(st.tone?'TONE':st.listening?'LISTENING':ph);
+  const c=st.sw||cfg();$('progFill').style.width=(st.phase!=='idle'?clamp(Math.log2(st.f/c.min)/Math.log2(c.max/c.min),0,1)*100:0)+'%';
+  $('playIco').setAttribute('d',(st.phase==='run'||st.tone)?PAUSE:PLAY);
+  $('swPause').textContent=st.phase==='paused'?'▶ Resume':'❚❚ Pause';$('swPause').disabled=!(st.phase==='run'||st.phase==='paused');
+  $('swStop').disabled=st.phase==='idle';$('swStart').disabled=st.phase!=='idle';
+}
+function lvlUI(){$('lvlTxt').textContent=$('sLevel').value+'%';$('muteBtn').textContent=st.muted?'🔇':'🔈'}
+
+/* ---------- Resonance list ---------- */
+function renderList(){
+  $('cnt').textContent=entries.length;
+  const L=$('list');
+  if(!entries.length){L.innerHTML='<p class="muted">No confirmed resonances yet. Run a sweep or capture a vocal pitch, then confirm candidates.</p>';return}
+  L.innerHTML=entries.map((e,i)=>{
+    if(st.editing===e.id)return`<div class="item ed"><label>Name<input type="text" id="eN" value="${esc(e.name)}"></label>
+      <label>Frequency (Hz)<input type="number" id="eF" step="0.01" min="20" max="10000" value="${e.f.toFixed(2)}" inputmode="decimal"></label>
+      <label>Notes<textarea id="eT" rows="2">${esc(e.notes)}</textarea></label>
+      <div class="row"><button data-act="cancel" data-id="${e.id}">Cancel</button><button class="pri" data-act="save" data-id="${e.id}">Save</button></div></div>`;
+    const pl=st.tone?.id===e.id;
+    return`<div class="item${pl?' playing':''}"><div class="num">${i+1}</div><div class="meta">
+      <span class="badge ${e.source}">${e.source==='vocal'?'vocal mode':'sweep · '+e.wave}</span><b>${esc(e.name)}</b>
+      <span class="f">${f2(e.f)} Hz</span><small>${e.source==='sweep'?'rise +'+f1(e.rise)+' dB · '+f1(e.level)+' dBFS':'conf '+(e.conf*100).toFixed(0)+'% · ±'+f1(e.spread)+'¢'}</small></div>
+      <div class="acts"><button data-act="play" data-id="${e.id}" aria-label="Play">${pl?'■':'▶'}</button><button data-act="edit" data-id="${e.id}" aria-label="Edit">✎</button><button data-act="del" data-id="${e.id}" aria-label="Remove">🗑</button></div></div>`;
+  }).join('');
+}
+$('list').addEventListener('click',async ev=>{
+  const b=ev.target.closest('button');if(!b)return;const e=entries.find(x=>x.id===b.dataset.id);if(!e)return;
+  const a=b.dataset.act;
+  if(a==='play'){if(st.tone?.id===e.id)stopTone();else if(await ready())playTone(e.f,e.id)}
+  else if(a==='edit')st.editing=e.id;
+  else if(a==='cancel')st.editing=null;
+  else if(a==='save'){e.name=$('eN').value.trim()||e.name;const f=+$('eF').value;if(f>=20&&f<=10000)e.f=Math.round(f*100)/100;e.notes=$('eT').value;st.editing=null;if(st.tone?.id===e.id){st.tone.f=e.f;setFreq(e.f)}save()}
+  else if(a==='del'&&confirm('Remove "'+e.name+'"?')){if(st.tone?.id===e.id)stopTone();entries=entries.filter(x=>x!==e);save()}
+  renderList();
+});
+
+/* ---------- Reporting / export ---------- */
+function settings(){
+  const c=cfg(),sr=st.ctx?.sampleRate||null;
+  return{generated:new Date().toISOString(),sample_rate_hz:sr,fft_size:8192,fft_bin_width_hz:sr?+(sr/8192).toFixed(3):null,
+    sweep_min_hz:c.min,sweep_max_hz:c.max,sweep_start_hz:c.start,speed_oct_per_min:c.speed,detect_rise_db:c.thr,hold_s:c.hold,
+    waveform:st.wave,output_level_pct:+$('sLevel').value,mic_echo_cancellation:st.ec,level_units:'uncalibrated dBFS (relative)',
+    display_resolution_hz:.01,accuracy_note:'Display/set resolution is 0.01 Hz; acoustic accuracy is limited by device, room, browser and FFT bin width.',
+    user_agent:navigator.userAgent};
+}
+const COLS=['type','index','name','frequency_hz','detected_hz','input_level_dbfs','rise_db','source','waveform','sweep_min_hz','sweep_max_hz','speed_oct_min','threshold_db','output_level_pct','vocal_confidence','vocal_spread_cents','status','time','notes'];
+function rowOf(type,i,e){return[type,i,e.name||'',f2(e.final_f??e.f),f2(e.detF),f2(e.level),f2(e.rise),e.source,e.wave||'',e.min??'',e.max??'',e.speed??'',e.thr??'',e.level_pct??'',e.conf!=null?e.conf.toFixed(3):'',e.spread!=null?e.spread.toFixed(2):'',e.status||'confirmed',e.time,e.notes||'']}
+function csv(){
+  const q=v=>/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':v;
+  const s=settings(),out=Object.entries(s).map(([k,v])=>'# '+k+': '+v);
+  out.push(COLS.join(','));
+  entries.forEach((e,i)=>out.push(rowOf('confirmed',i+1,e).map(q).join(',')));
+  detections.forEach((e,i)=>out.push(rowOf('detection',i+1,e).map(q).join(',')));
+  return out.join('\n');
+}
+const json=()=>JSON.stringify({settings:settings(),confirmed:entries,detection_log:detections},null,2);
+function download(name,text,mime){const u=URL.createObjectURL(new Blob([text],{type:mime})),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+async function copyText(t){
+  try{await navigator.clipboard.writeText(t);status('Report copied to clipboard.','ok')}
+  catch{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();status(ok?'Report copied.':'Copy failed — use CSV/JSON export.',ok?'ok':'err')}
+}
+function renderReport(){
+  const s=settings(),tbl=(rows,type)=>rows.length?`<div class="tw"><table><tr><th>#</th><th>Name</th><th>Hz</th><th>Level dBFS</th><th>Rise dB</th><th>Source</th><th>Wave</th><th>Range</th><th>Status</th><th>Time</th></tr>${rows.map((e,i)=>`<tr><td>${i+1}</td><td>${esc(e.name||'')}</td><td>${f2(e.final_f??e.f)}</td><td>${f1(e.level)}</td><td>${f1(e.rise)}</td><td>${e.source}</td><td>${e.wave||'—'}</td><td>${e.min!=null?e.min.toFixed(0)+'–'+e.max.toFixed(0):'—'}</td><td>${e.status||'confirmed'}</td><td>${new Date(e.time).toLocaleString()}</td></tr>`).join('')}</table></div>`:`<p class="muted">No ${type}.</p>`;
+  $('report').innerHTML=`<div class="kv"><b>Sample rate</b> ${s.sample_rate_hz??'—'} Hz · <b>FFT bin</b> ${s.fft_bin_width_hz??'—'} Hz<br><b>Sweep</b> ${s.sweep_min_hz}–${s.sweep_max_hz} Hz @ ${s.speed_oct_per_min} oct/min · <b>Rise</b> ${s.detect_rise_db} dB · <b>Hold</b> ${s.hold_s} s<br><b>Waveform</b> ${s.waveform} · <b>Output</b> ${s.output_level_pct}% · <b>Echo cancel</b> ${s.mic_echo_cancellation??'—'}<br><b>Levels</b> ${s.level_units}<br><small>${s.accuracy_note}</small></div>
+  <h3>Confirmed resonances</h3>${tbl(entries,'confirmed resonances')}<h3>Detection log</h3>${tbl(detections,'detections')}`;
+}
+
+/* ---------- Tabs & controls ---------- */
+function setTab(t){
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('hidden',p.id!=='p-'+t));
+  if(t==='sweep'||t==='vocal'){
+    if(t!==st.mode){
+      if(t==='vocal')swStop();else if(st.listening)vListen();
+      st.mode=t;if(st.ctx&&st.stream)ensureMic();
+    }
+  }
+  if(t==='list')renderList();if(t==='report')renderReport();ui();
+}
+document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.tab)});
+$('waves').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;st.wave=b.dataset.w;
+  document.querySelectorAll('#waves button').forEach(x=>x.classList.toggle('on',x===b));
+  if(st.osc){st.osc.type=st.wave;if(st.phase!=='paused')ramp(target(),.2)}ui()});
+['sMin','sMax','sStart','sSpeed'].forEach(id=>$(id).addEventListener('change',refreshRange));
+$('sLevel').addEventListener('input',()=>{lvlUI();if(st.osc&&st.phase!=='paused')ramp(target(),.3)});
+$('muteBtn').onclick=()=>{st.muted=!st.muted;lvlUI();if(st.osc&&st.phase!=='paused')ramp(target(),.2)};
+$('enableBtn').onclick=enable;
+$('helpBtn').onclick=()=>$('p-help').classList.toggle('hidden');
+$('swStart').onclick=swStart;$('swPause').onclick=swPause;$('swStop').onclick=()=>{swStop();status('Sweep stopped.')};
+$('vListen').onclick=vListen;$('vCapture').onclick=capture;
+document.querySelector('.adj').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&st.cand)adjCand(st.cand.f+ +b.dataset.d)});
+$('cFreq').addEventListener('change',()=>{const v=+$('cFreq').value;if(v)adjCand(v)});
+$('cProbe').onclick=async()=>{if(!st.cand)return;if(st.tone?.id==='cand'){stopTone();$('cProbe').textContent='▶ Probe tone'}
+  else if(await ready()){playTone(st.cand.f,'cand');$('cProbe').textContent='■ Stop probe'}};
+$('cVerify').onclick=()=>st.cand&&verifySweep(st.cand.f);
+$('cConfirm').onclick=()=>finishCand(true);$('cDismiss').onclick=()=>finishCand(false);
+$('stopBtn').onclick=()=>{if(st.listening)vListen();if(st.cand?.source==='sweep')finishCand(false);emergency()};
+$('playBtn').onclick=async()=>{
+  if(st.phase==='run'||st.phase==='paused'){swPause();return}
+  if(st.phase==='hold')return;
+  if(st.tone){stopTone();ui();return}
+  if(await ready()){if(st.listening)vListen();playTone(st.cand?st.cand.f:st.man,st.cand?'cand':null)}ui();
+};
+function step(sign){
+  const d=sign*+$('stepSel').value;
+  if(st.cand)adjCand(st.cand.f+d);
+  else{st.man=clamp(Math.round((st.man+d)*100)/100,20,10000);if(st.tone&&!st.tone.id){st.tone.f=st.man;setFreq(st.man)}ui()}
+}
+$('minusBtn').onclick=()=>step(-1);$('plusBtn').onclick=()=>step(1);
+
+// Stop output when hidden (screen off / app switch)
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&(st.osc||st.listening)){if(st.listening)vListen();if(st.cand?.source==='sweep')finishCand(false);emergency('App went to background — output stopped for safety.')}});
+window.addEventListener('error',e=>status('Unexpected error: '+esc(e.message),'err'));
+
+if(!window.isSecureContext)status('This page is not on a secure (https) connection; the microphone may be blocked. Open it via https:// or localhost.','warn');
+refreshRange();lvlUI();renderList();ui();
+</script>
+</body>
+</html>
