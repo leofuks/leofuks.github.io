@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Madde-Allein</title>
+<style>
+:root{--bg:#11141b;--card:#1a1e28;--line:#2a3142;--fg:#e6e9f0;--mut:#8f9ab0;--acc:#4f9fe8;--acc2:#f08a5d;--ok:#46c483;--bad:#e05656;--cl:#c77dff}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;padding:8px 16px;background:#0d1016;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:1.25rem;letter-spacing:.02em}
+.brand .attr{color:var(--mut);font-size:.78rem}
+.tabs{display:flex;gap:4px}
+.tabs button{border-radius:8px 8px 0 0;border-bottom:2px solid transparent;background:transparent}
+.tabs button.active{border-bottom-color:var(--acc);color:#fff;background:#1d2330}
+.sound{display:flex;align-items:center;gap:10px}
+.dot{width:12px;height:12px;border-radius:50%;background:#555}
+.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+#statusTxt{font-weight:600;min-width:72px}
+.kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:.75rem;color:var(--mut)}
+/* Top bar: three prominent checkboxes */
+.topchk{display:flex;gap:10px;align-items:center;padding:4px 8px;border:1px solid var(--line);border-radius:10px;background:#141925}
+.bigchk{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:700;min-height:40px;user-select:none;border:1px solid transparent}
+.bigchk input{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border:2px solid var(--mut);border-radius:4px;background:#0b0e14;display:grid;place-content:center;cursor:pointer}
+.bigchk input::after{content:"";width:12px;height:12px;transform:scale(0);transition:transform .1s;background:var(--ok);border-radius:2px}
+.bigchk input:checked{border-color:var(--ok)}
+.bigchk input:checked::after{transform:scale(1)}
+.bigchk:has(input:checked){background:#173225;border-color:#2c6b4a}
+.bigchk input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.bigchk small{font-weight:400;color:var(--mut)}
+main{max-width:1240px;margin:0 auto;padding:12px}
+.tab{display:none;gap:12px}
+.tab.active{display:grid}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+h2{font-size:.85rem;margin:0 0 8px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
+h3{font-size:.9rem;margin:0 0 4px}
+h4{font-size:.8rem;margin:10px 0 2px;color:var(--acc2)}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g2{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+@media(max-width:860px){.g2{grid-template-columns:1fr}}
+button{font:inherit;color:var(--fg);background:#252c3b;border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer;min-height:32px}
+button:hover:not(:disabled){background:#2f3749}
+button:disabled{opacity:.4;cursor:default}
+#startBtn{background:var(--ok);color:#06210f;font-weight:700}
+#startBtn.on{background:var(--bad);color:#fff}
+.primary.on{background:var(--bad);color:#fff;border-color:var(--bad)}
+#msg{position:relative;max-width:1240px;margin:10px auto 0;background:#4a1c1c;border:1px solid #933;color:#ffd6d6;padding:8px 36px 8px 12px;border-radius:8px}
+#msg button{position:absolute;right:6px;top:4px;padding:2px 8px}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;margin:7px 0}
+.row label{color:var(--mut)} .row output{font-variant-numeric:tabular-nums;text-align:right}
+.row input{grid-column:1/3}
+input[type=range]{width:100%;accent-color:var(--acc);margin:0;min-height:22px}
+input[type=number],select{font:inherit;color:var(--fg);background:#0c0f15;border:1px solid var(--line);border-radius:6px;padding:4px 7px}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--acc)}
+.chk{display:inline-flex;gap:6px;align-items:center;color:var(--mut)}
+.chk.big{color:var(--fg);font-weight:600}
+.opts{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.hint{color:var(--mut);font-size:.78rem;margin:6px 0 0}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+#noteRead{font-size:1.7rem;font-weight:700;margin-right:8px}
+.kbwrap{overflow-x:auto;margin-top:8px}
+.kb{position:relative;display:flex;height:120px;min-width:900px;user-select:none;-webkit-user-select:none;touch-action:none}
+.kb.porta{cursor:ew-resize}
+.portaMark{position:absolute;top:0;bottom:0;width:2px;background:var(--acc2);z-index:5;pointer-events:none;display:none}
+.key{cursor:pointer}
+.white{flex:1;background:#f2f3f5;border:1px solid #777;border-radius:0 0 4px 4px;color:#333;font-size:10px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px}
+.black{position:absolute;top:0;height:60%;background:#15171c;border:1px solid #000;border-radius:0 0 3px 3px;z-index:2}
+.white.inscale{background:#dbe9f7} .black.inscale{background:#22405e}
+.white.active{background:var(--acc);color:#001} .black.active{background:var(--acc2)}
+.white.held{background:#8be0ae} .black.held{background:#2a9f63}
+.white.pick,.black.pick{box-shadow:inset 0 -8px 0 var(--acc2)}
+canvas{width:100%;display:block;background:#0b0e14;border-radius:8px}
+#spec{height:180px;touch-action:none}
+#respCv{height:260px;touch-action:none}
+#fgraph{height:290px;touch-action:none;cursor:crosshair}
+#harmCv{height:260px;touch-action:none;cursor:crosshair}
+#camCv{height:auto;aspect-ratio:4/3;background:#000}
+.vb.sel{background:var(--acc);color:#001;border-color:var(--acc)}
+.vb{padding:4px 8px}
+.gnums{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.gnums label{display:flex;flex-direction:column;color:var(--mut);font-size:.78rem}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:500}
+tr.clu td{color:var(--cl)}
+.fcard{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#161a23}
+.fcard.clu{border-color:var(--cl);box-shadow:0 0 0 1px var(--cl) inset}
+.meter{display:grid;grid-template-columns:150px 1fr 56px;gap:8px;align-items:center;margin:3px 0;font-size:.78rem;color:var(--mut)}
+.meter span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.mbar{position:relative;height:8px;background:#0b0e14;border-radius:4px;overflow:hidden}
+.mbar.bi::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:#556}
+.mbar i{position:absolute;top:0;bottom:0;left:0;width:0;background:var(--ok)}
+.err{color:#ff8b8b!important}
+.kmap{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+.kc{display:inline-flex;flex-direction:column;align-items:center;min-width:32px;padding:2px 4px;border-radius:5px;background:#e6e9ef;color:#111;line-height:1.1}
+.kc.blk{background:#15171c;color:#eee;border:1px solid #444}
+.kc b{font-size:.85rem} .kc i{font-style:normal;font-size:.62rem;opacity:.75}
+.kc.on{outline:3px solid var(--ok)} .kc.off{opacity:.25}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chip{padding:2px 8px;border-radius:10px;background:#22405e;font-size:.8rem}
+.chip.cl{background:#4a2a66}
+.cam3{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.singRead,.artRead{display:flex;flex-wrap:wrap;gap:6px 22px;font-variant-numeric:tabular-nums;margin-top:6px}
+.singRead b{font-size:1.3rem}
+.artRead b{font-size:1.05rem;color:var(--acc2)}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line);padding:8px 14px;min-height:44px;background:#1b2130}
+.seg button:last-child{border-right:0}
+.seg button.sel{background:var(--acc);color:#001;font-weight:700}
+.seg button small{display:block;font-size:.7rem;opacity:.8}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.78rem;color:var(--mut);margin-top:6px}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px}
+footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Madde-Allein - Voice Synthesis with Camera Gesture Control</h1>
+    <div class="attr">Developed by Leonardo Fuks · Inspired by Svante Granqvist's MADDE - TOLVAN DATA . Dedicated to Johan Sundberg</div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="main" class="active" aria-selected="true">Graphs and Interface</button>
+    <button role="tab" data-tab="set" aria-selected="false">Controls and Settings</button>
+  </nav>
+  <div class="topchk" role="group" aria-label="Main devices and vibrato">
+    <label class="bigchk" title="Vibrato on/off (Esc turns it off)"><input type="checkbox" id="topVib" checked> Vibrato <small>Esc</small></label>
+    <label class="bigchk" title="Camera tracking on/off"><input type="checkbox" id="topCam"> Camera</label>
+    <label class="bigchk" title="Microphone (sing-along) on/off"><input type="checkbox" id="topMic"> Microphone</label>
+  </div>
+  <div class="sound">
+    <span class="dot" id="dot"></span><span id="statusTxt">Sound off</span>
+    <button id="startBtn" aria-pressed="false">Start sound</button>
+    <span class="kbd">Space</span>
+  </div>
+</header>
+<div id="msg" role="alert" hidden><span id="msgTxt"></span><button id="msgX" aria-label="Dismiss">×</button></div>
+
+<main>
+<!-- ================= TAB 1: GRAPHS AND INTERFACE ================= -->
+<section class="tab active" id="tab-main">
+  <section class="card">
+    <h2>Pitch</h2>
+    <div class="opts" style="justify-content:space-between">
+      <div><span id="noteRead">A3</span><span id="hzRead" style="color:var(--mut)"></span></div>
+      <div class="opts">
+        <label class="chk big"><input type="checkbox" id="porta"> Portamento mode</label>
+        <label class="chk big"><input type="checkbox" id="follow"> Formant Following</label>
+        <label class="chk"><input type="checkbox" id="snap"> Snap to semitones</label>
+        <label class="chk"><input type="checkbox" id="sustain" checked> Sustain main voice</label>
+      </div>
+    </div>
+    <p class="hint" style="margin:2px 0">Held keys: <b id="heldTxt">—</b> · <span id="octTxtMain"></span></p>
+    <div id="pitchSliderHost"></div>
+    <div class="kbwrap"><div class="kb" id="kb" role="group" aria-label="Piano keyboard C2 to G6"><div class="portaMark" id="portaMark"></div></div></div>
+    <p class="hint">Normal mode: click or drag across the keys to play equally tempered notes. Portamento mode: F0 follows the horizontal position of the mouse or finger continuously. Formant Following moves each formant F1–F5 to the harmonic of F0 nearest its set value. Computer keys Z…/ and Q…] play several notes at once, ← / → shift the octave, Space turns sound on and off, Esc turns vibrato off.</p>
+  </section>
+
+  <section class="card">
+    <h2>Live spectrum (0–8 kHz)</h2>
+    <canvas id="spec"></canvas>
+    <p class="hint">Dashed lines show the applied formants (violet = part of a cluster). Grey ticks at the top mark set values when Formant Following is on. Drag a line to change its frequency, drag its dot to change its peak gain, scroll over a line to change its bandwidth.</p>
+  </section>
+
+  <section class="card">
+    <h2>Vocal-tract frequency response (from the actual filter chain)</h2>
+    <div class="opts" style="margin-bottom:6px">
+      <label class="chk"><input type="checkbox" id="rShowInd" checked> Individual filters</label>
+      <label class="chk"><input type="checkbox" id="rShowNat" checked> Natural cascade response</label>
+      <label class="chk"><input type="checkbox" id="rShowEnh" checked> With cluster enhancement</label>
+      <label class="chk"><input type="checkbox" id="rShowHarm" checked> Harmonic positions</label>
+      <label class="chk">Scale <select id="rScale"><option value="lin">Linear Hz</option><option value="log">Log Hz</option></select></label>
+    </div>
+    <canvas id="respCv" aria-label="Formant filter frequency response"></canvas>
+    <div class="legend">
+      <span><i style="background:#4f9fe8"></i>Individual formant filter</span>
+      <span><i style="background:#e6e9f0"></i>Natural cascade H₁·H₂·…·H₅</span>
+      <span><i style="background:#c77dff"></i>Cascade + optional cluster enhancement</span>
+      <span><i style="background:rgba(199,125,255,.35);height:10px"></i>Detected cluster region</span>
+    </div>
+    <p class="hint" id="clusterTxt">No formant cluster detected.</p>
+  </section>
+
+  <div class="g2">
+    <section class="card">
+      <h2>Vowel space (F1 × F2)</h2>
+      <div class="toolbar" id="vowelBar"></div>
+      <p class="hint" id="vowelName" style="margin:0 0 6px"></p>
+      <canvas id="fgraph" tabindex="0" aria-label="F1 versus F2. Arrow keys move the point; Shift for larger steps."></canvas>
+      <div class="gnums" id="gnums"></div>
+    </section>
+
+    <section class="card">
+      <h2>Camera control</h2>
+      <div class="toolbar">
+        <button id="camBtn" class="primary" aria-pressed="false">Enable camera</button>
+        <button id="camCal" disabled>Recalibrate face</button>
+        <button id="handCal" disabled>Calibrate hand</button>
+      </div>
+      <div class="opts" style="margin-bottom:6px">
+        <label class="chk"><input type="checkbox" id="useFace" checked> Face → F1/F2</label>
+        <label class="chk"><input type="checkbox" id="useHead" checked> Head rotation → pitch</label>
+        <label class="chk"><input type="checkbox" id="useEyes" checked> Eyes + eyebrows → volume</label>
+        <label class="chk"><input type="checkbox" id="useHand" checked> Hand → F3/F4</label>
+        <label class="chk"><input type="checkbox" id="handRight"> Use right hand (unchecked = left)</label>
+      </div>
+      <p class="hint" id="camStat" style="margin:0 0 6px">The camera is off.</p>
+      <canvas id="camCv"></canvas>
+      <div class="artRead">
+        <span>Mouth: <b id="artMouth">—</b></span>
+        <span>Jaw: <b id="artJaw">—</b></span>
+        <span>Combined: <b id="artComb">—</b></span>
+        <span>F1 target: <b id="artF1">—</b></span>
+      </div>
+      <div id="meters" style="margin-top:6px"></div>
+      <p class="hint">F1 = mapping(A × mouth opening + B × jaw opening). Mouth opening is the inner-lip gap; jaw opening is the chin's downward displacement relative to stable upper-face landmarks. Both are normalised by the inter-ocular distance in 3-D. Lip spreading controls F2, head rotation changes pitch (up to ±6 octaves), eyes + eyebrows control volume, and the selected hand's finger spread/extension control F3/F4. Hold a neutral face (mouth closed, eyes open) and a relaxed, half-open hand for 1.5 s at start. Video is processed locally.</p>
+    </section>
+  </div>
+
+  <div class="g2">
+    <section class="card">
+      <h2>Sing-along (microphone)</h2>
+      <div class="toolbar">
+        <button id="singBtn" class="primary" aria-pressed="false">Enable sing-along</button>
+        <label class="bigchk" title="Use the measured F0 directly, without equal-tempered quantisation"><input type="checkbox" id="singFree"> FREE FREQUENCY</label>
+        <span class="hint" id="singStat" style="margin:0">The microphone is off.</span>
+      </div>
+      <div class="singRead">
+        <span>Sung: <b id="singHz">—</b></span>
+        <span>Nearest note: <b id="singNote">—</b></span>
+        <span>Deviation: <b id="singCents">—</b></span>
+        <span>Applied: <b id="singApplied">—</b></span>
+        <span>Level: <b id="singLvl">—</b></span>
+      </div>
+      <p class="hint">Normal mode: at each interval (1 s by default) a short window is analysed and the app moves to the nearest equally tempered note. FREE FREQUENCY: F0 is tracked continuously and applied as measured (e.g. 437.6 Hz stays 437.6 Hz), with light log-frequency smoothing that keeps glides, vibrato and microtones. Use headphones to avoid feedback.</p>
+    </section>
+
+    <section class="card">
+      <h2>Tonic / scale for head rotation</h2>
+      <div class="toolbar">
+        <label class="chk"><input type="checkbox" id="tonicOn"> Tonic mode</label>
+        <button id="tonicSel">Select tonic</button>
+        <button id="tonicOk" disabled>Confirm (Esc)</button>
+        <button id="tonicCancel" disabled>Cancel</button>
+      </div>
+      <p id="tonicTxt" style="margin:4px 0"></p>
+      <div class="chips" id="tonicChips"></div>
+      <p class="hint">Click Select tonic, then play the root and a third above it (minor third → minor scale, major third → major scale). Press <span class="kbd">Esc</span> to confirm (Esc also turns vibrato off).</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Formants overview</h2>
+    <table><thead><tr><th>Formant</th><th>Set (Hz)</th><th>Applied (Hz)</th><th>Range (Hz)</th><th>BW (Hz)</th><th>Q</th><th>Peak gain (dB)</th><th>Cluster</th></tr></thead><tbody id="sumRows"></tbody></table>
+  </section>
+</section>
+
+<!-- ================= TAB 2: CONTROLS AND SETTINGS ================= -->
+<section class="tab" id="tab-set">
+  <section class="card">
+    <h2>Source – harmonic levels</h2>
+    <div class="toolbar">
+      <label class="chk">Number of harmonics <input type="number" id="hCountNum" min="10" max="60" step="1" style="width:64px"></label>
+      <input type="range" id="hCount" min="10" max="60" step="1" style="width:200px">
+      <button id="hMax">All maximum</button><button id="hZero">All zero</button>
+      <label class="chk">Tilt (dB/oct) <input type="number" id="hTilt" value="-6" step="0.5" min="-24" max="0" style="width:64px"></label>
+      <button id="hTiltBtn">Apply tilt</button>
+    </div>
+    <canvas id="harmCv" aria-label="Harmonic level editor"></canvas>
+    <p class="hint" id="harmInfo"></p>
+    <p class="hint">Draw across the graph to shape the base levels (thin bars). The vocal-tension slope is added on top of this shape at the source (thick outline = actual excitation). Harmonics above 40% of the sample rate are muted (red).</p>
+  </section>
+
+  <section class="card" id="srcCard">
+    <h2>Source excitation – vocal tension &amp; breathiness</h2>
+    <div class="g2">
+      <div class="fcard">
+        <h3>Vocal tension (source spectral slope)</h3>
+        <div class="seg" id="tensionBar" role="radiogroup" aria-label="Vocal tension level"></div>
+        <p class="hint" id="tensionTxt"></p>
+        <div id="tensionSet"></div>
+      </div>
+      <div class="fcard">
+        <h3>Breathiness (aspiration noise at the glottis)</h3>
+        <div id="breathSet"></div>
+        <p class="hint" id="breathTxt"></p>
+      </div>
+    </div>
+    <p class="hint">Source = voiced harmonics + aspiration noise. Both are summed before the formant cascade, so the noise takes on the vocal-tract resonances. Tension changes the harmonic amplitudes themselves (−6, −4, −2, 0 dB/oct relative to the base shape) with smooth transitions.</p>
+  </section>
+
+  <section class="card">
+    <h2>Formants F1–F5 (frequency, bandwidth, Q, peak gain, range)</h2>
+    <div class="grid" id="formGrid"></div>
+    <p class="hint">The five resonators are second-order peaking biquads connected in cascade, so the combined response is H₁·H₂·H₃·H₄·H₅ (dB values add). Q = F / BW. Bandwidth is the primary control and Q is recalculated; editing Q recalculates the bandwidth. Peak gain is independent of Q.</p>
+  </section>
+
+  <section class="card" id="clusterCard">
+    <h2>Formant clustering (singer's-formant region)</h2>
+    <div class="opts" style="margin-bottom:6px">
+      <label class="bigchk"><input type="checkbox" id="clEn"> Cluster enhancement</label>
+      <label class="chk"><input type="checkbox" id="clDetect" checked> Show detected clusters</label>
+    </div>
+    <div class="grid" id="clSet"></div>
+    <div class="chips" id="clChips"></div>
+    <p class="hint">Detection: two neighbouring formants belong to a cluster when their distance is below tolerance + sensitivity × (BW₁+BW₂)/2. The natural boost comes from multiplying overlapping responses in the cascade. Enhancement is optional: an extra resonator centred on the cluster whose gain grows with the cluster's overlap. It is shown separately (violet curve) and capped.</p>
+  </section>
+
+  <div class="grid">
+    <section class="card" id="vibCard"><h2>Vibrato</h2><p class="hint" id="vibState"></p></section>
+    <section class="card" id="outCard"><h2>Output</h2>
+      <label class="chk"><input type="checkbox" id="autoGain" checked> Automatic gain normalisation (keeps spectral shape)</label>
+      <p class="hint" id="agTxt"></p>
+    </section>
+    <section class="card" id="singSet"><h2>Sing-along analysis</h2></section>
+  </div>
+
+  <section class="card">
+    <h2>Camera mapping and calibration</h2>
+    <div class="cam3">
+      <div class="fcard" id="faceSet"><h3>Face → F1 / F2</h3>
+        <h4>F1 – mouth opening + jaw opening</h4>
+        <div id="f1Set"></div>
+        <p class="hint" id="f1Read">Mouth —, jaw —, combined —</p>
+        <label class="chk"><input type="checkbox" id="inv1"> Invert F1</label>
+        <div class="toolbar" style="margin-top:6px"><button id="cal1">Recalibrate F1 neutral</button></div>
+        <h4>F2 – lip spreading</h4><div id="f2Set"></div>
+        <label class="chk"><input type="checkbox" id="inv2"> Invert F2</label>
+        <div class="toolbar" style="margin-top:6px"><button id="cal2">Recalibrate F2 neutral</button></div>
+      </div>
+      <div class="fcard" id="headSet"><h3>Head rotation → pitch</h3>
+        <div class="row"><label for="headMode">Mode (tonic off)</label>
+          <select id="headMode"><option value="continuous">Continuous glide</option><option value="chromatic">Chromatic steps</option></select></div>
+        <label class="chk"><input type="checkbox" id="headInv"> Invert direction</label>
+        <div id="headSliders"></div>
+        <p class="hint">Maximum range is ±72 semitones (6 octaves); the resulting pitch is limited to C2–G6.</p>
+      </div>
+      <div class="fcard" id="eyeSet"><h3>Eyes + eyebrows → volume</h3>
+        <div id="eyeSliders"></div>
+        <p class="hint" id="eyeVolTxt"></p>
+        <div class="toolbar" style="margin-top:6px"><button id="eyeCal">Recalibrate eyes/brows neutral</button></div>
+        <p class="hint">Eye closure = eyelid gap / eye width; brow lowering = brow-to-eyelid distance / inter-ocular distance, both relative to the neutral face. Attenuation = weight × eye closure + (1 − weight) × brow lowering. The Volume slider stays as the upper limit.</p>
+      </div>
+      <div class="fcard" id="handSet"><h3 id="handTitle">Left hand → F3 / F4</h3>
+        <label class="chk"><input type="checkbox" id="handSwap" checked> Swap handedness labels (unmirrored webcam)</label>
+        <p class="hint" id="handRaw">Raw: —</p>
+        <div class="toolbar" style="margin-top:6px"><button id="hcalBoth">Calibrate reference (both)</button><button id="hcal3">F3 only</button><button id="hcal4">F4 only</button></div>
+        <h4>F3 – finger spread (abduction)</h4><div id="f3Set"></div>
+        <h4>F4 – finger extension</h4><div id="f4Set"></div>
+        <h4>Separating F3 and F4</h4><div id="xSet"></div>
+        <p class="hint">Spread is the average angle between neighbouring fingers in the palm plane; extension is the average straightening of the finger joints. Both are joint angles, so they don't depend on hand position, rotation or distance.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Computer keyboard</h2>
+    <div class="toolbar"><button id="octDn">Octave −</button><button id="octUp">Octave +</button><span class="hint" id="octTxt" style="margin:0"></span></div>
+    <div class="kmap" id="kmapHi"></div>
+    <div class="kmap" id="kmapLo"></div>
+    <p class="hint">Up to 8 notes can sound at once. Note keys are ignored while you type in number fields.</p>
+  </section>
+</section>
+</main>
+<footer>Madde-Allein · Developed by Leonardo Fuks · Inspired by Svante Granqvist's MADDE . Dedicated to Johan Sundberg</footer>
+<div style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;overflow:hidden;pointer-events:none"><video id="vid" playsinline muted></video></div>
+
+<script>
+(() => {
+'use strict';
+/* ================= Constants & helpers ================= */
+const NOTES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const MIDI_MIN = 36, MIDI_MAX = 91, H_MIN = 10, H_MAX = 60, MAX_KEYED = 8;
+const DB_FLOOR = -48, BUS_GAIN = 0.6;
+const BW_MIN = 30, BW_MAX = 600, Q_MIN = 0.5, Q_MAX = 80, PK_MAX = 30, MAXF = 8000;
+const HEAD_RANGE_MAX = 72;
+const AG_TARGET = 0.28, AG_MIN = 0.02, AG_MAX = 6;
+const TENSION = [
+  {n: 'Lax',      s: -6, d: 'Lax / soft phonation: steep source slope, few strong upper harmonics.'},
+  {n: 'Moderate', s: -4, d: 'Moderate tension: slightly brighter than lax.'},
+  {n: 'Firm',     s: -2, d: 'Firm adduction: rich upper harmonics.'},
+  {n: 'Pressed',  s:  0, d: 'Pressed / high tension: flat relative slope, maximally bright.'}
+];
+const midiToHz = m => 440 * Math.pow(2, (m - 69) / 12);
+const hzToMidi = f => 69 + 12 * Math.log2(f / 440);
+const pc = m => ((Math.round(m) % 12) + 12) % 12;
+const noteName = m => NOTES[pc(m)] + (Math.floor(Math.round(m) / 12) - 1);
+const isBlackKey = m => [1, 3, 6, 8, 10].includes(pc(m));
+const $ = id => document.getElementById(id);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const dbToGain = d => Math.pow(10, d / 20);
+const gainToDb = g => 20 * Math.log10(Math.max(1e-9, g));
+const dpr = () => window.devicePixelRatio || 1;
+const pct = v => Math.round(v * 100) + '%';
+function showMsg(t) { $('msgTxt').textContent = t; $('msg').hidden = false; }
+$('msgX').onclick = () => { $('msg').hidden = true; };
+function safe(name, fn) { try { fn(); } catch (e) { console.error(name, e); showMsg('Error in ' + name + ': ' + (e && e.message || e)); } }
+const hooks = {};               // UI callbacks registered by later blocks
+const callHook = (k, ...a) => { if (hooks[k]) safe('hook ' + k, () => hooks[k](...a)); };
+
+/* ================= State ================= */
+const state = {
+  midi: 57, volume: 0.6, dry: 0, sustain: true, kbBase: 48,
+  vibOn: true, vibRate: 5.5, vibDepth: 0.1, vibJitter: 0,
+  porta: false, follow: false, autoGain: true,
+  nHarm: 40,
+  harmDb: Array.from({length: H_MAX}, (_, i) => Math.max(DB_FLOOR, -6 * Math.log2(i + 1))),
+  tension: 1,                   // index into TENSION
+  tensionTc: 0.12,              // s, smoothing of slope transitions
+  breath: 0.0,                  // 0..1 aspiration amount
+  breathHp: 500, breathLp: 7000, breathAM: 0.5,
+  // g = peak gain in dB of each peaking resonator
+  formants: [{f: 730, bw: 90, g: 18}, {f: 1090, bw: 110, g: 15}, {f: 2440, bw: 170, g: 12},
+             {f: 3400, bw: 250, g: 9}, {f: 4500, bw: 300, g: 6}],
+  cluster: {en: false, show: true, tol: 250, sens: 1.0, amt: 6, cap: 9, minG: 0.5}
+};
+const eff = state.formants.map(F => F.f);
+let clusters = [];               // [{m:[i..], fc, bw, lo, hi, overlap, boost}]
+let agValue = 1;
+const R = [{min: 250, max: 1500}, {min: 500, max: 3000}, {min: 1500, max: 4000}, {min: 2500, max: 5000}, {min: 3500, max: 6500}];
+const RLIM = [[150, 2000], [300, 4000], [1000, 5500], [1500, 6500], [2500, 8000]];
+
+const VOWELS = [
+  {s:'i', w:'beat', f:[270,2290,3010,3500]}, {s:'ɪ', w:'bit', f:[390,1990,2550,3500]},
+  {s:'e', w:'bait', f:[460,2020,2700,3500]}, {s:'ɛ', w:'bed', f:[530,1840,2480,3500]},
+  {s:'æ', w:'cat', f:[660,1720,2410,3400]}, {s:'a', w:'father', f:[730,1090,2440,3400]},
+  {s:'ɔ', w:'thought', f:[570,840,2410,3400]}, {s:'o', w:'boat', f:[450,800,2830,3500]},
+  {s:'ʊ', w:'book', f:[440,1020,2240,3400]}, {s:'u', w:'boot', f:[300,870,2240,3400]},
+  {s:'ʌ', w:'cup', f:[640,1190,2390,3400]}, {s:'ə', w:'about', f:[500,1500,2500,3400]},
+  {s:'y', w:'Fr. tu', f:[250,1750,2150,3400]}, {s:'ø', w:'Fr. peu', f:[350,1600,2200,3400]}
+];
+VOWELS.forEach(v => v.f.push(4500));
+
+const LOW_ROW = [['KeyZ',0],['KeyS',1],['KeyX',2],['KeyD',3],['KeyC',4],['KeyV',5],['KeyG',6],['KeyB',7],['KeyH',8],
+  ['KeyN',9],['KeyJ',10],['KeyM',11],['Comma',12],['KeyL',13],['Period',14],['Semicolon',15],['Slash',16]];
+const HIGH_ROW = [['KeyQ',12],['Digit2',13],['KeyW',14],['Digit3',15],['KeyE',16],['KeyR',17],['Digit5',18],['KeyT',19],
+  ['Digit6',20],['KeyY',21],['Digit7',22],['KeyU',23],['KeyI',24],['Digit9',25],['KeyO',26],['Digit0',27],
+  ['KeyP',28],['BracketLeft',29],['Equal',30],['BracketRight',31]];
+const KEYMAP = new Map([...LOW_ROW, ...HIGH_ROW]);
+const KEYLABEL = {Comma:',', Period:'.', Semicolon:';', Slash:'/', BracketLeft:'[', BracketRight:']', Equal:'='};
+const keyLabel = c => KEYLABEL[c] || c.replace(/^Key|^Digit/, '');
+
+/* ================= Runtime ================= */
+let ctx = null, nodes = null, running = false, rafId = 0, starting = null;
+const voices = new Map(), keys = {}, heldCodes = new Map(), capEls = new Map();
+let activeKey = null, ptrNote = null, pitchSl = null, headDriving = false;
+const fUI = [], gnumInputs = [], vowelBtns = [];
+const cam = {on: false, busy: false, stream: null, face: null, hand: null, loop: 0, token: 0, lastVT: -1, lastTs: 0, prevT: 0, lastFace: 0, ref: {}, cal: null, dirty: false};
+// F1 = map(A·mouth + B·jaw); F2 = lip spreading
+const faceCtl = {enabled: true, A: 0.6, B: 0.4, linkAB: true, curve: 1.0, mFull: 0.35, jFull: 0.25, dz: 0.03,
+                 g1: 1, g2: 1, s1: 0.4, s2: 0.4, base: null,
+                 sig: {mouth: 0, jaw: 0, comb: 0, lips: 0}};
+const headCtl = {enabled: true, range: 7, smooth: 0.5, fs: 0.2, base: 57, sig: 0, lastNote: null};
+const eyeCtl = {enabled: true, w: 0.5, er: 0.75, br: 0.35, dz: 0.05, curve: 1.5, smooth: 0.6, vol: 1, applied: 1, sig: {eye: 0, brow: 0}};
+const eyeGain = () => (cam.on && eyeCtl.enabled) ? eyeCtl.vol : 1;
+const handCtl = {enabled: true, g3: 1, g4: 1, s3: 0.5, s4: 0.5, fs: 12, fe: 50, dz: 0.05, xc: 0,
+                 ref: {}, cal: null, base: null, raw: null, sig: {s: 0, e: 0}};
+const singCtl = {on: false, free: false, interval: 1000, win: 150, minLvl: -50, smooth: 0.35, conf: 0.85, hz: 0, last: 0};
+const tonic = {enabled: false, root: 0, quality: 'major', selecting: false, picks: []};
+const SCALES = {major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10]};
+
+/* ================= Audio engine ================= */
+function put(p, v, imm, tc = 0.02) {
+  if (!ctx || !isFinite(v)) return;
+  const t = ctx.currentTime;
+  if (imm) { p.cancelScheduledValues(t); p.setValueAtTime(v, t); } else p.setTargetAtTime(v, t, tc);
+}
+const nyq = () => (ctx ? ctx.sampleRate : 44100) * 0.45;
+const sRate = () => (ctx ? ctx.sampleRate : 44100);
+const tensionSlope = () => TENSION[state.tension].s;
+/* Source level = base shape (editor) + tension slope (dB/oct, relative) */
+const harmDbEff = i => state.harmDb[i] + tensionSlope() * Math.log2(i + 1);
+const harmLevel = i => (i < state.nHarm && state.harmDb[i] > DB_FLOOR) ? dbToGain(Math.max(DB_FLOOR, harmDbEff(i))) : 0;
+function srcNorm() { let s = 0; for (let i = 0; i < state.nHarm; i++) s += harmLevel(i) ** 2; return 1 / Math.max(1e-3, Math.sqrt(s)); }
+const voicedScale = () => 1 - 0.45 * state.breath;          // breathy → weaker harmonics
+const noiseLevel = () => 0.5 * Math.pow(state.breath, 1.4);  // relative to normalised harmonics
+
+/* --- Formant following --- */
+function computeEff() {
+  const f0 = midiToHz(state.midi), top = nyq();
+  state.formants.forEach((F, i) => {
+    let v = F.f;
+    if (state.follow) { v = Math.max(1, Math.round(F.f / f0)) * f0; if (v > top) v = Math.min(F.f, top); }
+    eff[i] = Math.round(v * 10) / 10;
+  });
+}
+/* BW ↔ Q: bandwidth is primary; Q is derived from the applied centre frequency */
+const qOf = i => clamp(eff[i] / state.formants[i].bw, Q_MIN, Q_MAX);
+const bwFromQ = (i, q) => clamp(Math.round(eff[i] / clamp(q, Q_MIN, Q_MAX)), BW_MIN, BW_MAX);
+
+/* --- Peaking biquad magnitude (identical to the Web Audio spec / RBJ cookbook) --- */
+function peakDb(f, fc, Q, gDb, sr) {
+  if (Math.abs(gDb) < 1e-6) return 0;
+  const A = Math.pow(10, gDb / 40), w0 = 2 * Math.PI * fc / sr, al = Math.sin(w0) / (2 * Q), c = Math.cos(w0);
+  const b0 = 1 + al * A, b1 = -2 * c, b2 = 1 - al * A, a0 = 1 + al / A, a1 = -2 * c, a2 = 1 - al / A;
+  const w = 2 * Math.PI * f / sr, c1 = Math.cos(w), s1 = Math.sin(w), c2 = Math.cos(2 * w), s2 = Math.sin(2 * w);
+  const nr = b0 + b1 * c1 + b2 * c2, ni = -(b1 * s1 + b2 * s2);
+  const dr = a0 + a1 * c1 + a2 * c2, di = -(a1 * s1 + a2 * s2);
+  return 10 * Math.log10((nr * nr + ni * ni) / Math.max(1e-30, dr * dr + di * di));
+}
+
+/* --- Cluster detection (neighbours in frequency order) --- */
+function detectClusters() {
+  const C = state.cluster, F = state.formants;
+  const idx = [0, 1, 2, 3, 4].filter(i => F[i].g >= C.minG).sort((a, b) => eff[a] - eff[b]);
+  const groups = []; let cur = null;
+  for (let k = 0; k < idx.length - 1; k++) {
+    const a = idx[k], b = idx[k + 1], d = eff[b] - eff[a];
+    const thr = C.tol + C.sens * (F[a].bw + F[b].bw) / 2;
+    if (d < thr) {
+      const ov = 1 - d / thr;
+      if (cur && cur.m[cur.m.length - 1] === a) { cur.m.push(b); cur.ov.push(ov); }
+      else { cur = {m: [a, b], ov: [ov]}; groups.push(cur); }
+    } else cur = null;
+  }
+  groups.forEach(g => {
+    let wS = 0, fS = 0, lo = 1e9, hi = 0;
+    g.m.forEach(i => { const w = dbToGain(F[i].g); wS += w; fS += w * eff[i]; lo = Math.min(lo, eff[i] - F[i].bw / 2); hi = Math.max(hi, eff[i] + F[i].bw / 2); });
+    g.fc = fS / wS; g.lo = Math.max(20, lo); g.hi = hi;
+    g.bw = clamp(hi - lo, BW_MIN, 2000);
+    g.overlap = g.ov.reduce((s, v) => s + v, 0) / g.ov.length;
+    g.boost = Math.min(C.cap, C.amt * g.overlap * Math.sqrt(g.m.length - 1));
+  });
+  clusters = groups.slice(0, 2);
+  return clusters;
+}
+const inCluster = i => clusters.findIndex(c => c.m.includes(i));
+
+/* --- Response curves for display: individual, natural cascade, enhanced --- */
+function responseCurves(freqs) {
+  const sr = sRate(), F = state.formants;
+  const ind = F.map((Fi, i) => freqs.map(f => peakDb(f, eff[i], qOf(i), Fi.g, sr)));
+  const nat = freqs.map((_, k) => ind.reduce((s, a) => s + a[k], 0));
+  const enh = nat.map((v, k) => v + clusters.reduce((s, c) => s + (state.cluster.en ? peakDb(freqs[k], c.fc, c.fc / c.bw, c.boost, sr) : 0), 0));
+  return {ind, nat, enh};
+}
+function chainDbAt(f) {
+  const sr = sRate(); let d = 0;
+  state.formants.forEach((Fi, i) => { d += peakDb(f, eff[i], qOf(i), Fi.g, sr); });
+  if (state.cluster.en) clusters.forEach(c => { d += peakDb(f, c.fc, c.fc / c.bw, c.boost, sr); });
+  return d;
+}
+
+/* --- Graph ---
+   voices → norm ─┐
+   noise → HP → LP → AM → nG ─┴→ bus → PK1 → … → PK5 → CL1 → CL2 → mix → ag → comp → master → gate → out
+                                bus → dry ───────────────────────────┘                  └→ analyser          */
+function makeNoiseBuffer() {
+  const len = ctx.sampleRate * 2, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+function buildAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  try { ctx = new AC({latencyHint: 'interactive'}); } catch (e) { ctx = new AC(); }
+  const n = nodes = {};
+  n.gate = ctx.createGain(); n.gate.gain.value = 0; n.gate.connect(ctx.destination);
+  n.master = ctx.createGain(); n.master.connect(n.gate);
+  n.comp = ctx.createDynamicsCompressor();
+  n.comp.threshold.value = -10; n.comp.knee.value = 6; n.comp.ratio.value = 8; n.comp.attack.value = 0.003; n.comp.release.value = 0.15;
+  n.comp.connect(n.master);
+  n.an = ctx.createAnalyser(); n.an.fftSize = 4096; n.an.smoothingTimeConstant = 0.8; n.an.minDecibels = -90; n.an.maxDecibels = -20;
+  n.comp.connect(n.an); n.buf = new Uint8Array(n.an.frequencyBinCount);
+  n.ag = ctx.createGain(); n.ag.connect(n.comp);
+  n.mix = ctx.createGain(); n.mix.connect(n.ag);
+  n.bus = ctx.createGain(); n.bus.gain.value = BUS_GAIN;
+  n.norm = ctx.createGain(); n.norm.connect(n.bus);
+  n.dry = ctx.createGain(); n.dry.gain.value = 0; n.bus.connect(n.dry); n.dry.connect(n.mix);
+  // Cascade of peaking resonators
+  let prev = n.bus;
+  n.form = state.formants.map(() => { const pk = ctx.createBiquadFilter(); pk.type = 'peaking'; prev.connect(pk); prev = pk; return {pk}; });
+  n.cl = [0, 1].map(() => { const pk = ctx.createBiquadFilter(); pk.type = 'peaking'; pk.gain.value = 0; pk.frequency.value = 3000; prev.connect(pk); prev = pk; return pk; });
+  prev.connect(n.mix);
+  // Aspiration noise, pulsed at F0, added at the source
+  n.noise = ctx.createBufferSource(); n.noise.buffer = makeNoiseBuffer(); n.noise.loop = true;
+  n.nHP = ctx.createBiquadFilter(); n.nHP.type = 'highpass'; n.nHP.Q.value = 0.5;
+  n.nLP = ctx.createBiquadFilter(); n.nLP.type = 'lowpass'; n.nLP.Q.value = 0.5;
+  n.nAM = ctx.createGain(); n.nG = ctx.createGain(); n.nG.gain.value = 0;
+  n.noise.connect(n.nHP); n.nHP.connect(n.nLP); n.nLP.connect(n.nAM); n.nAM.connect(n.nG); n.nG.connect(n.bus);
+  n.amOsc = ctx.createOscillator(); n.amDepth = ctx.createGain();
+  n.amOsc.connect(n.amDepth); n.amDepth.connect(n.nAM.gain);
+  n.noise.start(); n.amOsc.start();
+  // Vibrato LFO (cents → detune)
+  n.lfo = ctx.createOscillator(); n.lfo.frequency.value = 0;
+  n.lfoDepth = ctx.createGain(); n.lfoDepth.gain.value = 0;
+  n.lfo.connect(n.lfoDepth); n.lfoDepth.connect(n.amOsc.detune); n.lfo.start();
+  const main = createVoice('main', state.midi);
+  main.env.gain.value = state.sustain ? 1 : 0;
+  applyAll(true);
+}
+function createVoice(id, midi) {
+  const f0 = midiToHz(midi);
+  const v = {id, midi, env: ctx.createGain(), osc: [], hg: []};
+  v.env.gain.value = 0; v.env.connect(nodes.norm);
+  for (let i = 0; i < state.nHarm; i++) {
+    const o = ctx.createOscillator(); o.frequency.value = f0 * (i + 1);
+    const g = ctx.createGain(); g.gain.value = 0;
+    o.connect(g); g.connect(v.env); nodes.lfoDepth.connect(o.detune);
+    o.start(); v.osc.push(o); v.hg.push(g);
+  }
+  voices.set(id, v); setVoiceHarm(v, true);
+  return v;
+}
+function setVoiceHarm(v, imm, tc = 0.02) {
+  const f0 = midiToHz(v.midi), lim = ctx.sampleRate * 0.4;
+  v.hg.forEach((g, i) => put(g.gain, f0 * (i + 1) < lim ? harmLevel(i) : 0, imm, tc));
+}
+function retuneVoice(id, midi) {
+  const v = voices.get(id); if (!v || !ctx) return;
+  v.midi = midi; const f0 = midiToHz(midi);
+  v.osc.forEach((o, i) => put(o.frequency, f0 * (i + 1), false, 0.012));
+  setVoiceHarm(v, false);
+}
+function killVoice(v) {
+  v.osc.forEach(o => { try { o.stop(); } catch (e) {} try { nodes.lfoDepth.disconnect(o.detune); } catch (e) {} });
+  try { v.env.disconnect(); } catch (e) {}
+}
+function rebuildVoices() {
+  if (!ctx) return;
+  const list = [...voices.values()].map(v => ({id: v.id, midi: v.midi}));
+  voices.forEach(v => { put(v.env.gain, 0, false, 0.01); setTimeout(() => killVoice(v), 80); });
+  voices.clear();
+  list.forEach(o => { const v = createVoice(o.id, o.midi); put(v.env.gain, o.id === 'main' ? (state.sustain ? 1 : 0) : 1, false, 0.02); });
+  updateBus(); applyHarmonics(false);
+}
+function startKeyed(id, midi) {
+  if (!ctx || !running) return;
+  if (voices.has(id)) releaseVoice(id);
+  const keyed = [...voices.keys()].filter(k => k !== 'main');
+  if (keyed.length >= MAX_KEYED) releaseVoice(keyed[0]);
+  put(createVoice(id, midi).env.gain, 1, false, 0.015);
+  updateBus();
+}
+function releaseVoice(id) {
+  const v = voices.get(id);
+  if (!v || id === 'main') return;
+  voices.delete(id); put(v.env.gain, 0, false, 0.05);
+  setTimeout(() => killVoice(v), 450); updateBus();
+}
+function updateBus() {
+  if (!ctx) return;
+  const n = Math.max(1, voices.size - 1 + (state.sustain ? 1 : 0));
+  put(nodes.bus.gain, BUS_GAIN / Math.sqrt(n), false, 0.05);
+}
+function applyPitch(imm) {
+  const m = voices.get('main');
+  if (ctx && m) {
+    m.midi = state.midi; const f0 = midiToHz(state.midi);
+    m.osc.forEach((o, i) => put(o.frequency, f0 * (i + 1), imm, 0.015));
+    put(nodes.amOsc.frequency, f0, imm, 0.015);
+    setVoiceHarm(m, imm);
+  }
+  if (state.follow) { computeEff(); applyFormants(imm); callHook('summary'); }
+  else scheduleAG();
+}
+function applyHarmonics(imm, tc = 0.03) {
+  if (!ctx) return;
+  voices.forEach(v => setVoiceHarm(v, imm, tc));
+  put(nodes.norm.gain, srcNorm() * voicedScale(), imm, tc);
+  scheduleAG();
+}
+function applyTension(imm) { applyHarmonics(imm, state.tensionTc); callHook('tension'); }
+function applyBreath(imm) {
+  if (ctx) {
+    const n = nodes;
+    put(n.nHP.frequency, state.breathHp, imm, 0.05);
+    put(n.nLP.frequency, state.breathLp, imm, 0.05);
+    put(n.nAM.gain, 1 - state.breathAM * 0.5, imm, 0.05);   // AM offset; depth below
+    put(n.amDepth.gain, state.breathAM * 0.5, imm, 0.05);
+    put(n.nG.gain, noiseLevel(), imm, 0.05);
+    put(n.norm.gain, srcNorm() * voicedScale(), imm, 0.05);
+  }
+  scheduleAG(); callHook('breath');
+}
+function applySustain() { if (!ctx) return; const m = voices.get('main'); if (m) put(m.env.gain, state.sustain ? 1 : 0, false, 0.03); updateBus(); }
+function applyFormant(i, imm) {
+  if (!ctx) return;
+  const F = state.formants[i], f = nodes.form[i];
+  put(f.pk.frequency, eff[i], imm, 0.03);
+  put(f.pk.Q, qOf(i), imm, 0.03);
+  put(f.pk.gain, clamp(F.g, 0, PK_MAX), imm, 0.03);
+}
+function applyClusters(imm) {
+  detectClusters();
+  if (ctx) nodes.cl.forEach((pk, j) => {
+    const c = clusters[j], on = state.cluster.en && c;
+    if (c) { put(pk.frequency, c.fc, imm, 0.04); put(pk.Q, clamp(c.fc / c.bw, Q_MIN, Q_MAX), imm, 0.04); }
+    put(pk.gain, on ? c.boost : 0, imm, 0.06);
+  });
+  callHook('cluster');
+}
+function applyFormants(imm) { for (let i = 0; i < 5; i++) applyFormant(i, imm); applyClusters(imm); scheduleAG(); }
+
+/* --- Automatic gain: estimate output RMS of the main voice through the chain --- */
+function estimateRms() {
+  const f0 = midiToHz(state.midi), lim = sRate() * 0.4, nrm = srcNorm() * voicedScale();
+  let e = 0;
+  for (let i = 0; i < state.nHarm; i++) {
+    const f = f0 * (i + 1); if (f >= lim) break;
+    const a = harmLevel(i) * nrm * dbToGain(chainDbAt(f)); e += a * a / 2;
+  }
+  const nl = noiseLevel();
+  if (nl > 0) {
+    let s = 0, k = 0;
+    for (let f = state.breathHp; f < Math.min(state.breathLp, lim); f *= 1.08) { s += dbToGain(2 * chainDbAt(f)); k++; }
+    e += nl * nl * (k ? s / k : 1) * 0.33;
+  }
+  return Math.sqrt(e) * BUS_GAIN;
+}
+function applyAutoGain() {
+  agValue = state.autoGain ? clamp(AG_TARGET / Math.max(1e-6, estimateRms()), AG_MIN, AG_MAX) : 1;
+  if (ctx) put(nodes.ag.gain, agValue, false, 0.08);
+  callHook('ag', agValue);
+}
+let agPend = 0;
+function scheduleAG() { if (agPend) return; agPend = requestAnimationFrame(() => { agPend = 0; applyAutoGain(); }); }
+
+/* --- Vibrato --- */
+let vibTimer = 0, vibTarget = 0, vibNext = 0;
+function applyVibrato(imm) {
+  if (!ctx) return;
+  const on = state.vibOn && state.vibRate > 0 && state.vibDepth > 0;
+  put(nodes.lfoDepth.gain, on ? state.vibDepth * 200 : 0, imm, 0.05);
+  clearInterval(vibTimer); vibTimer = 0;
+  if (!on || state.vibJitter <= 0) { put(nodes.lfo.frequency, state.vibRate, imm, 0.05); return; }
+  vibNext = 0;
+  vibTimer = setInterval(() => {
+    if (!ctx) return;
+    const now = performance.now();
+    if (now >= vibNext) { vibTarget = Math.max(0.1, state.vibRate + (Math.random() * 2 - 1) * state.vibJitter); vibNext = now + 300 + Math.random() * 600; }
+    put(nodes.lfo.frequency, vibTarget, false, 0.35);
+  }, 60);
+}
+function setVibOn(on) {
+  state.vibOn = !!on;
+  const t = $('topVib'); if (t && t.checked !== state.vibOn) t.checked = state.vibOn;
+  applyVibrato(false); callHook('vib');
+}
+
+/* --- Output = volume² × eye/brow factor --- */
+function applyOutput(imm) {
+  const t = $('eyeVolTxt'); if (t) t.textContent = 'Eyes/brows volume factor: ' + pct(eyeGain());
+  if (!ctx) return;
+  put(nodes.master.gain, state.volume * state.volume * eyeGain(), imm, 0.03);
+  put(nodes.dry.gain, state.dry, imm, 0.03);
+}
+function applyAll(imm) {
+  computeEff(); applyPitch(imm); applyHarmonics(imm); applyBreath(imm); applyVibrato(imm);
+  applyOutput(imm); applyFormants(imm); updateBus(); applyAutoGain();
+}
+
+function startAudio() {
+  if (running) return Promise.resolve(true);
+  if (starting) return starting;
+  starting = (async () => {
+    try {
+      if (!ctx) buildAudio();
+      await ctx.resume();
+      if (ctx.state !== 'running') throw new Error('The browser blocked audio. Click the page and try again.');
+      running = true; put(nodes.gate.gain, 1, false, 0.03); applyVibrato(false);
+      setUI(true); drawSpectrum(); updateHarmInfo(); drawHarm(); drawResp();
+      return true;
+    } catch (err) {
+      showMsg('Could not start audio: ' + (err && err.message || err));
+      try { if (ctx) ctx.close(); } catch (e) {}
+      ctx = null; nodes = null; voices.clear(); running = false; setUI(false);
+      return false;
+    } finally { starting = null; }
+  })();
+  return starting;
+}
+function stopAudio() {
+  clearInterval(vibTimer); vibTimer = 0; running = false;
+  [...voices.keys()].filter(k => k !== 'main').forEach(releaseVoice);
+  heldCodes.clear(); ptrNote = null; refreshHeld();
+  if (ctx) { put(nodes.gate.gain, 0, false, 0.03); setTimeout(() => { if (!running && ctx) ctx.suspend(); }, 500); }
+  setUI(false); setTimeout(drawSpectrum, 520);
+}
+const toggleSound = () => running ? stopAudio() : startAudio();
+
+/* ================= UI helpers ================= */
+function setUI(on) {
+  const b = $('startBtn');
+  b.textContent = on ? 'Stop sound' : 'Start sound';
+  b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+  $('dot').classList.toggle('on', on);
+  $('statusTxt').textContent = on ? 'Sound ON' : 'Sound off';
+}
+let uid = 0;
+function slider(parent, {label, min, max, step, value, fmt, oninput, tip}) {
+  const id = 'sl' + (uid++);
+  const row = document.createElement('div'); row.className = 'row';
+  const lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = label; if (tip) lab.title = tip;
+  const out = document.createElement('output');
+  const inp = document.createElement('input');
+  Object.assign(inp, {type: 'range', id, min, max, step}); inp.value = value;
+  const upd = () => { out.textContent = fmt(+inp.value); };
+  inp.addEventListener('input', () => { upd(); oninput(+inp.value); });
+  row.append(lab, out, inp); parent.append(row); upd();
+  return {inp, set(v) { inp.value = v; upd(); }, refresh: upd, setRange(a, b) { inp.min = a; inp.max = b; upd(); }};
+}
+$('startBtn').addEventListener('click', toggleSound);
+if (!(window.AudioContext || window.webkitAudioContext)) { showMsg('This browser does not support the Web Audio API. Use a recent version of Chrome, Firefox, Safari or Edge.'); $('startBtn').disabled = true; }
+
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+function showTab(t) {
+  document.querySelectorAll('[data-tab]').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
+  document.querySelectorAll('.tab').forEach(p => p.classList.toggle('active', p.id === 'tab-' + t));
+  requestAnimationFrame(resizeCanvases);
+}
+/* ================= Pitch + piano ================= */
+safe('pitch', () => {
+  pitchSl = slider($('pitchSliderHost'), {label: 'Fundamental frequency (f0)', min: MIDI_MIN, max: MIDI_MAX, step: 0.01, value: state.midi,
+    fmt: m => midiToHz(m).toFixed(1) + ' Hz', oninput: m => setMidi(m, true)});
+});
+function setMidi(m, fromSlider) {
+  state.midi = clamp(m, MIDI_MIN, MIDI_MAX);
+  if (!fromSlider && pitchSl) pitchSl.set(state.midi);
+  if (!headDriving && cam.on) { headCtl.base = state.midi; headCtl.lastNote = null; }
+  const nr = Math.round(state.midi), c = Math.round((state.midi - nr) * 100);
+  $('noteRead').textContent = noteName(nr);
+  $('hzRead').textContent = midiToHz(state.midi).toFixed(2) + ' Hz (' + (c >= 0 ? '+' : '') + c + ' ¢)';
+  if (activeKey !== nr) { if (keys[activeKey]) keys[activeKey].classList.remove('active'); activeKey = nr; if (keys[nr]) keys[nr].classList.add('active'); }
+  applyPitch(false);
+  if (state.follow) { drawGraph(); redrawIdle(); }
+}
+safe('piano', () => {
+  const kb = $('kb'), mark = $('portaMark'); let total = 0, whites = 0;
+  const whiteMidis = [];
+  for (let m = MIDI_MIN; m <= MIDI_MAX; m++) if (!isBlackKey(m)) { total++; whiteMidis.push(m); }
+  const bw = 100 / total * 0.62;
+  for (let m = MIDI_MIN; m <= MIDI_MAX; m++) {
+    const k = document.createElement('div');
+    k.dataset.midi = m; k.tabIndex = 0; k.setAttribute('role', 'button'); k.setAttribute('aria-label', noteName(m));
+    if (isBlackKey(m)) { k.className = 'key black'; k.style.width = bw + '%'; k.style.left = (whites / total * 100 - bw / 2) + '%'; }
+    else { k.className = 'key white'; whites++; if (m % 12 === 0) k.textContent = noteName(m); }
+    keys[m] = k; kb.append(k);
+  }
+  const midiAtX = clientX => {
+    const r = kb.getBoundingClientRect();
+    const c = clamp((clientX - r.left) / r.width, 0, 1) * total - 0.5;
+    if (c <= 0) return whiteMidis[0];
+    if (c >= total - 1) return whiteMidis[total - 1];
+    const i = Math.floor(c), t = c - i;
+    return whiteMidis[i] + (whiteMidis[i + 1] - whiteMidis[i]) * t;
+  };
+  const showMark = clientX => {
+    const r = kb.getBoundingClientRect();
+    mark.style.display = 'block'; mark.style.left = clamp(clientX - r.left, 0, r.width) + 'px';
+  };
+  let down = false, last = null, portaDown = false;
+  const pick = k => {
+    last = k; const m = +k.dataset.midi;
+    tonicPick(m); setMidi(m, false);
+    if (!state.sustain) {
+      if (ptrNote !== null) releaseVoice('ptr');
+      ptrNote = m; startAudio().then(ok => { if (ok && ptrNote === m) startKeyed('ptr', m); });
+    } else startAudio();
+  };
+  const portaMove = e => {
+    const m = midiAtX(e.clientX); showMark(e.clientX);
+    setMidi(m, false);
+    if (ptrNote !== null) retuneVoice('ptr', m);
+  };
+  const lift = () => { if (ptrNote !== null) { releaseVoice('ptr'); ptrNote = null; } };
+  kb.addEventListener('pointerdown', e => {
+    if (down || portaDown) return;
+    if (state.porta && !tonic.selecting) {
+      portaDown = true; try { kb.setPointerCapture(e.pointerId); } catch (er) {}
+      const m = midiAtX(e.clientX); showMark(e.clientX); setMidi(m, false);
+      if (!state.sustain) { ptrNote = m; startAudio().then(ok => { if (ok && portaDown) { startKeyed('ptr', state.midi); ptrNote = state.midi; } }); }
+      else startAudio();
+      e.preventDefault(); return;
+    }
+    const k = e.target.closest('.key'); if (!k) return; down = true; pick(k); e.preventDefault();
+  });
+  kb.addEventListener('pointermove', e => {
+    if (portaDown) { portaMove(e); return; }
+    if (!down) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY), k = el && el.closest && el.closest('.key');
+    if (k && k !== last && !tonic.selecting) pick(k);
+  });
+  const end = () => { if (portaDown) { portaDown = false; mark.style.display = 'none'; } down = false; last = null; lift(); };
+  ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, end));
+  kb.addEventListener('lostpointercapture', () => { if (portaDown) end(); });
+  kb.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('key')) { e.preventDefault(); if (!e.repeat) pick(e.target); } });
+  kb.addEventListener('keyup', e => { if (e.key === 'Enter') lift(); });
+});
+$('snap').addEventListener('change', e => { pitchSl.inp.step = e.target.checked ? 1 : 0.01; if (e.target.checked) setMidi(Math.round(state.midi), false); });
+$('sustain').addEventListener('change', e => { state.sustain = e.target.checked; applySustain(); });
+$('porta').addEventListener('change', e => { state.porta = e.target.checked; $('kb').classList.toggle('porta', state.porta); });
+$('follow').addEventListener('change', e => { state.follow = e.target.checked; computeEff(); applyFormants(false); refreshFormantUI(); });
+
+/* ================= Computer keyboard ================= */
+function renderKeyMap() {
+  for (const [code, off] of KEYMAP) {
+    const m = state.kbBase + off, el = capEls.get(code), ok = m >= MIDI_MIN && m <= MIDI_MAX;
+    if (!el) continue; el.querySelector('i').textContent = ok ? noteName(m) : '–'; el.classList.toggle('off', !ok);
+  }
+  const t = `Z = ${noteName(state.kbBase)}, Q = ${noteName(state.kbBase + 12)}`;
+  $('octTxt').textContent = t; $('octTxtMain').textContent = 'Keys: ' + t;
+  $('octDn').disabled = state.kbBase <= MIDI_MIN; $('octUp').disabled = state.kbBase + 12 > MIDI_MAX - 31;
+}
+function shiftOctave(d) { const nb = state.kbBase + 12 * d; if (nb < MIDI_MIN || nb > MIDI_MAX - 31) return; state.kbBase = nb; renderKeyMap(); }
+safe('keymap', () => {
+  const mk = (code, off, host) => {
+    const el = document.createElement('span'); el.className = 'kc' + (isBlackKey(off) ? ' blk' : '');
+    el.innerHTML = `<b>${keyLabel(code)}</b><i></i>`; host.append(el); capEls.set(code, el);
+  };
+  HIGH_ROW.forEach(([c, o]) => mk(c, o, $('kmapHi'))); LOW_ROW.forEach(([c, o]) => mk(c, o, $('kmapLo')));
+  $('octDn').onclick = () => shiftOctave(-1); $('octUp').onclick = () => shiftOctave(1);
+  renderKeyMap();
+});
+function refreshHeld() {
+  const set = new Set(heldCodes.values());
+  for (let m = MIDI_MIN; m <= MIDI_MAX; m++) if (keys[m]) keys[m].classList.toggle('held', set.has(m));
+  for (const [c, el] of capEls) el.classList.toggle('on', heldCodes.has(c));
+  $('heldTxt').textContent = heldCodes.size ? [...set].sort((a, b) => a - b).map(noteName).join(' ') : '—';
+}
+function isTyping(t) {
+  if (!t) return false;
+  if (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return true;
+  return t.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes(t.type);
+}
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape') {
+    e.preventDefault();
+    if (tonic.selecting) tonicCommit();   // Esc confirms the tonic while selecting…
+    else setVibOn(false);                 // …otherwise it turns vibrato off
+    return;
+  }
+  if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) toggleSound(); return; }
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+    if (e.target.tagName === 'INPUT' || e.target.id === 'fgraph') return;
+    e.preventDefault(); shiftOctave(e.code === 'ArrowRight' ? 1 : -1); return;
+  }
+  const off = KEYMAP.get(e.code); if (off === undefined) return;
+  e.preventDefault();
+  if (e.repeat || heldCodes.has(e.code)) return;
+  const m = state.kbBase + off, code = e.code;
+  if (m < MIDI_MIN || m > MIDI_MAX) return;
+  tonicPick(m);
+  heldCodes.set(code, m); refreshHeld();
+  startAudio().then(ok => {
+    if (ok && heldCodes.get(code) === m) startKeyed(code, m);
+    else if (!ok) { heldCodes.delete(code); refreshHeld(); }
+  });
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space' && !isTyping(e.target)) e.preventDefault();
+  if (!heldCodes.has(e.code)) return;
+  heldCodes.delete(e.code); releaseVoice(e.code); refreshHeld();
+});
+window.addEventListener('blur', () => { heldCodes.forEach((_, c) => releaseVoice(c)); heldCodes.clear(); refreshHeld(); });
+
+/* ================= Tonic / scale ================= */
+const inScale = m => SCALES[tonic.quality].includes(((pc(m) - tonic.root) + 12) % 12);
+function qualityOf(picks) {
+  if (picks.length < 2) return null;
+  const lo = Math.min(...picks), hi = Math.max(...picks), iv = (hi - lo) % 12;
+  return {root: pc(lo), q: iv === 3 ? 'minor' : iv === 4 ? 'major' : null, iv};
+}
+function tonicPick(m) {
+  if (!tonic.selecting) return;
+  tonic.picks.push(m); if (tonic.picks.length > 2) tonic.picks = tonic.picks.slice(-2);
+  renderTonic();
+}
+function tonicCommit() {
+  const r = qualityOf(tonic.picks);
+  if (!r) { $('tonicTxt').innerHTML = '<span class="err">Select two notes first: the root and a third above it.</span>'; return; }
+  if (!r.q) { $('tonicTxt').innerHTML = `<span class="err">Those notes are ${r.iv} semitones apart. Use a minor third (3) or a major third (4).</span>`; return; }
+  tonic.root = r.root; tonic.quality = r.q; tonic.selecting = false; tonic.picks = [];
+  tonic.enabled = true; $('tonicOn').checked = true; headCtl.lastNote = null;
+  renderTonic();
+}
+function renderTonic() {
+  const sel = tonic.selecting;
+  $('tonicOk').disabled = !sel; $('tonicCancel').disabled = !sel; $('tonicSel').disabled = sel;
+  for (let m = MIDI_MIN; m <= MIDI_MAX; m++) {
+    keys[m].classList.toggle('pick', sel && tonic.picks.includes(m));
+    keys[m].classList.toggle('inscale', tonic.enabled && inScale(m));
+  }
+  if (sel) {
+    const r = qualityOf(tonic.picks), names = tonic.picks.map(noteName).join(' + ') || '—';
+    $('tonicTxt').textContent = `Selecting: ${names}` + (r ? (r.q ? ` → ${NOTES[r.root]} ${r.q}. Press Esc to confirm.` : ' → not a third') : '. Play the root, then a third above it.');
+  } else $('tonicTxt').innerHTML = `Tonic: <b>${NOTES[tonic.root]} ${tonic.quality}</b> · ${tonic.enabled ? 'active for head rotation' : 'inactive'}`;
+  const ch = $('tonicChips'); ch.innerHTML = '';
+  SCALES[tonic.quality].forEach(s => { const c = document.createElement('span'); c.className = 'chip'; c.textContent = NOTES[(tonic.root + s) % 12]; ch.append(c); });
+}
+$('tonicSel').onclick = () => { tonic.selecting = true; tonic.picks = []; renderTonic(); };
+$('tonicOk').onclick = tonicCommit;
+$('tonicCancel').onclick = () => { tonic.selecting = false; tonic.picks = []; renderTonic(); };
+$('tonicOn').addEventListener('change', e => { tonic.enabled = e.target.checked; headCtl.lastNote = null; renderTonic(); });
+function snapScale(m) {
+  let best = null, bd = 1e9;
+  for (let k = Math.floor(m) - 2; k <= Math.ceil(m) + 2; k++) {
+    if (k < MIDI_MIN || k > MIDI_MAX || !inScale(k)) continue;
+    const d = Math.abs(k - m); if (d < bd) { bd = d; best = k; }
+  }
+  return best === null ? Math.round(m) : best;
+}
+
+/* ================= Formants: setters ================= */
+function fixOrder(fs) { for (let j = 0; j < 5; j++) fs[j] = Math.round(Math.min(clamp(fs[j], R[j].min, R[j].max), nyq())); }
+function commitFreqs(fs, src) {
+  fs.forEach((v, j) => { state.formants[j].f = v; });
+  computeEff(); applyFormants(false);
+  if (src !== 'cam' && cam.on) {
+    if (faceCtl.base) faceCtl.base = [state.formants[0].f, state.formants[1].f];
+    if (handCtl.base) handCtl.base = [state.formants[2].f, state.formants[3].f];
+  }
+  if (src === 'cam') cam.dirty = true; else refreshFormantUI(src === 'num');
+}
+function setFormantFreq(i, f, src) {
+  const fs = state.formants.map(F => F.f);
+  fs[i] = clamp(Math.round(f), R[i].min, R[i].max);
+  fixOrder(fs); commitFreqs(fs, src);
+}
+/* Peak gain in dB (independent of Q) */
+function setFormantGain(i, dB) { state.formants[i].g = clamp(Math.round(dB * 10) / 10, 0, PK_MAX); applyFormant(i, false); applyClusters(false); scheduleAG(); refreshFormantUI(); }
+/* Bandwidth primary → Q recalculated */
+function setFormantBw(i, b) { state.formants[i].bw = Math.round(clamp(b, BW_MIN, BW_MAX)); applyFormant(i, false); applyClusters(false); scheduleAG(); refreshFormantUI(); }
+/* Q edited → bandwidth recalculated */
+function setFormantQ(i, q) { setFormantBw(i, bwFromQ(i, q)); }
+function setRange(i, which, v) {
+  const r = R[i];
+  if (which === 'min') r.min = Math.min(v, r.max - 100); else r.max = Math.max(v, r.min + 100);
+  const fs = state.formants.map((F, j) => clamp(F.f, R[j].min, R[j].max));
+  fixOrder(fs); commitFreqs(fs, 'range');
+}
+
+/* ================= Formants: UI ================= */
+function refreshSummary() {
+  const f0 = midiToHz(state.midi);
+  $('sumRows').innerHTML = state.formants.map((F, i) => {
+    const c = inCluster(i);
+    return `<tr class="${c >= 0 ? 'clu' : ''}"><td>F${i + 1}</td><td>${F.f}</td><td>${Math.round(eff[i])}${state.follow ? ' (H' + Math.round(eff[i] / f0) + ')' : ''}</td><td>${R[i].min}–${R[i].max}</td><td>${F.bw}</td><td>${qOf(i).toFixed(1)}</td><td>${F.g.toFixed(1)}</td><td>${c >= 0 ? 'C' + (c + 1) : '—'}</td></tr>`;
+  }).join('');
+  fUI.forEach((u, i) => {
+    u.title.textContent = `F${i + 1}: ${state.formants[i].f} Hz` + (state.follow ? ` → ${Math.round(eff[i])} Hz (H${Math.round(eff[i] / f0)})` : '');
+    u.card.classList.toggle('clu', state.cluster.show && inCluster(i) >= 0);
+    u.sq.set(qOf(i));
+  });
+}
+function refreshFormantUI(keepNum) {
+  state.formants.forEach((F, i) => {
+    const u = fUI[i]; if (!u) return;
+    u.sf.setRange(R[i].min, R[i].max); u.sf.set(F.f); u.sb.set(F.bw); u.sq.set(qOf(i)); u.sg.set(F.g);
+    u.rmin.set(R[i].min); u.rmax.set(R[i].max);
+  });
+  gnumInputs.forEach((inp, i) => { inp.min = R[i].min; inp.max = R[i].max; if (!keepNum) inp.value = state.formants[i].f; inp.previousSibling.textContent = `F${i + 1} (Hz) · ${R[i].min}–${R[i].max}`; });
+  refreshSummary(); markVowel(); drawGraph(); redrawIdle();
+}
+hooks.summary = refreshSummary;
+function markVowel() {
+  let hit = -1;
+  VOWELS.forEach((v, k) => { if (v.f.every((f, i) => f === state.formants[i].f)) hit = k; });
+  vowelBtns.forEach((b, k) => b.classList.toggle('sel', k === hit));
+  $('vowelName').textContent = hit >= 0 ? `Vowel /${VOWELS[hit].s}/ as in "${VOWELS[hit].w}"` : 'Custom formant setting';
+}
+function applyVowel(k) {
+  const fs = VOWELS[k].f.map((f, j) => clamp(f, R[j].min, R[j].max));
+  fixOrder(fs); commitFreqs(fs, 'vowel');
+}
+safe('formant UI', () => {
+  VOWELS.forEach((v, k) => {
+    const b = document.createElement('button'); b.className = 'vb';
+    b.textContent = '/' + v.s + '/'; b.title = `"${v.w}": ` + v.f.map((f, i) => `F${i + 1} ${f}`).join(', ');
+    b.onclick = () => applyVowel(k); vowelBtns.push(b); $('vowelBar').append(b);
+  });
+  state.formants.forEach((F, i) => {
+    const card = document.createElement('div'); card.className = 'fcard';
+    const title = document.createElement('h3'); card.append(title);
+    const sf = slider(card, {label: 'Frequency (set)', min: R[i].min, max: R[i].max, step: 1, value: F.f, fmt: v => v + ' Hz', oninput: v => setFormantFreq(i, v)});
+    const sb = slider(card, {label: 'Bandwidth', min: BW_MIN, max: BW_MAX, step: 1, value: F.bw, fmt: v => v + ' Hz',
+      tip: 'Primary control. Q = F / BW is recalculated.', oninput: v => setFormantBw(i, v)});
+    const sq = slider(card, {label: 'Q (F / BW)', min: Q_MIN, max: 40, step: 0.1, value: qOf(i), fmt: v => v.toFixed(1),
+      tip: 'Editing Q recalculates the bandwidth.', oninput: v => setFormantQ(i, v)});
+    const sg = slider(card, {label: 'Peak gain', min: 0, max: PK_MAX, step: 0.5, value: F.g, fmt: v => v.toFixed(1) + ' dB',
+      tip: 'Resonance peak height, independent of Q.', oninput: v => setFormantGain(i, v)});
+    const rmin = slider(card, {label: 'Range min', min: RLIM[i][0], max: RLIM[i][1], step: 10, value: R[i].min, fmt: v => v + ' Hz', oninput: v => setRange(i, 'min', v)});
+    const rmax = slider(card, {label: 'Range max', min: RLIM[i][0], max: RLIM[i][1], step: 10, value: R[i].max, fmt: v => v + ' Hz', oninput: v => setRange(i, 'max', v)});
+    fUI.push({card, title, sf, sb, sq, sg, rmin, rmax}); $('formGrid').append(card);
+  });
+  [0, 1].forEach(i => {
+    const l = document.createElement('label'); l.append(document.createTextNode(''));
+    const inp = document.createElement('input'); Object.assign(inp, {type: 'number', step: 1});
+    inp.addEventListener('input', () => { const v = parseFloat(inp.value); if (isFinite(v) && v >= R[i].min && v <= R[i].max) setFormantFreq(i, v, 'num'); });
+    inp.addEventListener('change', () => { const v = parseFloat(inp.value); setFormantFreq(i, isFinite(v) ? v : state.formants[i].f); });
+    l.append(inp); $('gnums').append(l); gnumInputs.push(inp);
+  });
+});
+
+/* ================= F1 × F2 graph ================= */
+const gc = $('fgraph'), g2 = gc.getContext('2d'), GP = {l: 46, r: 14, t: 12, b: 30};
+function drawGraph() {
+  const d = dpr(), W = gc.width / d, H = gc.height / d; if (W < 50) return;
+  const R0 = R[0], R1 = R[1];
+  const X = f => GP.l + (clamp(f, R0.min, R0.max) - R0.min) / (R0.max - R0.min) * (W - GP.l - GP.r);
+  const Y = f => GP.t + (1 - (clamp(f, R1.min, R1.max) - R1.min) / (R1.max - R1.min)) * (H - GP.t - GP.b);
+  g2.setTransform(d, 0, 0, d, 0, 0); g2.clearRect(0, 0, W, H);
+  g2.font = '11px sans-serif'; g2.lineWidth = 1; g2.strokeStyle = '#222a39'; g2.fillStyle = '#6b778f';
+  g2.textAlign = 'center'; g2.textBaseline = 'top';
+  for (let f = Math.ceil(R0.min / 250) * 250; f <= R0.max; f += 250) { g2.beginPath(); g2.moveTo(X(f), GP.t); g2.lineTo(X(f), H - GP.b); g2.stroke(); g2.fillText(f, X(f), H - GP.b + 3); }
+  g2.textAlign = 'right'; g2.textBaseline = 'middle';
+  for (let f = Math.ceil(R1.min / 500) * 500; f <= R1.max; f += 500) { g2.beginPath(); g2.moveTo(GP.l, Y(f)); g2.lineTo(W - GP.r, Y(f)); g2.stroke(); g2.fillText(f, GP.l - 4, Y(f)); }
+  g2.fillStyle = '#8f9ab0'; g2.textAlign = 'center'; g2.textBaseline = 'bottom'; g2.fillText('F1 (Hz)', (GP.l + W) / 2, H - 1);
+  g2.save(); g2.translate(10, H / 2); g2.rotate(-Math.PI / 2); g2.textBaseline = 'top'; g2.fillText('F2 (Hz)', 0, -4); g2.restore();
+  const F1 = state.formants[0].f, F2 = state.formants[1].f;
+  g2.textAlign = 'left'; g2.textBaseline = 'alphabetic';
+  VOWELS.forEach(v => {
+    if (v.f[0] < R0.min || v.f[0] > R0.max || v.f[1] < R1.min || v.f[1] > R1.max) return;
+    g2.fillStyle = '#56627a'; g2.beginPath(); g2.arc(X(v.f[0]), Y(v.f[1]), 3.5, 0, 7); g2.fill();
+    g2.fillStyle = '#8491ab'; g2.fillText(v.s, X(v.f[0]) + 6, Y(v.f[1]) - 4);
+  });
+  if (cam.on && faceCtl.base && faceCtl.enabled) {
+    const bx = X(faceCtl.base[0]), by = Y(faceCtl.base[1]);
+    g2.strokeStyle = '#46c483'; g2.lineWidth = 2; g2.setLineDash([3, 3]);
+    g2.beginPath(); g2.moveTo(bx, by); g2.lineTo(X(F1), Y(F2)); g2.stroke(); g2.setLineDash([]);
+    g2.beginPath(); g2.arc(bx, by, 6, 0, 7); g2.stroke();
+  }
+  if (state.follow) {
+    g2.strokeStyle = '#4f9fe8'; g2.lineWidth = 2;
+    g2.beginPath(); g2.arc(X(eff[0]), Y(eff[1]), 6, 0, 7); g2.stroke();
+  }
+  const px = X(F1), py = Y(F2);
+  g2.fillStyle = '#f08a5d'; g2.strokeStyle = '#fff'; g2.lineWidth = 2;
+  g2.beginPath(); g2.arc(px, py, 8, 0, 7); g2.fill(); g2.stroke();
+  const right = px > W * 0.6; g2.fillStyle = '#e6e9f0'; g2.textAlign = right ? 'right' : 'left'; g2.textBaseline = 'top';
+  g2.fillText(`F1 ${F1} · F2 ${F2}` + (state.follow ? `  (applied ${Math.round(eff[0])} · ${Math.round(eff[1])})` : ''), px + (right ? -12 : 12), Math.max(GP.t, py + 10));
+}
+let gDrag = false;
+function graphPoint(e) {
+  const r = gc.getBoundingClientRect();
+  const tx = clamp((e.clientX - r.left - GP.l) / (r.width - GP.l - GP.r), 0, 1);
+  const ty = clamp(1 - (e.clientY - r.top - GP.t) / (r.height - GP.t - GP.b), 0, 1);
+  const fs = state.formants.map(F => F.f);
+  fs[0] = R[0].min + tx * (R[0].max - R[0].min);
+  fs[1] = R[1].min + ty * (R[1].max - R[1].min);
+  fixOrder(fs); commitFreqs(fs, 'graph');
+}
+gc.addEventListener('pointerdown', e => { gDrag = true; gc.focus(); try { gc.setPointerCapture(e.pointerId); } catch (er) {} graphPoint(e); e.preventDefault(); });
+gc.addEventListener('pointermove', e => { if (gDrag) graphPoint(e); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => gc.addEventListener(t, () => { gDrag = false; }));
+gc.addEventListener('keydown', e => {
+  const st = e.shiftKey ? 50 : 10, F = state.formants;
+  const mv = {ArrowLeft: [0, -st], ArrowRight: [0, st], ArrowDown: [1, -st], ArrowUp: [1, st]}[e.key];
+  if (!mv) return;
+  e.preventDefault(); setFormantFreq(mv[0], F[mv[0]].f + mv[1]);
+});
+/* ================= Canvas sizing ================= */
+function fitCanvas(c) {
+  const d = dpr(), w = Math.round(c.clientWidth * d), h = Math.round(c.clientHeight * d);
+  if (w && h && (c.width !== w || c.height !== h)) { c.width = w; c.height = h; }
+}
+function resizeCanvases() {
+  ['spec', 'respCv', 'fgraph', 'harmCv'].forEach(id => fitCanvas($(id)));
+  drawGraph(); drawSpecFrame(); drawResp(); drawHarm();
+}
+window.addEventListener('resize', () => requestAnimationFrame(resizeCanvases));
+let idlePend = 0;
+function redrawIdle() {
+  if (idlePend) return;
+  idlePend = requestAnimationFrame(() => { idlePend = 0; if (!running) drawSpecFrame(); drawResp(); drawHarm(); });
+}
+
+/* ================= Live spectrum ================= */
+const sc = $('spec'), s2 = sc.getContext('2d'), SP = {t: 14, b: 18};
+const sX = (f, W) => f / MAXF * W;
+const gainY = (g, H) => SP.t + (1 - g / PK_MAX) * (H - SP.t - SP.b) * 0.6;
+function drawSpecFrame() {
+  const d = dpr(), W = sc.width / d, H = sc.height / d; if (W < 50) return;
+  s2.setTransform(d, 0, 0, d, 0, 0); s2.clearRect(0, 0, W, H);
+  s2.font = '10px sans-serif'; s2.fillStyle = '#6b778f'; s2.strokeStyle = '#1e2533'; s2.textAlign = 'center';
+  for (let f = 1000; f < MAXF; f += 1000) { const x = sX(f, W); s2.beginPath(); s2.moveTo(x, 0); s2.lineTo(x, H - SP.b); s2.stroke(); s2.fillText(f / 1000 + 'k', x, H - 4); }
+  if (running && nodes) {
+    nodes.an.getByteFrequencyData(nodes.buf);
+    const bins = nodes.buf.length, hz = ctx.sampleRate / 2 / bins, n = Math.min(bins, Math.ceil(MAXF / hz));
+    s2.beginPath(); s2.moveTo(0, H - SP.b);
+    for (let k = 0; k < n; k++) s2.lineTo(sX(k * hz, W), H - SP.b - nodes.buf[k] / 255 * (H - SP.t - SP.b));
+    s2.lineTo(sX(n * hz, W), H - SP.b); s2.closePath();
+    s2.fillStyle = 'rgba(79,159,232,.35)'; s2.fill(); s2.strokeStyle = '#4f9fe8'; s2.stroke();
+  } else { s2.fillStyle = '#56627a'; s2.fillText('Sound off', W / 2, H / 2); }
+  state.formants.forEach((F, i) => {
+    const x = sX(eff[i], W), cl = inCluster(i) >= 0 && state.cluster.show, col = cl ? '#c77dff' : '#f08a5d';
+    s2.strokeStyle = col; s2.setLineDash([4, 4]); s2.beginPath(); s2.moveTo(x, SP.t); s2.lineTo(x, H - SP.b); s2.stroke(); s2.setLineDash([]);
+    const bw = F.bw / MAXF * W; s2.fillStyle = cl ? 'rgba(199,125,255,.12)' : 'rgba(240,138,93,.10)'; s2.fillRect(x - bw / 2, SP.t, bw, H - SP.t - SP.b);
+    s2.fillStyle = col; s2.beginPath(); s2.arc(x, gainY(F.g, H), 5, 0, 7); s2.fill();
+    s2.fillText('F' + (i + 1), x, SP.t - 3);
+    if (state.follow) { s2.fillStyle = '#8f9ab0'; s2.fillRect(sX(F.f, W) - 1, 0, 2, 6); }
+  });
+}
+function specLoop() {
+  if (cam.dirty) { cam.dirty = false; refreshFormantUI(); }
+  drawSpecFrame();
+  rafId = running ? requestAnimationFrame(specLoop) : 0;
+}
+function drawSpectrum() { if (running && !rafId) rafId = requestAnimationFrame(specLoop); else if (!running) drawSpecFrame(); }
+let sDrag = null;
+function nearestFormant(e) {
+  const r = sc.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = -1, bd = 10;
+  eff.forEach((f, i) => { const dx = Math.abs(sX(f, r.width) - x); if (dx < bd) { bd = dx; best = i; } });
+  return {i: best, x, y, W: r.width, H: r.height};
+}
+sc.addEventListener('pointerdown', e => {
+  const p = nearestFormant(e); if (p.i < 0) return;
+  sDrag = {i: p.i, mode: Math.abs(p.y - gainY(state.formants[p.i].g, p.H)) < 10 ? 'g' : 'f'};
+  try { sc.setPointerCapture(e.pointerId); } catch (er) {} e.preventDefault();
+});
+sc.addEventListener('pointermove', e => {
+  const r = sc.getBoundingClientRect();
+  if (!sDrag) { sc.style.cursor = nearestFormant(e).i >= 0 ? 'ew-resize' : 'default'; return; }
+  if (sDrag.mode === 'f') setFormantFreq(sDrag.i, (e.clientX - r.left) / r.width * MAXF);
+  else setFormantGain(sDrag.i, (1 - (e.clientY - r.top - SP.t) / ((r.height - SP.t - SP.b) * 0.6)) * PK_MAX);
+  if (!running) drawSpecFrame();
+});
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => sc.addEventListener(t, () => { sDrag = null; }));
+sc.addEventListener('wheel', e => {
+  const p = nearestFormant(e); if (p.i < 0) return; e.preventDefault();
+  setFormantBw(p.i, state.formants[p.i].bw * (e.deltaY > 0 ? 1.08 : 1 / 1.08));
+}, {passive: false});
+
+/* ================= Frequency response ================= */
+const rc = $('respCv'), r2 = rc.getContext('2d'), RP = {l: 40, r: 10, t: 10, b: 22}, R_DB = [-6, 42];
+function drawResp() {
+  const d = dpr(), W = rc.width / d, H = rc.height / d; if (W < 50) return;
+  const log = $('rScale').value === 'log', fLo = log ? 50 : 0;
+  const X = f => RP.l + (log ? Math.log(f / fLo) / Math.log(MAXF / fLo) : f / MAXF) * (W - RP.l - RP.r);
+  const Y = db => RP.t + (1 - (clamp(db, R_DB[0], R_DB[1]) - R_DB[0]) / (R_DB[1] - R_DB[0])) * (H - RP.t - RP.b);
+  const N = 500, freqs = Array.from({length: N}, (_, k) => log ? fLo * Math.pow(MAXF / fLo, k / (N - 1)) : Math.max(10, k / (N - 1) * MAXF));
+  const cv = responseCurves(freqs);
+  r2.setTransform(d, 0, 0, d, 0, 0); r2.clearRect(0, 0, W, H);
+  r2.font = '10px sans-serif'; r2.lineWidth = 1;
+  r2.strokeStyle = '#1e2533'; r2.fillStyle = '#6b778f'; r2.textAlign = 'right'; r2.textBaseline = 'middle';
+  for (let db = 0; db <= R_DB[1]; db += 10) { r2.beginPath(); r2.moveTo(RP.l, Y(db)); r2.lineTo(W - RP.r, Y(db)); r2.stroke(); r2.fillText(db + ' dB', RP.l - 3, Y(db)); }
+  r2.textAlign = 'center'; r2.textBaseline = 'top';
+  (log ? [100, 200, 500, 1000, 2000, 4000, 8000] : [1000, 2000, 3000, 4000, 5000, 6000, 7000]).forEach(f => {
+    r2.beginPath(); r2.moveTo(X(f), RP.t); r2.lineTo(X(f), H - RP.b); r2.stroke(); r2.fillText(f >= 1000 ? f / 1000 + 'k' : f, X(f), H - RP.b + 4);
+  });
+  if (state.cluster.show) clusters.forEach(c => { r2.fillStyle = 'rgba(199,125,255,.18)'; r2.fillRect(X(Math.max(fLo || 1, c.lo)), RP.t, X(c.hi) - X(Math.max(fLo || 1, c.lo)), H - RP.t - RP.b); });
+  if ($('rShowHarm').checked) {
+    const f0 = midiToHz(state.midi); r2.strokeStyle = 'rgba(230,233,240,.18)';
+    for (let k = 1; k * f0 < MAXF && k <= state.nHarm; k++) { const x = X(k * f0); r2.beginPath(); r2.moveTo(x, H - RP.b); r2.lineTo(x, H - RP.b - 8); r2.stroke(); }
+  }
+  const line = (arr, col, w) => { r2.strokeStyle = col; r2.lineWidth = w; r2.beginPath(); arr.forEach((v, k) => k ? r2.lineTo(X(freqs[k]), Y(v)) : r2.moveTo(X(freqs[k]), Y(v))); r2.stroke(); };
+  if ($('rShowInd').checked) cv.ind.forEach((a, i) => line(a, inCluster(i) >= 0 ? 'rgba(199,125,255,.6)' : 'rgba(79,159,232,.7)', 1));
+  if ($('rShowEnh').checked && state.cluster.en && clusters.length) line(cv.enh, '#c77dff', 2.2);
+  if ($('rShowNat').checked) line(cv.nat, '#e6e9f0', 1.6);
+}
+['rShowInd', 'rShowNat', 'rShowEnh', 'rShowHarm', 'rScale'].forEach(id => $(id).addEventListener('change', drawResp));
+
+/* ================= Harmonic editor ================= */
+const hc = $('harmCv'), h2 = hc.getContext('2d'), HP = {l: 36, r: 8, t: 8, b: 20};
+function drawHarm() {
+  const d = dpr(), W = hc.width / d, H = hc.height / d; if (W < 50) return;
+  const n = state.nHarm, bw = (W - HP.l - HP.r) / n, f0 = midiToHz(state.midi), lim = sRate() * 0.4;
+  const Y = db => HP.t + (Math.min(0, Math.max(DB_FLOOR, db)) / DB_FLOOR) * (H - HP.t - HP.b);
+  h2.setTransform(d, 0, 0, d, 0, 0); h2.clearRect(0, 0, W, H);
+  h2.font = '10px sans-serif'; h2.fillStyle = '#6b778f'; h2.strokeStyle = '#1e2533'; h2.textAlign = 'right'; h2.textBaseline = 'middle';
+  for (let db = 0; db >= DB_FLOOR; db -= 12) { h2.beginPath(); h2.moveTo(HP.l, Y(db)); h2.lineTo(W - HP.r, Y(db)); h2.stroke(); h2.fillText(db, HP.l - 3, Y(db)); }
+  h2.textAlign = 'center'; h2.textBaseline = 'top';
+  for (let i = 0; i < n; i++) {
+    const x = HP.l + i * bw, muted = f0 * (i + 1) >= lim;
+    h2.fillStyle = muted ? '#e05656' : '#4f9fe8';
+    h2.fillRect(x + bw * 0.3, Y(state.harmDb[i]), bw * 0.4, H - HP.b - Y(state.harmDb[i]));
+    h2.strokeStyle = muted ? '#e05656' : '#f08a5d'; h2.lineWidth = 2;
+    h2.strokeRect(x + bw * 0.1, Y(harmDbEff(i)), bw * 0.8, H - HP.b - Y(harmDbEff(i)));
+    if ((i + 1) % 5 === 0 || i === 0) { h2.fillStyle = '#6b778f'; h2.fillText(i + 1, x + bw / 2, H - HP.b + 4); }
+  }
+}
+function updateHarmInfo() {
+  const f0 = midiToHz(state.midi), lim = sRate() * 0.4;
+  const audible = Math.min(state.nHarm, Math.floor(lim / f0));
+  $('harmInfo').textContent = `${state.nHarm} harmonics · ${audible} below ${Math.round(lim)} Hz at f0 = ${f0.toFixed(1)} Hz · tension slope ${tensionSlope()} dB/oct`;
+}
+let hDraw = false;
+function harmAt(e) {
+  const r = hc.getBoundingClientRect(), n = state.nHarm;
+  const i = Math.floor((e.clientX - r.left - HP.l) / ((r.width - HP.l - HP.r) / n));
+  if (i < 0 || i >= n) return;
+  const t = clamp((e.clientY - r.top - HP.t) / (r.height - HP.t - HP.b), 0, 1);
+  state.harmDb[i] = Math.round(t * DB_FLOOR * 2) / 2;
+  applyHarmonics(false); drawHarm();
+}
+hc.addEventListener('pointerdown', e => { hDraw = true; try { hc.setPointerCapture(e.pointerId); } catch (er) {} harmAt(e); e.preventDefault(); });
+hc.addEventListener('pointermove', e => { if (hDraw) harmAt(e); });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => hc.addEventListener(t, () => { hDraw = false; }));
+function setHarmCount(v) {
+  state.nHarm = clamp(Math.round(v), H_MIN, H_MAX);
+  $('hCount').value = $('hCountNum').value = state.nHarm;
+  rebuildVoices(); updateHarmInfo(); drawHarm(); drawResp();
+}
+$('hCount').value = $('hCountNum').value = state.nHarm;
+$('hCount').addEventListener('input', e => setHarmCount(+e.target.value));
+$('hCountNum').addEventListener('change', e => setHarmCount(+e.target.value || state.nHarm));
+$('hMax').onclick = () => { state.harmDb.fill(0); applyHarmonics(false); drawHarm(); };
+$('hZero').onclick = () => { state.harmDb.fill(DB_FLOOR); applyHarmonics(false); drawHarm(); };
+$('hTiltBtn').onclick = () => {
+  const t = clamp(+$('hTilt').value || 0, -24, 0);
+  state.harmDb = state.harmDb.map((_, i) => Math.max(DB_FLOOR, t * Math.log2(i + 1)));
+  applyHarmonics(false); drawHarm();
+};
+
+/* ================= Source: tension + breathiness ================= */
+safe('source UI', () => {
+  TENSION.forEach((T, k) => {
+    const b = document.createElement('button'); b.setAttribute('role', 'radio');
+    b.innerHTML = `${T.n}<small>${T.s} dB/oct</small>`;
+    b.onclick = () => { state.tension = k; applyTension(false); updateHarmInfo(); };
+    $('tensionBar').append(b);
+  });
+  slider($('tensionSet'), {label: 'Transition time', min: 0.01, max: 0.5, step: 0.01, value: state.tensionTc, fmt: v => Math.round(v * 1000) + ' ms', oninput: v => { state.tensionTc = v; }});
+  const bs = $('breathSet');
+  slider(bs, {label: 'Breathiness amount', min: 0, max: 1, step: 0.01, value: state.breath, fmt: pct, oninput: v => { state.breath = v; applyBreath(false); }});
+  slider(bs, {label: 'Noise high-pass', min: 100, max: 3000, step: 10, value: state.breathHp, fmt: v => v + ' Hz', oninput: v => { state.breathHp = v; applyBreath(false); }});
+  slider(bs, {label: 'Noise low-pass', min: 2000, max: 12000, step: 50, value: state.breathLp, fmt: v => v + ' Hz', oninput: v => { state.breathLp = v; applyBreath(false); }});
+  slider(bs, {label: 'Pulsing at F0 (AM)', min: 0, max: 1, step: 0.01, value: state.breathAM, fmt: pct, oninput: v => { state.breathAM = v; applyBreath(false); }});
+});
+hooks.tension = () => {
+  [...$('tensionBar').children].forEach((b, k) => { b.classList.toggle('sel', k === state.tension); b.setAttribute('aria-checked', k === state.tension); });
+  $('tensionTxt').textContent = TENSION[state.tension].d; drawHarm();
+};
+hooks.breath = () => {
+  $('breathTxt').textContent = `Voiced level ×${voicedScale().toFixed(2)} · noise level ${noiseLevel().toFixed(3)}`;
+  drawResp();
+};
+
+/* ================= Clusters ================= */
+safe('cluster UI', () => {
+  const C = state.cluster, h = $('clSet'), card = () => { const c = document.createElement('div'); c.className = 'fcard'; h.append(c); return c; };
+  const a = card(), b = card(), upd = () => { applyClusters(false); scheduleAG(); refreshSummary(); drawResp(); };
+  slider(a, {label: 'Tolerance', min: 0, max: 800, step: 10, value: C.tol, fmt: v => v + ' Hz', oninput: v => { C.tol = v; upd(); }});
+  slider(a, {label: 'Bandwidth sensitivity', min: 0, max: 3, step: 0.05, value: C.sens, fmt: v => v.toFixed(2) + '×', oninput: v => { C.sens = v; upd(); }});
+  slider(a, {label: 'Minimum peak gain', min: 0, max: 20, step: 0.5, value: C.minG, fmt: v => v + ' dB', oninput: v => { C.minG = v; upd(); }});
+  slider(b, {label: 'Enhancement amount', min: 0, max: 18, step: 0.5, value: C.amt, fmt: v => v + ' dB', oninput: v => { C.amt = v; upd(); }});
+  slider(b, {label: 'Enhancement cap', min: 0, max: 18, step: 0.5, value: C.cap, fmt: v => v + ' dB', oninput: v => { C.cap = v; upd(); }});
+  $('clEn').addEventListener('change', e => { C.en = e.target.checked; upd(); });
+  $('clDetect').addEventListener('change', e => { C.show = e.target.checked; upd(); redrawIdle(); });
+});
+hooks.cluster = () => {
+  const txt = clusters.length ? clusters.map((c, j) =>
+    `C${j + 1}: ${c.m.map(i => 'F' + (i + 1)).join('+')} at ${Math.round(c.fc)} Hz (overlap ${pct(c.overlap)}${state.cluster.en ? ', +' + c.boost.toFixed(1) + ' dB' : ''})`).join(' · ')
+    : 'No formant cluster detected.';
+  $('clusterTxt').textContent = txt;
+  $('clChips').innerHTML = clusters.map((c, j) => `<span class="chip cl">C${j + 1} · ${Math.round(c.lo)}–${Math.round(c.hi)} Hz</span>`).join('');
+  redrawIdle();
+};
+
+/* ================= Vibrato + Output ================= */
+safe('vib/out UI', () => {
+  const v = $('vibCard');
+  slider(v, {label: 'Rate', min: 0, max: 9, step: 0.1, value: state.vibRate, fmt: x => x.toFixed(1) + ' Hz', oninput: x => { state.vibRate = x; applyVibrato(false); callHook('vib'); }});
+  slider(v, {label: 'Depth', min: 0, max: 1, step: 0.01, value: state.vibDepth, fmt: x => '±' + Math.round(x * 200) + ' ¢', oninput: x => { state.vibDepth = x; applyVibrato(false); callHook('vib'); }});
+  slider(v, {label: 'Rate irregularity', min: 0, max: 2, step: 0.05, value: state.vibJitter, fmt: x => '±' + x.toFixed(2) + ' Hz', oninput: x => { state.vibJitter = x; applyVibrato(false); }});
+  const o = $('outCard');
+  slider(o, {label: 'Volume', min: 0, max: 1, step: 0.01, value: state.volume, fmt: pct, oninput: x => { state.volume = x; applyOutput(false); }});
+  slider(o, {label: 'Dry source mix', min: 0, max: 1, step: 0.01, value: state.dry, fmt: pct, oninput: x => { state.dry = x; applyOutput(false); }});
+  $('autoGain').addEventListener('change', e => { state.autoGain = e.target.checked; applyAutoGain(); });
+  $('topVib').addEventListener('change', e => setVibOn(e.target.checked));
+});
+hooks.vib = () => { $('vibState').textContent = state.vibOn ? `On · ${state.vibRate.toFixed(1)} Hz, ±${Math.round(state.vibDepth * 200)} ¢` : 'Off (Esc or top checkbox)'; };
+hooks.ag = g => { $('agTxt').textContent = state.autoGain ? `Make-up gain ${gainToDb(g).toFixed(1)} dB` : 'Off: level changes with formants and tension.'; };
+/* ================= Block 5: camera, microphone, startup ================= */
+const lerp = (a, b, t) => a + (b - a) * t;
+const ema = (p, v, s) => (isFinite(p) ? p : v) + (v - (isFinite(p) ? p : v)) * (1 - clamp(s, 0, 0.97));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const shape = (x, dz, cu) => { const s = Math.sign(x), a = clamp((Math.abs(x) - dz) / (1 - dz), 0, 1); return s * Math.pow(a, cu); };
+const onEl = (id, ev, fn) => { const e = $(id); if (e) e.addEventListener(ev, fn); return e; };
+const setTxt = (id, t) => { const e = $(id); if (e) e.textContent = t; };
+const chk = id => { const e = $(id); return !!(e && e.checked); };
+function SL(host, obj, key, label, min, max, step, fmt, after) {
+  const h = $(host); if (!h) return null;
+  return slider(h, {label, min, max, step, value: obj[key], fmt, oninput: v => { obj[key] = v; if (after) after(v); }});
+}
+
+/* ---------- Camera (MediaPipe Tasks Vision) ---------- */
+const VURL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MURL = 'https://storage.googleapis.com/mediapipe-models/';
+async function loadVision() {
+  if (cam.face) return;
+  const V = await import(VURL + '/vision_bundle.mjs');
+  const fs = await V.FilesetResolver.forVisionTasks(VURL + '/wasm');
+  const mk = async (Cls, path, extra) => {
+    for (const delegate of ['GPU', 'CPU']) {
+      try { return await Cls.createFromOptions(fs, {baseOptions: {modelAssetPath: MURL + path, delegate}, runningMode: 'VIDEO', ...extra}); }
+      catch (e) { if (delegate === 'CPU') throw e; }
+    }
+  };
+  cam.face = await mk(V.FaceLandmarker, 'face_landmarker/face_landmarker/float16/1/face_landmarker.task', {numFaces: 1});
+  cam.hand = await mk(V.HandLandmarker, 'hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', {numHands: 1});
+}
+function faceMetrics(L) {
+  const fh = dist(L[10], L[152]) || 1, mw = dist(L[61], L[291]) || 1, fw = dist(L[234], L[454]) || 1;
+  return {
+    mouth: dist(L[13], L[14]) / mw, jaw: dist(L[1], L[152]) / fh, lips: mw / fw,
+    roll: Math.atan2(L[263].y - L[33].y, L[263].x - L[33].x),
+    eye: (dist(L[159], L[145]) + dist(L[386], L[374])) / 2 / fh,
+    brow: (dist(L[105], L[159]) + dist(L[334], L[386])) / 2 / fh
+  };
+}
+function handMetrics(L) {
+  const palm = dist(L[0], L[9]) || 1;
+  return {
+    spread: dist(L[4], L[8]) / palm * 100,
+    ext: [8, 12, 16, 20].reduce((s, k) => s + dist(L[k], L[0]), 0) / 4 / palm * 100 - 100
+  };
+}
+function startCalibration() { cam.cal = {n: 0, sum: {}, until: performance.now() + 1500}; setTxt('camStat', 'Calibrating: neutral face, relaxed hand (1.5 s)…'); }
+function calibrate(m) {
+  const c = cam.cal; c.n++;
+  for (const k in m) c.sum[k] = (c.sum[k] || 0) + m[k];
+  if (performance.now() < c.until) return;
+  for (const k in c.sum) cam.ref[k] = c.sum[k] / c.n;
+  cam.cal = null;
+  faceCtl.base = [state.formants[0].f, state.formants[1].f];
+  handCtl.base = [state.formants[2].f, state.formants[3].f];
+  headCtl.base = state.midi; headCtl.lastNote = null;
+  Object.assign(faceCtl.sig, {f1: faceCtl.base[0], f2: faceCtl.base[1]});
+  Object.assign(handCtl.sig, {f3: handCtl.base[0], f4: handCtl.base[1]});
+  setTxt('camStat', 'Calibrated. Camera control active.');
+}
+function processFace(m) {
+  const r = cam.ref, fs = state.formants.map(F => F.f);
+  let changed = false;
+  if (faceCtl.enabled && faceCtl.base) {
+    const mo = clamp((m.mouth - r.mouth) / faceCtl.mFull, 0, 1);
+    const jw = clamp((m.jaw - r.jaw) / (r.jaw * faceCtl.jFull), 0, 1);
+    const comb = (faceCtl.A * mo + faceCtl.B * jw) / Math.max(1e-3, faceCtl.A + faceCtl.B);
+    const t = shape(comb, faceCtl.dz, faceCtl.curve);
+    let l = shape(clamp((m.lips - r.lips) / (r.lips * 0.15), -1, 1), faceCtl.dz, faceCtl.curve);
+    if (chk('inv2')) l = -l;
+    const [b1, b2] = faceCtl.base;
+    const t1 = lerp(b1, chk('inv1') ? R[0].min : R[0].max, clamp(t * faceCtl.g1, 0, 1));
+    const t2 = b2 + l * faceCtl.g2 * (l > 0 ? R[1].max - b2 : b2 - R[1].min);
+    faceCtl.sig.f1 = ema(faceCtl.sig.f1, t1, faceCtl.s1);
+    faceCtl.sig.f2 = ema(faceCtl.sig.f2, t2, faceCtl.s2);
+    fs[0] = faceCtl.sig.f1; fs[1] = faceCtl.sig.f2; changed = true;
+    setTxt('artMouth', pct(mo)); setTxt('artJaw', pct(jw)); setTxt('artComb', pct(t));
+    setTxt('artF1', Math.round(faceCtl.sig.f1) + ' Hz');
+    setTxt('f1Read', `Mouth ${pct(mo)}, jaw ${pct(jw)}, combined ${pct(t)}`);
+  }
+  if (headCtl.enabled) {
+    let raw = shape(clamp(-(m.roll - r.roll) / (Math.PI / 6), -1, 1), 0.05, 1);
+    if (chk('headInv')) raw = -raw;
+    headCtl.sig = ema(headCtl.sig, raw, headCtl.smooth);
+    let note = clamp(headCtl.base + headCtl.sig * headCtl.range, MIDI_MIN, MIDI_MAX);
+    const chrom = $('headMode') && $('headMode').value === 'chromatic';
+    if (tonic.enabled || chrom || chk('snap')) {
+      const q = tonic.enabled ? snapScale(note) : Math.round(note);
+      if (headCtl.lastNote === null || Math.abs(note - headCtl.lastNote) > 0.5 + headCtl.fs) headCtl.lastNote = q;
+      note = headCtl.lastNote;
+    }
+    if (Math.abs(note - state.midi) > 0.005) { headDriving = true; setMidi(note, false); headDriving = false; }
+  }
+  if (eyeCtl.enabled) {
+    const e = (m.eye - r.eye) / (r.eye * eyeCtl.er), b = (m.brow - r.brow) / (r.brow * eyeCtl.br);
+    const s = shape(clamp(eyeCtl.w * e + (1 - eyeCtl.w) * b, -1, 1), eyeCtl.dz, eyeCtl.curve);
+    eyeCtl.vol = ema(eyeCtl.vol, Math.min(1, Math.pow(2, s)), eyeCtl.smooth);   // Volume slider = upper limit
+    if (Math.abs(eyeCtl.vol - eyeCtl.applied) > 0.005) { eyeCtl.applied = eyeCtl.vol; applyOutput(false); }
+  }
+  return {fs, changed};
+}
+function processHand(h, fs) {
+  if (!handCtl.enabled || !handCtl.base) return false;
+  const [b3, b4] = handCtl.base, span = Math.max(1, handCtl.fe - handCtl.fs);
+  let t3 = 0.5, t4 = 0.5;
+  if (h) {
+    t3 = clamp((h.spread - handCtl.fs) / span, 0, 1);
+    t4 = clamp((h.ext - handCtl.fs) / span, 0, 1);
+    setTxt('handRaw', `Raw: spread ${h.spread.toFixed(0)}%, extension ${h.ext.toFixed(0)}%`);
+  }
+  const tgt = (b, i, t) => t >= 0.5 ? lerp(b, R[i].max, (t - 0.5) * 2) : lerp(R[i].min, b, t * 2);
+  handCtl.sig.f3 = ema(handCtl.sig.f3, lerp(b3, tgt(b3, 2, t3), handCtl.g3), handCtl.s3);
+  handCtl.sig.f4 = ema(handCtl.sig.f4, lerp(b4, tgt(b4, 3, t4), handCtl.g4), handCtl.s4);
+  fs[2] = handCtl.sig.f3; fs[3] = handCtl.sig.f4;
+  return true;
+}
+function drawCamOverlay(L, H) {
+  const c = $('camCv'), v = $('vid'); if (!c) return;
+  fitCanvas(c); const x = c.getContext('2d'), W = c.width, Hh = c.height;
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, W, Hh);
+  if (cam.on && v && v.readyState >= 2) { x.save(); x.translate(W, 0); x.scale(-1, 1); x.drawImage(v, 0, 0, W, Hh); x.restore(); }
+  const dot = (p, col) => { x.fillStyle = col; x.beginPath(); x.arc((1 - p.x) * W, p.y * Hh, 3 * dpr(), 0, 7); x.fill(); };
+  if (L) [13, 14, 61, 291, 1, 152, 33, 263, 159, 145, 386, 374, 105, 334].forEach(k => dot(L[k], '#f08a5d'));
+  if (H) [0, 4, 8, 9, 12, 16, 20].forEach(k => dot(H[k], '#46c483'));
+}
+function camLoop(token) {
+  if (token !== cam.token || !cam.on) return;
+  const v = $('vid');
+  if (v && v.readyState >= 2 && v.currentTime !== cam.lastVT && !cam.busy) {
+    cam.busy = true; cam.lastVT = v.currentTime;
+    try {
+      const ts = Math.max(cam.lastTs + 1, performance.now()); cam.lastTs = ts;
+      const fr = cam.face.detectForVideo(v, ts), L = fr.faceLandmarks && fr.faceLandmarks[0];
+      let HL = cam.lastHand;
+      if (handCtl.enabled && (cam.prevT++ & 1) === 0) { const hr = cam.hand.detectForVideo(v, ts); HL = cam.lastHand = hr.landmarks && hr.landmarks[0]; }
+      if (L) {
+        cam.lastFace = ts;
+        const m = faceMetrics(L);
+        if (cam.cal) calibrate(m);
+        else if (cam.ref.mouth !== undefined) {
+          const {fs, changed} = processFace(m);
+          const hcg = processHand(HL ? handMetrics(HL) : null, fs);
+          if (changed || hcg) { fixOrder(fs); commitFreqs(fs, 'cam'); }
+        }
+      } else if (ts - cam.lastFace > 1500) setTxt('camStat', 'No face detected.');
+      drawCamOverlay(L, HL);
+    } catch (e) { console.error('cam', e); }
+    cam.busy = false;
+  }
+  cam.loop = requestAnimationFrame(() => camLoop(token));
+}
+function setCamUI(on) {
+  const b = $('camBtn'); if (b) { b.textContent = on ? 'Disable camera' : 'Enable camera'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
+  const t = $('topCam'); if (t) t.checked = on;
+  ['camCal', 'handCal'].forEach(id => { const e = $(id); if (e) e.disabled = !on; });
+}
+async function startCam() {
+  if (cam.on) return true;
+  const token = ++cam.token;
+  try {
+    setTxt('camStat', 'Loading face/hand models…');
+    startAudio();
+    cam.stream = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480, facingMode: 'user'}, audio: false});
+    await loadVision();
+    if (token !== cam.token) { cam.stream.getTracks().forEach(t => t.stop()); return false; }
+    const v = $('vid'); v.srcObject = cam.stream; await v.play();
+    cam.on = true; cam.ref = {}; eyeCtl.vol = eyeCtl.applied = 1;
+    setCamUI(true); startCalibration(); camLoop(token);
+    return true;
+  } catch (e) { showMsg('Camera unavailable: ' + (e && e.message || e)); stopCam(); return false; }
+}
+function stopCam() {
+  cam.token++; cam.on = false; cancelAnimationFrame(cam.loop);
+  if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+  cam.stream = null; cam.cal = null; faceCtl.base = handCtl.base = null; cam.lastHand = null;
+  eyeCtl.vol = eyeCtl.applied = 1; applyOutput(false);
+  const v = $('vid'); if (v) v.srcObject = null;
+  drawCamOverlay(null, null); setTxt('camStat', 'The camera is off.');
+  setCamUI(false); drawGraph();
+}
+const toggleCam = () => cam.on ? stopCam() : startCam();
+
+/* ---------- Microphone (YIN pitch) ---------- */
+const mic = {stream: null, src: null, an: null, buf: null, timer: 0};
+function yin(buf, sr) {
+  const N = buf.length, half = N >> 1, tMin = Math.floor(sr / 1100), tMax = Math.min(half - 1, Math.floor(sr / 60));
+  const d = new Float32Array(tMax + 1), cm = new Float32Array(tMax + 1);
+  for (let t = 1; t <= tMax; t++) { let s = 0; for (let i = 0; i < half; i++) { const x = buf[i] - buf[i + t]; s += x * x; } d[t] = s; }
+  let run = 0; cm[0] = 1;
+  for (let t = 1; t <= tMax; t++) { run += d[t]; cm[t] = d[t] * t / (run || 1); }
+  const thr = 1 - singCtl.conf; let tau = -1;
+  for (let t = tMin; t <= tMax; t++) if (cm[t] < thr) { while (t + 1 <= tMax && cm[t + 1] < cm[t]) t++; tau = t; break; }
+  if (tau < 1) return null;
+  const a = cm[tau - 1], b = cm[tau], c = tau + 1 <= tMax ? cm[tau + 1] : b, den = a - 2 * b + c;
+  return {hz: sr / (tau + (den ? (a - c) / (2 * den) : 0)), conf: 1 - b};
+}
+function micTick() {
+  if (!mic.an || !ctx) return;
+  mic.an.getFloatTimeDomainData(mic.buf);
+  const n = Math.min(mic.buf.length, Math.round(ctx.sampleRate * singCtl.win / 1000)), w = mic.buf.subarray(mic.buf.length - n);
+  let e = 0; for (let i = 0; i < n; i++) e += w[i] * w[i];
+  const lvl = gainToDb(Math.sqrt(e / n)); setTxt('singLvl', lvl.toFixed(0) + ' dB');
+  if (lvl < singCtl.minLvl) { setTxt('singStat', 'Too quiet'); return; }
+  const r = yin(w, ctx.sampleRate);
+  if (!r) { setTxt('singStat', 'No stable pitch'); return; }
+  const raw = hzToMidi(r.hz), near = Math.round(raw);
+  let m = singCtl.free ? raw : (tonic.enabled ? snapScale(raw) : near);
+  m = singCtl.last ? ema(singCtl.last, m, singCtl.smooth) : m;
+  if (!singCtl.free) m = Math.round(m * 100) / 100;
+  singCtl.last = m; singCtl.hz = r.hz;
+  setMidi(m, false);
+  setTxt('singHz', r.hz.toFixed(1) + ' Hz'); setTxt('singNote', noteName(near));
+  const c = Math.round((raw - near) * 100); setTxt('singCents', (c >= 0 ? '+' : '') + c + ' ¢');
+  setTxt('singApplied', midiToHz(m).toFixed(1) + ' Hz');
+  setTxt('singStat', singCtl.free ? 'FREE FREQUENCY' : 'Snapped');
+}
+function restartMicTimer() { clearInterval(mic.timer); if (singCtl.on) mic.timer = setInterval(micTick, singCtl.free ? Math.min(singCtl.interval, 40) : singCtl.interval); }
+function setMicUI(on) {
+  const b = $('singBtn'); if (b) { b.textContent = on ? 'Disable sing-along' : 'Enable sing-along'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
+  const t = $('topMic'); if (t) t.checked = on;
+}
+async function startMic() {
+  if (singCtl.on) return true;
+  if (!(await startAudio())) return false;
+  try {
+    mic.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
+    mic.src = ctx.createMediaStreamSource(mic.stream);
+    mic.an = ctx.createAnalyser(); mic.an.fftSize = 8192;
+    mic.src.connect(mic.an); mic.buf = new Float32Array(mic.an.fftSize);
+    singCtl.on = true; singCtl.last = 0; restartMicTimer(); setMicUI(true);
+    setTxt('singStat', 'Listening… (use headphones)');
+    return true;
+  } catch (e) { showMsg('Microphone unavailable: ' + (e && e.message || e)); stopMic(); return false; }
+}
+function stopMic() {
+  singCtl.on = false; clearInterval(mic.timer);
+  try { if (mic.src) mic.src.disconnect(); } catch (e) {}
+  if (mic.stream) mic.stream.getTracks().forEach(t => t.stop());
+  mic.stream = mic.src = mic.an = null;
+  setTxt('singStat', 'The microphone is off.'); setMicUI(false);
+}
+const toggleMic = () => singCtl.on ? stopMic() : startMic();
+
+/* ---------- Camera / mic settings UI ---------- */
+safe('cam/mic UI', () => {
+  const p = pct, x = v => v.toFixed(2) + '×';
+  let sA = null, sB = null;
+  sA = SL('f1Set', faceCtl, 'A', 'Weight A (mouth)', 0, 1, 0.01, x, v => { if (faceCtl.linkAB) { faceCtl.B = +(1 - v).toFixed(2); sB && sB.set(faceCtl.B); } });
+  sB = SL('f1Set', faceCtl, 'B', 'Weight B (jaw)', 0, 1, 0.01, x, v => { if (faceCtl.linkAB) { faceCtl.A = +(1 - v).toFixed(2); sA && sA.set(faceCtl.A); } });
+  SL('f1Set', faceCtl, 'mFull', 'Mouth full-open ratio', 0.1, 1, 0.01, x);
+  SL('f1Set', faceCtl, 'jFull', 'Jaw full-drop (rel.)', 0.05, 0.5, 0.01, p);
+  SL('f1Set', faceCtl, 'curve', 'Response curve', 0.3, 3, 0.05, x);
+  SL('f1Set', faceCtl, 'dz', 'Dead zone', 0, 0.3, 0.01, p);
+  SL('f1Set', faceCtl, 'g1', 'F1 depth', 0, 1.5, 0.01, p);
+  SL('f1Set', faceCtl, 's1', 'F1 smoothing', 0, 0.95, 0.01, p);
+  SL('f2Set', faceCtl, 'g2', 'F2 depth (lips)', 0, 1.5, 0.01, p);
+  SL('f2Set', faceCtl, 's2', 'F2 smoothing', 0, 0.95, 0.01, p);
+  SL('headSliders', headCtl, 'range', 'Pitch range', 1, HEAD_RANGE_MAX, 1, v => '±' + v + ' st');
+  SL('headSliders', headCtl, 'smooth', 'Smoothing', 0, 0.95, 0.01, p);
+  SL('headSliders', headCtl, 'fs', 'Note hysteresis', 0, 1, 0.05, v => v.toFixed(2) + ' st');
+  SL('eyeSliders', eyeCtl, 'w', 'Eyes ↔ brows weight', 0, 1, 0.01, v => 'eyes ' + pct(v));
+  SL('eyeSliders', eyeCtl, 'er', 'Eye range', 0.2, 1.5, 0.01, p);
+  SL('eyeSliders', eyeCtl, 'br', 'Brow range', 0.1, 1, 0.01, p);
+  SL('eyeSliders', eyeCtl, 'dz', 'Dead zone', 0, 0.3, 0.01, p);
+  SL('eyeSliders', eyeCtl, 'curve', 'Curve', 0.3, 3, 0.05, x);
+  SL('eyeSliders', eyeCtl, 'smooth', 'Smoothing', 0, 0.95, 0.01, p);
+  SL('f3Set', handCtl, 'g3', 'F3 depth', 0, 1, 0.01, p);
+  SL('f3Set', handCtl, 's3', 'F3 smoothing', 0, 0.95, 0.01, p);
+  SL('f4Set', handCtl, 'g4', 'F4 depth', 0, 1, 0.01, p);
+  SL('f4Set', handCtl, 's4', 'F4 smoothing', 0, 0.95, 0.01, p);
+  SL('xSet', handCtl, 'fs', 'Start (% palm)', 0, 100, 1, v => v + '%');
+  SL('xSet', handCtl, 'fe', 'End (% palm)', 10, 200, 1, v => v + '%');
+  SL('singSet', singCtl, 'interval', 'Update interval', 20, 2000, 10, v => v + ' ms', restartMicTimer);
+  SL('singSet', singCtl, 'win', 'Analysis window', 40, 170, 5, v => v + ' ms');
+  SL('singSet', singCtl, 'minLvl', 'Minimum level', -80, -10, 1, v => v + ' dB');
+  SL('singSet', singCtl, 'conf', 'Required confidence', 0.5, 0.99, 0.01, p);
+  SL('singSet', singCtl, 'smooth', 'Pitch smoothing', 0, 0.95, 0.01, p);
+  [['useFace', faceCtl], ['useHead', headCtl], ['useEyes', eyeCtl], ['useHand', handCtl]].forEach(([id, o]) => {
+    const e = onEl(id, 'change', ev => { o.enabled = ev.target.checked; if (o === eyeCtl) { eyeCtl.vol = eyeCtl.applied = 1; applyOutput(false); } drawGraph(); });
+    if (e) e.checked = o.enabled;
+  });
+  ['camCal', 'eyeCal', 'cal1', 'cal2', 'handCal', 'hcalBoth', 'hcal3', 'hcal4'].forEach(id => onEl(id, 'click', () => { if (cam.on) startCalibration(); }));
+  onEl('handRight', 'change', e => setTxt('handTitle', (e.target.checked ? 'Right' : 'Left') + ' hand → F3 / F4'));
+  onEl('singFree', 'change', e => { singCtl.free = e.target.checked; singCtl.last = 0; restartMicTimer(); });
+  onEl('camBtn', 'click', toggleCam);
+  onEl('singBtn', 'click', toggleMic);
+  onEl('topCam', 'change', e => { e.target.checked ? startCam() : stopCam(); });
+  onEl('topMic', 'change', e => { e.target.checked ? startMic() : stopMic(); });
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+    ['topCam', 'topMic', 'camBtn', 'singBtn'].forEach(id => { const e = $(id); if (e) { e.disabled = true; e.title = 'Requires HTTPS or localhost'; } });
+});
+window.addEventListener('pagehide', () => { stopCam(); stopMic(); });
+
+/* ---------- Startup ---------- */
+safe('startup', () => {
+  $('topVib').checked = state.vibOn;
+  renderTonic(); setMidi(state.midi, false); refreshFormantUI();
+  hooks.tension(); hooks.breath(); hooks.vib(); applyClusters(false); applyAutoGain();
+  updateHarmInfo(); applyOutput(true); setUI(false);
+  requestAnimationFrame(resizeCanvases);
+});
+})();
+</script>
+</body>
+</html>
