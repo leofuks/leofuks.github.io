@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Harmonimpro – Developed by Leonardo Fuchs</title>
+<meta name="author" content="Leonardo Fuchs">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, sans-serif; background: #1c1712; color: #eee;
+    display: flex; flex-direction: column; align-items: center; padding: 20px 20px 120px; user-select: none;
+    -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  h1 { margin: 0 0 4px; font-weight: 600; letter-spacing: 1px; color: #e8c37a; text-align: center; }
+  .credit { color: #e8c37a; font-size: 13px; margin-bottom: 4px; text-align: center; opacity: .9; }
+  .sub { color: #aaa; margin-bottom: 16px; font-size: 14px; text-align: center; }
+  .panel {
+    display: grid; grid-template-columns: repeat(3, minmax(200px, 1fr)); gap: 12px;
+    width: 100%; max-width: 1000px; margin-bottom: 16px;
+  }
+  .box { background: #2a231b; border: 1px solid #4a3d2c; border-radius: 8px; padding: 10px 14px; min-width: 0; }
+  .box.wide { grid-column: 1 / -1; }
+  .box h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; color: #c9a45c; letter-spacing: 1px; }
+  .big { font-size: 26px; font-weight: 700; }
+  #recent span, .notes span {
+    display: inline-block; background: #3e3224; border-radius: 4px; padding: 3px 8px; margin: 2px; font-weight: 600;
+  }
+  #recent span.mic { background: #2f4a3a; }
+  .chordPair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chordPair > div { min-width: 0; }
+  .chordPair .lbl { font-size: 11px; color: #999; text-transform: uppercase; }
+  #nextWrap { border-left: 1px dashed #5a4a34; padding-left: 10px; }
+  #nextName { color: #9fd0ff; }
+  #transpose, #instSel { margin-left: 6px; background: #3e3224; color: #eee; border: 1px solid #6a5638; border-radius: 4px; font-size: 12px; }
+  #instSel { font-size: 14px; padding: 4px 6px; margin-left: 0; }
+  .info { font-size: 12px; color: #bbb; min-height: 16px; }
+  .info.warn { color: #ffb36b; }
+  #history { max-height: 90px; overflow-y: auto; font-size: 14px; }
+  #history div { padding: 1px 0; border-bottom: 1px solid #3a3025; }
+  #history div:first-child { color: #ffd98a; font-weight: 700; }
+  .soundRow { display: grid; grid-template-columns: 1fr 2fr 2fr 1fr; gap: 16px; align-items: end; }
+  .ctl label { display: block; font-size: 12px; color: #bbb; margin-bottom: 4px; }
+  .ctl label b { color: #fff; }
+  .ctl input[type=range] { width: 100%; accent-color: #e8c37a; }
+  .ctl.disabled { opacity: .4; }
+  .ctl .hint { font-size: 11px; color: #888; }
+  #kbWrap {
+    background: linear-gradient(#5a3b22, #3a2614); padding: 14px 14px 18px; border-radius: 10px;
+    box-shadow: 0 8px 30px #000a; max-width: 100%; overflow-x: auto;
+  }
+  #keyboard { position: relative; height: 200px; }
+  .key { position: absolute; top: 0; border-radius: 0 0 5px 5px; cursor: pointer;
+         display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+         font-size: 11px; padding-bottom: 6px; transition: background .05s; touch-action: none; }
+  .white { width: 40px; height: 200px; background: linear-gradient(#fdfaf2, #e9e2cf);
+           border: 1px solid #555; color: #444; z-index: 1; }
+  .black { width: 26px; height: 124px; background: linear-gradient(#333, #111);
+           border: 1px solid #000; color: #ccc; z-index: 2; }
+  .white.on { background: linear-gradient(#ffe7a8, #f0c15a); }
+  .black.on { background: linear-gradient(#a7782a, #6e4a12); }
+  .white.chord { box-shadow: inset 0 -10px 0 #6fb3ff; }
+  .black.chord { box-shadow: inset 0 -8px 0 #6fb3ff; }
+  .key b { font-size: 13px; }
+  .help { max-width: 1000px; font-size: 13px; color: #bbb; margin-top: 16px; line-height: 1.6; }
+  footer { margin-top: 18px; font-size: 13px; color: #c9a45c; }
+  kbd { background: #3e3224; border: 1px solid #6a5638; border-radius: 3px; padding: 0 5px; font-family: monospace; color: #fff; }
+  .badge { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 4px; background: #3e3224; font-size: 12px; }
+  .badge.on { background: #6fb3ff; color: #000; }
+  #previewInd.on { background: #e07a5f; color: #000; }
+  #ctrlInd.on { background: #b48cff; color: #000; }
+  #acqInd { background: #5fd08a; color: #000; }
+  #acqInd.off { background: #8a3a32; color: #fff; }
+  button {
+    background: #3e3224; color: #eee; border: 1px solid #6a5638; border-radius: 5px;
+    padding: 6px 12px; font-size: 14px; cursor: pointer; margin: 2px 4px 4px 0; touch-action: manipulation;
+  }
+  button.on { background: #6fb3ff; color: #000; border-color: #6fb3ff; }
+  #micBtn.on { background: #5fd08a; border-color: #5fd08a; }
+  #latchBtn.on { background: #f0c15a; border-color: #f0c15a; }
+  #acqBtn { background: #5fd08a; border-color: #5fd08a; color: #000; }
+  #acqBtn.off { background: #8a3a32; border-color: #c0574b; color: #fff; }
+  #micStatus { font-size: 12px; color: #bbb; min-height: 16px; }
+  #micStatus.err { color: #ff8a7a; }
+  #micPitch { font-size: 18px; font-weight: 700; min-height: 24px; }
+  #levelBar { height: 5px; background: #3e3224; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  #levelFill { height: 100%; width: 0; background: #5fd08a; transition: width .05s; }
+  #testOut { display: none; max-width: 1000px; width: 100%; background: #2a231b; border: 1px solid #4a3d2c;
+             border-radius: 8px; padding: 10px 14px; font-size: 12px; white-space: pre-wrap; margin: 0 0 16px; }
+
+  #pad {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 10px; padding: 10px 14px;
+    background: #140f0bee; border-top: 1px solid #4a3d2c; justify-content: center; z-index: 10;
+  }
+  #pad button { margin: 0; font-weight: 700; touch-action: none; }
+  #ctrlBtn { flex: 0 0 100px; height: 56px; font-size: 18px; }
+  #shiftBtn { flex: 0 0 120px; height: 56px; font-size: 18px; }
+  #chordsBtn { flex: 0 1 360px; height: 56px; font-size: 22px; background: #2d4a66; border-color: #6fb3ff; }
+  #ctrlBtn.on { background: #b48cff; border-color: #b48cff; color: #000; }
+  #shiftBtn.on { background: #e07a5f; border-color: #e07a5f; color: #000; }
+  #chordsBtn.on { background: #6fb3ff; color: #000; }
+
+  @media (max-width: 760px), (pointer: coarse) {
+    body { padding: 10px 10px 140px; }
+    .panel { grid-template-columns: 1fr; }
+    .soundRow { grid-template-columns: 1fr; }
+    .big { font-size: 22px; }
+    #ctrlBtn { flex: 0 0 22%; height: 90px; font-size: 20px; }
+    #shiftBtn { flex: 0 0 26%; height: 90px; font-size: 22px; }
+    #chordsBtn { flex: 1 1 auto; height: 90px; font-size: 30px; }
+    .help { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<h1>Harmonimpro</h1>
+<div class="credit">Developed by Leonardo Fuchs</div>
+<div class="sub">Harmony + improvisation · Organ &amp; plucked string · Web Audio API · Chords chosen from your recent notes (played or sung)</div>
+
+<div class="panel">
+  <div class="box wide"><h3>Sound</h3>
+    <div class="soundRow">
+      <div class="ctl"><label for="instSel">Instrument</label>
+        <select id="instSel" tabindex="-1">
+          <option value="organ">Pipe organ</option>
+          <option value="pluck">Plucked guitar</option>
+        </select>
+      </div>
+      <div class="ctl"><label for="volSl">Master volume: <b id="volVal">100%</b></label>
+        <input type="range" id="volSl" min="0" max="500" step="1" value="100" tabindex="-1">
+        <div class="hint">0–500 % · built-in limiter prevents harsh clipping</div>
+      </div>
+      <div class="ctl" id="decayCtl"><label for="decaySl">Pluck decay (fade to silence): <b id="decayVal">3.0 s</b></label>
+        <input type="range" id="decaySl" min="0.3" max="12" step="0.1" value="3" tabindex="-1">
+        <div class="hint">Short = muted/staccato · long = ringing sustain</div>
+      </div>
+      <div class="ctl" id="ringCtl"><label><input type="checkbox" id="ringChk" tabindex="-1" checked> Let ring</label>
+        <div class="hint">ON: plucks keep decaying after key release</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="box"><h3>Octave (Z = C<span id="octZ"></span>)</h3><div class="big" id="octave"></div></div>
+  <div class="box"><h3>Recent 6 notes <span id="acqInd" class="badge">ACQ ON</span></h3><div id="recent"></div></div>
+  <div class="box"><h3>Chords <span id="spaceInd" class="badge">SPACE</span></h3>
+    <div class="chordPair">
+      <div><div class="lbl">Last played</div>
+        <div class="big" id="chordName">—</div><div id="chordNotes" class="notes"></div><div id="chordInfo" class="info"></div></div>
+      <div id="nextWrap"><div class="lbl">Up next ▶
+        <select id="transpose" tabindex="-1">
+          <option value="0">C instr.</option>
+          <option value="2">B♭ instr.</option>
+          <option value="9">E♭ instr.</option>
+          <option value="7">F instr.</option>
+        </select></div>
+        <div class="big" id="nextName">—</div><div id="nextNotes" class="notes"></div><div id="nextInfo" class="info"></div></div>
+    </div>
+  </div>
+</div>
+<div class="panel">
+  <div class="box"><h3>Microphone <kbd>1</kbd></h3>
+    <button id="micBtn" tabindex="-1">🎤 Mic: OFF</button>
+    <div id="micPitch"></div>
+    <div id="levelBar"><div id="levelFill"></div></div>
+    <div id="micStatus">Disabled</div>
+  </div>
+  <div class="box"><h3>Modes</h3>
+    <button id="acqBtn" tabindex="-1">Acquisition: ON</button>
+    <button id="latchBtn" tabindex="-1">Toggle mode: OFF</button>
+    <button id="minorBtn" tabindex="-1">Prefer minor: OFF <kbd>-</kbd></button>
+    <button id="resetPosBtn" tabindex="-1">Reset positions</button>
+    <button id="resetBtn" tabindex="-1">Reset <kbd>Esc</kbd></button>
+    <button id="testBtn" tabindex="-1">Self-test</button>
+    <div style="margin-top:6px;font-size:12px"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> = start/stop acquisition</div>
+    <div style="margin-top:4px;font-size:12px">Hold <kbd>Shift</kbd> = pause input <span id="previewInd" class="badge">PAUSED</span></div>
+    <div style="margin-top:4px;font-size:12px">Hold <kbd>Ctrl</kbd> = repeat chord, keep acquiring <span id="ctrlInd" class="badge">CTRL</span></div>
+  </div>
+  <div class="box"><h3>Chord history (newest first)</h3><div id="history"><em style="color:#777">none yet</em></div></div>
+</div>
+
+<pre id="testOut"></pre>
+
+<div id="kbWrap"><div id="keyboard"></div></div>
+
+<div class="help">
+  <b>Controls:</b> hold a key to sound a note · click/touch the on-screen keys (drag to glide) ·
+  <kbd>↑</kbd>/<kbd>↓</kbd> octave · <kbd>Space</kbd> or <b>Chords</b> plays the "Up next" chord
+  (held, or press-on/press-off when <b>Toggle mode</b> is ON).<br>
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> or the <b>Acquisition</b> button = start/stop note acquisition (latched; notes still sound while stopped) ·
+  <kbd>Shift</kbd> or the on-screen <b>Shift</b> button (hold) = pause input: notes sound but neither keys nor the mic are stored ·
+  While Shift is held, <b>Chords</b> repeats the current chord without advancing ·
+  <kbd>Ctrl</kbd> (hold) or the on-screen <b>Ctrl</b> button (tap on/off) = Space/Chords repeat the current chord while new notes keep being acquired for the next one ·
+  The dropdown in "Up next" shows that chord transposed for C, B♭, E♭ or F instruments ·
+  <b>Reset positions</b> clears the note memory and restores octave 3 without stopping sound or mic; pressing Chords before any new note replays the last chord ·
+  <kbd>Esc</kbd> full session reset · <kbd>1</kbd> mic on/off · <kbd>-</kbd> prefer-minor.<br>
+  <b>Lower row:</b> <kbd>Z</kbd>C <kbd>S</kbd>C♯ <kbd>X</kbd>D <kbd>D</kbd>D♯ <kbd>C</kbd>E <kbd>V</kbd>F <kbd>G</kbd>F♯
+  <kbd>B</kbd>G <kbd>H</kbd>G♯ <kbd>N</kbd>A <kbd>J</kbd>A♯ <kbd>M</kbd>B <kbd>,</kbd>C <kbd>L</kbd>C♯ <kbd>.</kbd>D <kbd>;</kbd>D♯ <kbd>/</kbd>E<br>
+  <b>Upper row (+1 oct):</b> <kbd>Q</kbd>C <kbd>2</kbd>C♯ <kbd>W</kbd>D <kbd>3</kbd>D♯ <kbd>E</kbd>E <kbd>R</kbd>F <kbd>5</kbd>F♯
+  <kbd>T</kbd>G <kbd>6</kbd>G♯ <kbd>Y</kbd>A <kbd>7</kbd>A♯ <kbd>U</kbd>B <kbd>I</kbd>C <kbd>9</kbd>C♯ <kbd>O</kbd>D <kbd>0</kbd>D♯ <kbd>P</kbd>E<br>
+  <b>Note:</b> browsers reserve Ctrl+W/T/N (and sometimes Ctrl+digits); use the on-screen <b>Ctrl</b> button for those notes.<br>
+  <b>Microphone:</b> use headphones; requires <code>https://</code> or <code>localhost</code>.
+</div>
+<footer>Harmonimpro · Developed by Leonardo Fuchs</footer>
+
+<div id="pad">
+  <button id="ctrlBtn" tabindex="-1">Ctrl</button>
+  <button id="shiftBtn" tabindex="-1">Shift</button>
+  <button id="chordsBtn" tabindex="-1">Chords</button>
+</div>
+
+<script>
+"use strict";
+/* Harmonimpro — Developed by Leonardo Fuchs
+ * ====================== NOTE MAPPING ======================
+ *  Lower row  : Z=C  S=C# X=D  D=D# C=E  V=F  G=F# B=G  H=G# N=A  J=A# M=B
+ *               ,=C+12  L=C#  .=D  ;=D#  /=E
+ *  Upper row  : Q=C+12 2=C# W=D 3=D# E=E R=F 5=F# T=G 6=G# Y=A 7=A# U=B
+ *               I=C+24 9=C# O=D 0=D# P=E
+ * Control keys: Digit1 = mic, Minus = prefer-minor, Escape = reset, Shift = pause input,
+ *               Ctrl = repeat while acquiring, Space = chord, Ctrl+Shift+Space = acquisition on/off.
+ */
+const KEYMAP = {
+  KeyZ:0, KeyS:1, KeyX:2, KeyD:3, KeyC:4, KeyV:5, KeyG:6, KeyB:7, KeyH:8, KeyN:9, KeyJ:10, KeyM:11,
+  Comma:12, KeyL:13, Period:14, Semicolon:15, Slash:16,
+  KeyQ:12, Digit2:13, KeyW:14, Digit3:15, KeyE:16, KeyR:17, Digit5:18, KeyT:19, Digit6:20,
+  KeyY:21, Digit7:22, KeyU:23, KeyI:24, Digit9:25, KeyO:26, Digit0:27, KeyP:28
+};
+const CODE_LABEL = { Comma:',', Period:'.', Semicolon:';', Slash:'/' };
+const labelOf = c => CODE_LABEL[c] || c.replace('Key','').replace('Digit','');
+const NAMES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const RANGE = 29;
+const MIN_OCT = 1, MAX_OCT = 6, DEFAULT_OCT = 3;
+let octave = DEFAULT_OCT;
+const baseMidi = () => 12 * (octave + 1);
+const $ = id => document.getElementById(id);
+
+/* ====================== SOUND SETTINGS ====================== */
+const BASE_GAIN = 0.22;
+const sound = { inst: 'organ', vol: 1.0, decay: 3.0, ring: true };
+
+/* ====================== AUDIO ENGINE ======================
+ * Chain: voices → master (volume) → compressor/limiter → soft-clip → out
+ * Pluck voices also pass through a guitar "body" filter bus.
+ */
+let ctx = null, master, organWave, lfoGain, pluckBus;
+function softClipCurve(n = 2048, k = 1.4) {
+  const c = new Float32Array(n), norm = Math.tanh(k);
+  for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(k * x) / norm; }
+  return c;
+}
+function ensureAudio() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = BASE_GAIN * sound.vol;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.knee.value = 8; comp.ratio.value = 10;
+    comp.attack.value = 0.003; comp.release.value = 0.2;
+    const clip = ctx.createWaveShaper(); clip.curve = softClipCurve(); clip.oversample = '2x';
+    const out = ctx.createGain(); out.gain.value = 0.95;
+    master.connect(comp).connect(clip).connect(out).connect(ctx.destination);
+    const real = new Float32Array(9), imag = new Float32Array(9);
+    imag[1] = 1; imag[2] = 0.55; imag[3] = 0.4; imag[4] = 0.3; imag[5] = 0.12; imag[6] = 0.18; imag[8] = 0.12;
+    organWave = ctx.createPeriodicWave(real, imag);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 5.8;
+    lfoGain = ctx.createGain(); lfoGain.gain.value = 4;
+    lfo.connect(lfoGain); lfo.start();
+    // Guitar body: low resonances + gentle top roll-off
+    pluckBus = ctx.createGain(); pluckBus.gain.value = 1;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 65;
+    const b1 = ctx.createBiquadFilter(); b1.type = 'peaking'; b1.frequency.value = 105; b1.Q.value = 1.3; b1.gain.value = 5;
+    const b2 = ctx.createBiquadFilter(); b2.type = 'peaking'; b2.frequency.value = 230; b2.Q.value = 1.5; b2.gain.value = 3;
+    const b3 = ctx.createBiquadFilter(); b3.type = 'peaking'; b3.frequency.value = 2800; b3.Q.value = 0.9; b3.gain.value = 2;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000; lp.Q.value = 0.5;
+    pluckBus.connect(hp).connect(b1).connect(b2).connect(b3).connect(lp).connect(master);
+  }
+  if (ctx.state === 'suspended') ctx.resume();
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function setVolume(v) {
+  sound.vol = v;
+  if (ctx) master.gain.setTargetAtTime(BASE_GAIN * v, ctx.currentTime, 0.03);
+}
+
+/* ---------- Plucked string: Karplus-Strong (extended), pre-rendered & cached ---------- */
+const pluckCache = new Map();
+function pluckBuffer(midi) {
+  const T = sound.decay, key = midi + '|' + T.toFixed(1);
+  if (pluckCache.has(key)) return pluckCache.get(key);
+  if (pluckCache.size > 240) pluckCache.clear();
+  const sr = ctx.sampleRate, f = mtof(midi), P = sr / f;
+  const D = Math.max(2, Math.floor(P - 0.5)), frac = P - 0.5 - D, C = (1 - frac) / (1 + frac);
+  const len = Math.floor(sr * Math.min(14, T * 1.15 + 0.25));
+  // Excitation: filtered noise burst with pick-position comb (pluck ~14% from bridge)
+  const exc = new Float32Array(D);
+  let y = 0, mean = 0;
+  for (let n = 0; n < D; n++) { y += 0.6 * ((Math.random() * 2 - 1) - y); exc[n] = y; }
+  const p = Math.max(1, Math.round(D * 0.14));
+  for (let n = D - 1; n >= p; n--) exc[n] -= exc[n - p];
+  for (let n = 0; n < D; n++) mean += exc[n]; mean /= D;
+  let pk = 1e-9; for (let n = 0; n < D; n++) { exc[n] -= mean; pk = Math.max(pk, Math.abs(exc[n])); }
+  for (let n = 0; n < D; n++) exc[n] /= pk;
+  // Loop gain for the chosen T60, compensating the averaging filter's own loss at f
+  let g = Math.pow(10, -3 / (f * T)) / Math.max(0.5, Math.cos(Math.PI * f / sr));
+  g = Math.min(g, 0.99995);
+  const out = new Float32Array(len);
+  let apIn = 0, apOut = 0;
+  for (let n = 0; n < len; n++) {
+    const a = n >= D ? out[n - D] : 0, b = n >= D + 1 ? out[n - D - 1] : 0;
+    const lpv = g * 0.5 * (a + b);
+    const ap = C * lpv + apIn - C * apOut; apIn = lpv; apOut = ap;
+    out[n] = (n < D ? exc[n] : 0) + ap;
+  }
+  const fade = Math.min(len, Math.floor(sr * 0.06));
+  for (let i = 0; i < fade; i++) out[len - 1 - i] *= i / fade;
+  const buf = ctx.createBuffer(1, len, sr);
+  buf.copyToChannel ? buf.copyToChannel(out, 0) : buf.getChannelData(0).set(out);
+  pluckCache.set(key, buf);
+  return buf;
+}
+
+function startVoice(midi, level = 0.3, delay = 0) {
+  ensureAudio();
+  const t = ctx.currentTime + delay, f = mtof(midi);
+  const g = ctx.createGain();
+  if (sound.inst === 'pluck') {
+    const src = ctx.createBufferSource(); src.buffer = pluckBuffer(midi);
+    g.gain.value = level * 1.5;
+    src.connect(g).connect(pluckBus);
+    src.onended = () => { try { g.disconnect(); } catch (e) {} };
+    src.start(t);
+    return { g, oscs: [src], midi, pluck: true };
+  }
+  g.gain.setValueAtTime(0, t);
+  g.gain.setTargetAtTime(level, t, 0.008);
+  g.connect(master);
+  const main = ctx.createOscillator(); main.setPeriodicWave(organWave); main.frequency.value = f;
+  const sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = f / 2;
+  const subG = ctx.createGain(); subG.gain.value = 0.35;
+  main.connect(g); sub.connect(subG).connect(g);
+  lfoGain.connect(main.detune); lfoGain.connect(sub.detune);
+  main.start(t); sub.start(t);
+  return { g, oscs: [main, sub], midi };
+}
+function stopVoice(v) {
+  if (!v || !ctx) return;
+  if (v.pluck && sound.ring) return;            // let the string decay naturally
+  const t = ctx.currentTime;
+  v.g.gain.cancelScheduledValues(t);
+  v.g.gain.setValueAtTime(v.g.gain.value, t);
+  v.g.gain.setTargetAtTime(0, t, v.pluck ? 0.06 : 0.035);
+  v.oscs.forEach(o => { try { o.stop(t + 0.4); } catch (e) {} });
+  setTimeout(() => { try { v.g.disconnect(); } catch (e) {} }, 600);
+}
+
+/* ====================== NOTE STATE ====================== */
+const keyVoices = new Map();
+const ptrVoices = new Map();
+const litCount = new Map();
+const recent = [];                // {pc, midi, src:'key'|'mic'} (max 6)
+
+function recordNote(midi, src = 'key') {
+  recent.push({ pc: ((midi % 12) + 12) % 12, midi, src });
+  if (recent.length > 6) recent.shift();
+  renderRecent();
+  refreshUpcoming();
+}
+function noteOn(midi, record = true) {
+  const v = startVoice(midi);
+  litCount.set(midi, (litCount.get(midi) || 0) + 1);
+  if (record) recordNote(midi, 'key');
+  renderLit();
+  return v;
+}
+function noteOff(v) {
+  if (!v) return;
+  stopVoice(v);
+  const c = (litCount.get(v.midi) || 1) - 1;
+  c ? litCount.set(v.midi, c) : litCount.delete(v.midi);
+  renderLit();
+}
+
+/* ====================== CHORD LIBRARY ======================
+ * Qualities grouped in categories with target probabilities (sum = 1).
+ * Perfect major/minor triads target 25% and are hard-capped at 30% (see TRIAD_MAX).
+ */
+const QUALITIES = [
+  ['', [0,4,7]], ['m', [0,3,7]], ['°', [0,3,6]], ['+', [0,4,8]],
+  ['sus2', [0,2,7]], ['sus4', [0,5,7]], ['6', [0,4,7,9]], ['m6', [0,3,7,9]],
+  ['7', [0,4,7,10]], ['maj7', [0,4,7,11]], ['m7', [0,3,7,10]], ['m7♭5', [0,3,6,10]],
+  ['°7', [0,3,6,9]], ['m(maj7)', [0,3,7,11]], ['7sus4', [0,5,7,10]], ['+7', [0,4,8,10]],
+  ['add9', [0,4,7,14]], ['m(add9)', [0,3,7,14]],
+  ['9', [0,4,7,10,14]], ['maj9', [0,4,7,11,14]], ['m9', [0,3,7,10,14]], ['6/9', [0,4,7,9,14]], ['7♭9', [0,4,7,10,13]]
+];
+const CATS = {
+  triad: { t: 0.25, label: 'perfect triad',  q: ['', 'm'] },
+  dim:   { t: 0.14, label: 'diminished',     q: ['°', '°7', 'm7♭5'] },
+  sev:   { t: 0.30, label: 'seventh',        q: ['7', 'maj7', 'm7', 'm(maj7)', '7sus4', '+7'] },
+  ninth: { t: 0.13, label: 'ninth / added',  q: ['9', 'maj9', 'm9', 'add9', 'm(add9)', '6/9', '7♭9'] },
+  color: { t: 0.18, label: 'color triad/6th', q: ['+', 'sus2', 'sus4', '6', 'm6'] }
+};
+const CAT_OF = {};
+for (const [cat, d] of Object.entries(CATS)) d.q.forEach(q => CAT_OF[q] = cat);
+const MINOR_Q   = new Set(['m','m6','m7','m7♭5','°','°7','m(maj7)','m9','m(add9)']);
+const NEUTRAL_Q = new Set(['sus2','sus4','7sus4']);
+const LIB = [];
+for (let r = 0; r < 12; r++) for (const [q, iv] of QUALITIES)
+  LIB.push({ name: NAMES[r] + q, root: r, q, iv, cat: CAT_OF[q], pcs: [...new Set(iv.map(i => (r + i) % 12))] });
+
+/* ====================== HARMONIC CONTEXT (KEY + NEIGHBOUR KEYS) ====================== */
+const DIA = new Set([0,2,4,5,7,9,11]);
+const inColl = (pcs, K) => pcs.every(p => { const r = (p - K + 12) % 12; return DIA.has(r) || r === 8; });
+const fifthDist = (a, b) => { const k = (((a - b) * 7) % 12 + 12) % 12; return Math.min(k, 12 - k); };
+const keyName = k => k == null ? '?' : `${NAMES[k]} / ${NAMES[(k + 9) % 12]}m`;
+function keyFit(c, K) {
+  if (K == null) return { f: 1, lbl: '' };
+  if (inColl(c.pcs, K)) return { f: 3, lbl: 'in key' };
+  if (inColl(c.pcs, (K + 7) % 12) || inColl(c.pcs, (K + 5) % 12)) return { f: 1.6, lbl: 'neighbour key' };
+  let d = 6;
+  for (let k = 0; k < 12; k++) if (inColl(c.pcs, k)) d = Math.min(d, fifthDist(k, K));
+  return { f: d <= 2 ? 0.6 : 0.25, lbl: 'distant' };
+}
+const keyState = { k: null };
+function estimateKey(rec, hist, ks) {
+  const w = new Array(12).fill(0);
+  rec.forEach((n, i) => w[n.pc] += 0.6 + 0.4 * (i + 1) / rec.length);
+  hist.slice(-3).reverse().forEach((c, i) => c.pcs.forEach(p => w[p] += [0.5, 0.3, 0.2][i]));
+  if (!w.some(Boolean)) return ks.k;
+  let best = 0, bs = -Infinity;
+  for (let k = 0; k < 12; k++) {
+    let s = 0.3 * w[k] + 0.2 * w[(k + 9) % 12];
+    for (let p = 0; p < 12; p++) { const r = (p - k + 12) % 12; s += w[p] * (DIA.has(r) ? 1 : r === 8 ? 0.3 : -0.8); }
+    if (k === ks.k) s += 0.6;
+    if (s > bs) { bs = s; best = k; }
+  }
+  return ks.k = best;
+}
+
+/* ====================== CHORD SELECTION ====================== */
+const TRIAD_MAX = 0.30, WIN = 20;
+let preferMinor = false;
+const chordHistory = [];
+function pickW(arr, wf) {
+  const ws = arr.map(wf); let tot = ws.reduce((a, b) => a + b, 0);
+  if (!tot) { ws.fill(1); tot = ws.length; }
+  let x = Math.random() * tot, i = 0;
+  while ((x -= ws[i]) > 0 && i < arr.length - 1) i++;
+  return arr[i];
+}
+function selectChord(rec = recent, hist = chordHistory, ks = keyState) {
+  const H = new Set(rec.map(n => n.pc));
+  if (!H.size) return { chord: null, info: 'Play or sing some notes first. No chord selected.', warn: true };
+  const req = Math.min(3, H.size);
+  const K = estimateKey(rec, hist, ks);
+  const prev = hist[hist.length - 1];
+  const win = hist.slice(-WIN), last19 = hist.slice(-(WIN - 1)), lastNames = hist.slice(-4).map(c => c.name);
+
+  const cats = [];
+  for (const [cat, def] of Object.entries(CATS)) {
+    const list = LIB.filter(c => c.cat === cat).map(c => ({ c, match: c.pcs.filter(p => H.has(p)).length }));
+    let r = req, pool = [];
+    while (r >= 1 && !(pool = list.filter(s => s.match >= r)).length) r--;
+    if (!pool.length) continue;
+    const share = (win.filter(c => c.cat === cat).length + def.t * 4) / (win.length + 4);
+    let w = def.t * Math.min(3, Math.max(0.15, 1 + 2.5 * (def.t - share) / def.t));
+    if (cat === 'triad' && (last19.filter(c => c.cat === 'triad').length + 1) / WIN > TRIAD_MAX) w = 0;
+    if (prev && prev.cat === cat) w *= 0.6;
+    if (cat === 'ninth' && hist.slice(-2).some(c => c.cat === 'ninth')) w *= 0.4;
+    if (r < req) w *= 0.35;
+    cats.push({ cat, pool, r, w });
+  }
+  const C = pickW(cats, x => x.w);
+
+  const scored = C.pool.map(s => {
+    const extra = s.c.pcs.length - s.match, fit = keyFit(s.c, K);
+    let w = (1 + s.match) ** 2 / (1 + extra * 0.5) * fit.f;
+    if (prev) {
+      w *= 1 + s.c.pcs.filter(p => prev.pcs.includes(p)).length * 0.4;
+      if (s.c.name === prev.name) w *= 0.15;
+    }
+    if (lastNames.includes(s.c.name)) w *= 0.5;
+    if (preferMinor) w *= MINOR_Q.has(s.c.q) ? 4 : NEUTRAL_Q.has(s.c.q) ? 1 : 0.4;
+    return { ...s, fit, w: Math.pow(w, 0.85) };
+  });
+  const pick = pickW(scored, s => s.w);
+  const warn = C.r < req;
+  let info = warn
+    ? `Fallback: partial match (${C.r} of ${req} notes) · `
+    : `Matches ${pick.match} of ${H.size} recent pitch classes · `;
+  info += `${CATS[C.cat].label} · key ${keyName(K)}${pick.fit.lbl ? ' (' + pick.fit.lbl + ')' : ''}`;
+  if (preferMinor) info += ' · minor preferred';
+  return { chord: pick.c, info, warn, key: K };
+}
+
+/* ====================== UPCOMING-CHORD PREVIEW ====================== */
+let upcoming = { chord: null, info: '', warn: false };
+function refreshUpcoming() {
+  const last = chordHistory[chordHistory.length - 1];
+  if (!recent.length && last) upcoming = { chord: last, info: 'No new input since reset: replays last chord.', warn: false, replay: true };
+  else upcoming = selectChord();
+  renderUpcoming();
+}
+
+/* ====================== CHORD PLAYBACK ====================== */
+let chordVoices = null, chordMidis = [];
+function soundChord(chord) {
+  if (chordVoices) chordOff();
+  const rootMidi = baseMidi() + chord.root;
+  chordMidis = [rootMidi - 12, ...chord.iv.map(i => rootMidi + i)];
+  const lvl = 0.32 / Math.sqrt(chordMidis.length);
+  const strum = sound.inst === 'pluck' ? 0.018 : 0;     // gentle downstroke for guitar
+  chordVoices = chordMidis.map((m, i) => startVoice(m, lvl, i * strum));
+  renderLit(); setChordBtnState();
+}
+function chordOn() {
+  ensureAudio();
+  if (chordVoices) chordOff();
+  const { chord, info, warn } = upcoming;
+  setChordInfo(info, warn);
+  if (!chord) return;
+  chordHistory.push(chord);
+  soundChord(chord);
+  renderChord(chord); renderHistory();
+  refreshUpcoming();
+}
+function chordOff() {
+  if (chordVoices) chordVoices.forEach(stopVoice);
+  chordVoices = null; chordMidis = []; renderLit(); setChordBtnState();
+}
+
+/* ====================== TOGGLE (LATCH) MODE + TRIGGER LOGIC ====================== */
+let latch = false;
+function chordPress() {
+  if (latch && chordVoices) chordOff(); else chordOn();
+}
+function chordRelease() { if (!latch) chordOff(); }
+const isRepeat = src => ctrlActive() || (src === 'btn' && inputPaused());
+function chordTrigger(src) {
+  if (!isRepeat(src)) return chordPress();
+  if (latch && chordVoices) return chordOff();
+  const cur = chordHistory[chordHistory.length - 1];
+  if (!cur) {
+    if (ctrlActive()) return chordPress();
+    setChordInfo('No current chord to repeat yet.', true); return;
+  }
+  ensureAudio();
+  soundChord(cur);
+  setChordInfo(`Repeating ${cur.name} (${ctrlActive() ? 'Ctrl: still acquiring notes' : 'Shift held'})`, false);
+}
+function toggleLatch() {
+  latch = !latch;
+  const b = $('latchBtn'); b.classList.toggle('on', latch);
+  b.textContent = `Toggle mode: ${latch ? 'ON' : 'OFF'}`;
+  if (!latch) chordOff();
+}
+function setChordBtnState() {
+  $('chordsBtn').classList.toggle('on', !!chordVoices);
+  $('spaceInd').classList.toggle('on', !!chordVoices);
+}
+
+/* ====================== MICROPHONE PITCH DETECTION (YIN) ====================== */
+const mic = { on: false, pending: false, stream: null, src: null, analyser: null, buf: null, raf: 0,
+              cand: null, candCount: 0, lastAdded: null, silent: 0 };
+const MIC_RMS_MIN = 0.012, YIN_THRESH = 0.15, CONF_MIN = 0.85, STABLE_FRAMES = 5;
+let sessionId = 0;
+
+function yin(buf, sr) {
+  const W = buf.length >> 1;
+  const tauMin = Math.max(2, Math.floor(sr / 1100)), tauMax = Math.min(W - 1, Math.floor(sr / 70));
+  const d = new Float32Array(tauMax + 2);
+  for (let tau = 1; tau <= tauMax + 1; tau++) {
+    let s = 0;
+    for (let j = 0; j < W; j++) { const x = buf[j] - buf[j + tau]; s += x * x; }
+    d[tau] = s;
+  }
+  d[0] = 1; let run = 0;
+  for (let tau = 1; tau <= tauMax + 1; tau++) { run += d[tau]; d[tau] = run ? d[tau] * tau / run : 1; }
+  let tau = -1;
+  for (let t = tauMin; t <= tauMax; t++) {
+    if (d[t] < YIN_THRESH) { while (t + 1 <= tauMax && d[t + 1] < d[t]) t++; tau = t; break; }
+  }
+  if (tau < 0) return null;
+  const a = d[tau - 1], b = d[tau], c = d[tau + 1], den = a - 2 * b + c;
+  const shift = den ? 0.5 * (a - c) / den : 0;
+  return { freq: sr / (tau + shift), conf: 1 - b };
+}
+
+function micLoop() {
+  if (!mic.on) return;
+  mic.analyser.getFloatTimeDomainData(mic.buf);
+  let rms = 0; for (const v of mic.buf) rms += v * v; rms = Math.sqrt(rms / mic.buf.length);
+  $('levelFill').style.width = Math.min(100, rms * 600) + '%';
+
+  let reliable = false;
+  if (rms >= MIC_RMS_MIN) {
+    const r = yin(mic.buf, ctx.sampleRate);
+    if (r && r.conf >= CONF_MIN) {
+      const mf = 69 + 12 * Math.log2(r.freq / 440);
+      const n = Math.round(mf), cents = Math.round((mf - n) * 100);
+      if (n >= 24 && n <= 96) {
+        reliable = true; mic.silent = 0;
+        $('micPitch').textContent =
+          `${NAMES[n % 12]}${Math.floor(n / 12) - 1}  ${cents >= 0 ? '+' : ''}${cents}¢  (${r.freq.toFixed(1)} Hz)` +
+          (acquireEnabled() ? '' : '  ⏸');
+        if (n === mic.cand) mic.candCount++; else { mic.cand = n; mic.candCount = 1; }
+        if (mic.candCount === STABLE_FRAMES && n !== mic.lastAdded) {
+          if (acquireEnabled()) recordNote(n, 'mic');
+          mic.lastAdded = n;
+        }
+      }
+    }
+  }
+  if (!reliable) {
+    mic.cand = null; mic.candCount = 0;
+    if (++mic.silent > 8) { mic.lastAdded = null; $('micPitch').textContent = ''; }
+  }
+  mic.raf = requestAnimationFrame(micLoop);
+}
+
+function setMicStatus(t, err) { const el = $('micStatus'); el.textContent = t; el.classList.toggle('err', !!err); }
+function renderMicBtn() { const b = $('micBtn'); b.classList.toggle('on', mic.on); b.textContent = `🎤 Mic: ${mic.on ? 'ON' : mic.pending ? '…' : 'OFF'}`; }
+
+async function startMic() {
+  if (mic.on || mic.pending) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setMicStatus('Microphone not available here (open over https:// or localhost).', true); return;
+  }
+  ensureAudio();
+  mic.pending = true; renderMicBtn(); setMicStatus('Requesting permission…');
+  const mySession = sessionId;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch (err) {
+    mic.pending = false; renderMicBtn();
+    const msg = {
+      NotAllowedError: 'Permission denied. Allow microphone access in the browser settings.',
+      SecurityError: 'Permission denied. Allow microphone access in the browser settings.',
+      NotFoundError: 'No microphone found.',
+      NotReadableError: 'Microphone is busy or unavailable.',
+      OverconstrainedError: 'Microphone does not support the requested settings.'
+    }[err.name] || ('Microphone error: ' + err.message);
+    setMicStatus(msg, true); return;
+  }
+  mic.pending = false;
+  if (mySession !== sessionId) { stream.getTracks().forEach(t => t.stop()); renderMicBtn(); return; }
+  mic.stream = stream;
+  mic.src = ctx.createMediaStreamSource(stream);
+  mic.analyser = ctx.createAnalyser(); mic.analyser.fftSize = 2048;
+  mic.buf = new Float32Array(mic.analyser.fftSize);
+  mic.src.connect(mic.analyser);
+  stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => {
+    stopMic(); setMicStatus('Microphone disconnected.', true);
+  }));
+  mic.on = true; mic.cand = null; mic.candCount = 0; mic.lastAdded = null; mic.silent = 0;
+  renderMicBtn(); setMicStatus('Listening. Sing steady notes.');
+  micLoop();
+}
+function stopMic() {
+  cancelAnimationFrame(mic.raf);
+  if (mic.src) { try { mic.src.disconnect(); } catch (e) {} }
+  if (mic.stream) mic.stream.getTracks().forEach(t => t.stop());
+  Object.assign(mic, { on: false, stream: null, src: null, analyser: null, cand: null, candCount: 0, lastAdded: null });
+  $('micPitch').textContent = ''; $('levelFill').style.width = '0';
+  renderMicBtn(); setMicStatus('Disabled');
+}
+const toggleMic = () => (mic.on ? stopMic() : startMic());
+
+/* ====================== MODES & RESETS ====================== */
+function toggleMinor() {
+  preferMinor = !preferMinor;
+  const b = $('minorBtn'); b.classList.toggle('on', preferMinor);
+  b.innerHTML = `Prefer minor: ${preferMinor ? 'ON' : 'OFF'} <kbd>-</kbd>`;
+  refreshUpcoming();
+}
+function resetSession() {
+  sessionId++;
+  allOff();
+  stopMic(); mic.pending = false; renderMicBtn();
+  recent.length = 0; chordHistory.length = 0; keyState.k = null;
+  acqOn = true; renderAcq();
+  renderRecent(); renderHistory();
+  $('chordName').textContent = '—'; $('chordNotes').innerHTML = '';
+  setChordInfo('Session reset.', false);
+  refreshUpcoming();
+}
+function resetPositions() {
+  recent.length = 0;
+  mic.lastAdded = null;
+  setOctave(DEFAULT_OCT);
+  renderRecent();
+  refreshUpcoming();
+}
+
+/* ====================== SHIFT / CTRL / ACQUISITION STATE ====================== */
+let spaceDown = false, shiftKeyDown = false, shiftBtnDown = false;
+let ctrlKeyDown = false, ctrlBtnOn = false;
+let acqOn = true, comboDown = false;
+const inputPaused = () => shiftKeyDown || shiftBtnDown;
+const ctrlActive = () => ctrlKeyDown || ctrlBtnOn;
+const acquireEnabled = () => acqOn && !inputPaused();   // Ctrl never blocks acquisition
+const isPreview = e => !acquireEnabled() || !!e.shiftKey;
+function renderShift() {
+  $('previewInd').classList.toggle('on', inputPaused());
+  $('shiftBtn').classList.toggle('on', inputPaused());
+}
+function setShift(on) { shiftKeyDown = on; renderShift(); }
+function renderCtrl() {
+  $('ctrlInd').classList.toggle('on', ctrlActive());
+  $('ctrlBtn').classList.toggle('on', ctrlActive());
+}
+function setCtrl(on) { ctrlKeyDown = on; renderCtrl(); }
+function renderAcq() {
+  const b = $('acqBtn'), i = $('acqInd');
+  b.classList.toggle('off', !acqOn); i.classList.toggle('off', !acqOn);
+  b.textContent = `Acquisition: ${acqOn ? 'ON' : 'OFF'}`;
+  i.textContent = acqOn ? 'ACQ ON' : 'ACQ OFF';
+}
+function toggleAcq() {
+  acqOn = !acqOn; renderAcq();
+  setChordInfo(acqOn ? 'Acquisition started: notes are stored again.' : 'Acquisition stopped: notes sound but are not stored.', !acqOn);
+}
+
+/* ====================== INPUT: COMPUTER KEYBOARD ====================== */
+window.addEventListener('keydown', e => {
+  if (e.key === 'Shift') { setShift(true); return; }
+  if (e.key === 'Control') { setCtrl(true); return; }
+  if (e.metaKey || e.altKey) return;
+  if (e.code === 'Space' && e.ctrlKey && e.shiftKey) {               // acquisition start/stop
+    e.preventDefault();
+    if (!e.repeat && !comboDown) { comboDown = true; toggleAcq(); }
+    return;
+  }
+  if (e.ctrlKey && !(e.code === 'Space' || e.code in KEYMAP)) return;
+  if (e.code === 'Escape') { e.preventDefault(); if (!e.repeat) resetSession(); return; }
+  if (e.code === 'Digit1') { e.preventDefault(); if (!e.repeat) toggleMic(); return; }
+  if (e.code === 'Minus' || e.code === 'NumpadSubtract') { e.preventDefault(); if (!e.repeat) toggleMinor(); return; }
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+    e.preventDefault();
+    if (!e.repeat) setOctave(octave + (e.code === 'ArrowUp' ? 1 : -1));
+    return;
+  }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (e.repeat || spaceDown || comboDown) return;
+    spaceDown = true; chordTrigger('space'); return;
+  }
+  if (e.code in KEYMAP) {
+    e.preventDefault();
+    if (e.repeat || keyVoices.has(e.code)) return;
+    keyVoices.set(e.code, noteOn(baseMidi() + KEYMAP[e.code], !isPreview(e)));
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.key === 'Shift') { setShift(false); return; }
+  if (e.key === 'Control') { setCtrl(false); return; }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    comboDown = false;
+    if (!spaceDown) return;
+    spaceDown = false; chordRelease(); return;
+  }
+  if (keyVoices.has(e.code)) { noteOff(keyVoices.get(e.code)); keyVoices.delete(e.code); }
+});
+function allOff() {
+  keyVoices.forEach(noteOff); keyVoices.clear();
+  ptrVoices.forEach(noteOff); ptrVoices.clear();
+  spaceDown = false; comboDown = false; chordPtr = null;
+  shiftBtnDown = false; setShift(false);
+  setCtrl(false);
+  chordOff();
+}
+window.addEventListener('blur', allOff);
+document.addEventListener('visibilitychange', () => { if (document.hidden) allOff(); });
+
+/* ====================== INPUT: POINTER (on-screen keys) ====================== */
+function ptrStart(e, midi) {
+  e.preventDefault();
+  if (ptrVoices.has(e.pointerId)) noteOff(ptrVoices.get(e.pointerId));
+  ptrVoices.set(e.pointerId, noteOn(midi, !isPreview(e)));
+}
+function ptrEnd(e) {
+  if (ptrVoices.has(e.pointerId)) { noteOff(ptrVoices.get(e.pointerId)); ptrVoices.delete(e.pointerId); }
+}
+window.addEventListener('pointerup', ptrEnd);
+window.addEventListener('pointercancel', ptrEnd);
+document.addEventListener('pointerleave', ptrEnd);
+
+/* ====================== INPUT: PAD BUTTONS (Ctrl / Shift / Chords) ====================== */
+let chordPtr = null;
+function holdButton(el, down, up, guard) {
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (guard && !guard(e)) return;
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    down(e);
+  });
+  const end = e => up(e);
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', end);
+}
+holdButton($('shiftBtn'),
+  () => { shiftBtnDown = true; renderShift(); },
+  () => { if (shiftBtnDown) { shiftBtnDown = false; renderShift(); } });
+holdButton($('chordsBtn'),
+  e => { chordPtr = e.pointerId; chordTrigger('btn'); },
+  e => { if (chordPtr === e.pointerId) { chordPtr = null; chordRelease(); } },
+  () => chordPtr === null);
+$('ctrlBtn').addEventListener('contextmenu', e => e.preventDefault());
+$('ctrlBtn').addEventListener('pointerdown', e => { e.preventDefault(); ctrlBtnOn = !ctrlBtnOn; renderCtrl(); });
+
+[['micBtn', toggleMic], ['minorBtn', toggleMinor], ['resetBtn', resetSession], ['acqBtn', toggleAcq],
+ ['latchBtn', toggleLatch], ['resetPosBtn', resetPositions], ['testBtn', runAllTests]].forEach(([id, fn]) => {
+  const b = $(id);
+  b.addEventListener('mousedown', e => e.preventDefault());
+  b.addEventListener('click', () => { fn(); b.blur(); });
+});
+
+/* ====================== SOUND CONTROLS ====================== */
+function renderSoundCtl() {
+  const p = sound.inst === 'pluck';
+  $('decayCtl').classList.toggle('disabled', !p);
+  $('ringCtl').classList.toggle('disabled', !p);
+}
+$('instSel').addEventListener('change', e => { sound.inst = e.target.value; renderSoundCtl(); e.target.blur(); });
+$('volSl').addEventListener('input', e => { const v = +e.target.value; $('volVal').textContent = v + '%'; setVolume(v / 100); });
+$('decaySl').addEventListener('input', e => { sound.decay = +e.target.value; $('decayVal').textContent = sound.decay.toFixed(1) + ' s'; });
+$('ringChk').addEventListener('change', e => { sound.ring = e.target.checked; e.target.blur(); });
+['volSl', 'decaySl'].forEach(id => {
+  const el = $(id);
+  ['pointerup', 'change'].forEach(ev => el.addEventListener(ev, () => el.blur()));
+  el.addEventListener('keydown', e => e.preventDefault());   // keyboard is reserved for playing
+});
+
+/* ====================== UI ====================== */
+const kb = $('keyboard');
+const isBlack = s => [1,3,6,8,10].includes(s % 12);
+function buildKeyboard() {
+  kb.innerHTML = '';
+  const labels = {};
+  for (const [code, off] of Object.entries(KEYMAP)) (labels[off] = labels[off] || []).push(labelOf(code));
+  const W = 40, BW = 26; let wi = 0;
+  for (let s = 0; s < RANGE; s++) {
+    const midi = baseMidi() + s, el = document.createElement('div');
+    const name = NAMES[midi % 12] + (Math.floor(midi / 12) - 1);
+    el.className = 'key ' + (isBlack(s) ? 'black' : 'white');
+    el.dataset.midi = midi;
+    el.innerHTML = `<b>${(labels[s] || []).join(' ')}</b>${name}`;
+    if (isBlack(s)) el.style.left = (wi * W - BW / 2) + 'px';
+    else { el.style.left = (wi * W) + 'px'; wi++; }
+    el.addEventListener('pointerdown', e => ptrStart(e, midi));
+    el.addEventListener('pointerenter', e => {
+      const v = ptrVoices.get(e.pointerId);
+      if (v && v.midi !== midi && e.buttons) ptrStart(e, midi);
+    });
+    kb.appendChild(el);
+  }
+  kb.style.width = (wi * W) + 'px';
+  renderLit();
+}
+function setOctave(o) {
+  octave = Math.max(MIN_OCT, Math.min(MAX_OCT, o));
+  $('octave').textContent = octave;
+  $('octZ').textContent = octave;
+  buildKeyboard();
+}
+function renderLit() {
+  kb.querySelectorAll('.key').forEach(k => {
+    const m = +k.dataset.midi;
+    k.classList.toggle('on', litCount.has(m));
+    k.classList.toggle('chord', chordMidis.includes(m));
+  });
+}
+function renderRecent() {
+  $('recent').innerHTML =
+    recent.map(n => `<span class="${n.src}" title="${n.src === 'mic' ? 'sung' : 'played'}">${n.src === 'mic' ? '🎤' : ''}${NAMES[n.pc]}</span>`).join('')
+    || '<em style="color:#777">none</em>';
+}
+function chordNotesHTML(c, t = 0) {
+  const H = new Set(recent.map(n => n.pc));
+  return c.iv.map(i => {
+    const pc = (c.root + i) % 12;
+    return `<span style="${H.has(pc) ? 'background:#6fb3ff;color:#000' : ''}">${NAMES[(pc + t) % 12]}</span>`;
+  }).join('');
+}
+function renderChord(c) {
+  $('chordName').textContent = c.name;
+  $('chordNotes').innerHTML = chordNotesHTML(c);
+}
+const transposeAmt = () => +$('transpose').value;
+function renderUpcoming() {
+  const { chord, info, warn } = upcoming, t = transposeAmt();
+  $('nextName').textContent = chord ? NAMES[(chord.root + t) % 12] + chord.q : '—';
+  $('nextNotes').innerHTML = chord ? chordNotesHTML(chord, t) : '';
+  const el = $('nextInfo');
+  el.textContent = (info || '') + (chord && t ? ` · written for ${$('transpose').selectedOptions[0].text} (concert: ${chord.name})` : '');
+  el.classList.toggle('warn', !!warn);
+}
+function setChordInfo(t, warn) {
+  const el = $('chordInfo');
+  el.textContent = t; el.classList.toggle('warn', !!warn);
+}
+function renderHistory() {
+  $('history').innerHTML = chordHistory.length
+    ? chordHistory.slice().reverse().map((c, i) => `<div>${chordHistory.length - i}. ${c.name}</div>`).join('')
+    : '<em style="color:#777">none yet</em>';
+}
+
+/* ====================== SELF-TESTS ====================== */
+const check = (ok, msg) => ({ ok: !!ok, msg });
+const pct = x => (x * 100).toFixed(1) + '%';
+
+function runHarmonyTests(N = 3000) {
+  const hist = [], ks = { k: null }, rec = [], cnt = {}, qs = new Set(), dia = [0,2,4,5,7,9,11];
+  let K0 = Math.floor(Math.random() * 12), good = 0, maxWinTriad = 0;
+  for (let i = 0; i < N; i++) {
+    if (Math.random() < 0.03) K0 = (K0 + (Math.random() < 0.5 ? 7 : 5)) % 12;
+    const add = Math.random() < 0.5 ? 1 : 2;
+    for (let j = 0; j < add; j++) {
+      const pc = Math.random() < 0.9 ? (K0 + dia[Math.floor(Math.random() * 7)]) % 12 : Math.floor(Math.random() * 12);
+      rec.push({ pc, midi: 60 + pc, src: 'key' }); if (rec.length > 6) rec.shift();
+    }
+    const { chord } = selectChord(rec, hist, ks);
+    hist.push(chord); cnt[chord.cat] = (cnt[chord.cat] || 0) + 1; qs.add(chord.q);
+    if (keyFit(chord, K0).f >= 1.6) good++;
+    if (hist.length >= WIN) maxWinTriad = Math.max(maxWinTriad, hist.slice(-WIN).filter(c => c.cat === 'triad').length / WIN);
+  }
+  const sh = c => (cnt[c] || 0) / N;
+  return [
+    check(sh('triad') >= 0.2 && sh('triad') <= 0.3, `Perfect triads: ${pct(sh('triad'))} (target 20–30%)`),
+    check(maxWinTriad <= TRIAD_MAX + 1e-9, `Max triads in any ${WIN}-chord window: ${pct(maxWinTriad)} (≤30%)`),
+    check(sh('ninth') <= 0.2, `Ninth/added chords: ${pct(sh('ninth'))} (≤20%)`),
+    check(qs.size >= 18, `Distinct qualities used: ${qs.size} of ${QUALITIES.length}`),
+    check(good / N >= 0.75, `In key or neighbour key: ${pct(good / N)} (≥75%)`),
+    check(true, 'Shares → ' + Object.keys(CATS).map(c => `${c} ${pct(sh(c))}`).join(' · '))
+  ];
+}
+
+function runControlTests() {
+  const save = { sk: shiftKeyDown, sb: shiftBtnDown, ck: ctrlKeyDown, cb: ctrlBtnOn, acq: acqOn,
+                 rec: recent.slice(), hist: chordHistory.slice(), up: upcoming, key: keyState.k };
+  const set = (s, c) => { shiftKeyDown = s; shiftBtnDown = false; ctrlKeyDown = c; ctrlBtnOn = false; acqOn = true; };
+  const res = [];
+  [[false,false,true,false,false],[true,false,false,false,true],[false,true,true,true,true],[true,true,false,true,true]]
+    .forEach(([s, c, a, rs, rb]) => {
+      set(s, c);
+      res.push(check(acquireEnabled() === a && isRepeat('space') === rs && isRepeat('btn') === rb,
+        `Shift=${+s} Ctrl=${+c} → acquire=${a}, repeat Space=${rs}, repeat Chords=${rb}`));
+    });
+  set(false, true);
+  recent.length = 0; chordHistory.push(LIB[0]);
+  const cur = chordHistory[chordHistory.length - 1], up0 = upcoming;
+  [62, 65, 69].forEach(m => { if (acquireEnabled()) recordNote(m, 'key'); });
+  res.push(check(chordHistory[chordHistory.length - 1] === cur && recent.length === 3 && upcoming !== up0,
+    'Ctrl: notes acquired, Up next updated, current chord unchanged'));
+  set(true, false);
+  const n0 = recent.length;
+  if (acquireEnabled()) recordNote(64, 'key');
+  res.push(check(recent.length === n0, 'Shift: acquisition paused'));
+  set(false, false); acqOn = false;
+  res.push(check(!acquireEnabled() && isPreview({ shiftKey: false }), 'Acquisition OFF (Ctrl+Shift+Space): notes not stored'));
+  shiftKeyDown = save.sk; shiftBtnDown = save.sb; ctrlKeyDown = save.ck; ctrlBtnOn = save.cb; acqOn = save.acq;
+  recent.length = 0; recent.push(...save.rec);
+  chordHistory.length = 0; chordHistory.push(...save.hist);
+  upcoming = save.up; keyState.k = save.key;
+  renderRecent(); renderHistory(); renderUpcoming(); renderShift(); renderCtrl(); renderAcq();
+  return res;
+}
+function runAllTests() {
+  const res = [...runHarmonyTests(), ...runControlTests()];
+  const out = $('testOut');
+  out.style.display = 'block';
+  out.textContent = `Self-test (${res.filter(r => r.ok).length}/${res.length} passed)\n` +
+    res.map(r => `${r.ok ? '✅' : '❌'} ${r.msg}`).join('\n');
+  console.table(res);
+}
+
+$('transpose').addEventListener('change', e => { renderUpcoming(); e.target.blur(); });
+setOctave(octave);
+renderRecent();
+renderCtrl();
+renderAcq();
+renderSoundCtl();
+refreshUpcoming();
+if (/[?&]test\b/.test(location.search)) runAllTests();
+</script>
+</body>
+</html>
