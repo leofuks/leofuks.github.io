@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Madde MIDI</title>
+<style>
+:root{--bg:#11141b;--card:#1a1e28;--line:#2a3142;--fg:#e6e9f0;--mut:#8f9ab0;--acc:#4f9fe8;--acc2:#f08a5d;--ok:#46c483;--bad:#e05656}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"SeFuksgoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between;padding:8px 16px;background:#0d1016;border-bottom:1px solid var(--line)}
+.brand h1{margin:0;font-size:1.25rem}.brand .attr{color:var(--mut);font-size:.78rem}
+.kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:.75rem;color:var(--mut)}
+main{max-width:1240px;margin:0 auto;padding:12px;display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+h2{font-size:.85rem;margin:0 0 8px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+button{font:inherit;color:var(--fg);background:#252c3b;border:1px solid var(--line);border-radius:7px;padding:6px 11px;cursor:pointer}
+button:hover:not(:disabled){background:#2f3749}button:disabled{opacity:.4;cursor:default}
+.on.rec{background:var(--bad);color:#fff;border-color:var(--bad)}
+#msg{max-width:1240px;margin:10px auto 0;background:#4a1c1c;border:1px solid #933;color:#ffd6d6;padding:8px 12px;border-radius:8px}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;margin:7px 0}
+.row label{color:var(--mut)}.row output{font-variant-numeric:tabular-nums;font-weight:600}.row input{grid-column:1/3}
+input[type=range]{width:100%;accent-color:var(--acc);margin:0}
+input[type=range]:disabled{opacity:.4}
+.hint{color:var(--mut);font-size:.78rem;margin:6px 0 0}
+.warn{color:#ff8b8b;font-weight:600}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+#noteRead{font-size:1.7rem;font-weight:700;margin-right:8px}
+.kbwrap{overflow-x:auto;margin-top:8px}
+.kb{position:relative;display:flex;height:120px;min-width:900px;user-select:none;-webkit-user-select:none;touch-action:none}
+.key{cursor:pointer}
+.white{flex:1;background:#f2f3f5;border:1px solid #777;border-radius:0 0 4px 4px;color:#333;font-size:10px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px}
+.black{position:absolute;top:0;height:60%;background:#15171c;border:1px solid #000;border-radius:0 0 3px 3px;z-index:2}
+.white.active{background:var(--acc);color:#001}.black.active{background:var(--acc2)}
+.white.play{background:#8be0ae}.black.play{background:#2a9f63}
+.badge{padding:2px 8px;border-radius:10px;font-weight:600}
+.badge.on{background:var(--ok);color:#06210f}.badge.off{background:#444;color:#ccc}.badge.rec{background:var(--bad);color:#fff}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:3px 6px;border-bottom:1px solid var(--line);text-align:right}
+th{color:var(--mut);font-weight:500}
+.tblwrap{max-height:260px;overflow:auto}
+footer{text-align:center;color:var(--mut);font-size:.75rem;padding:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Madde MIDI</h1>
+    <div class="attr">Developed by Leonardo Fuks for Madde-Allein · Monophonic MIDI melody recorder &amp; editor</div>
+  </div>
+  <span class="hint" id="srcTxt" style="margin:0">Source: —</span>
+</header>
+<div id="msg" hidden></div>
+<main>
+  <section class="card">
+    <h2>Keyboard (monophonic)</h2>
+    <div class="toolbar">
+      <span id="noteRead">—</span>
+      <span class="hint" id="octTxt" style="margin:0 0 0 auto"></span>
+    </div>
+    <div class="kbwrap"><div class="kb" id="kb" role="group" aria-label="Piano keyboard C2 to G6"></div></div>
+    <p class="hint">Click, tap or drag across keys (lower click = higher velocity), or use computer keys Z…/ and Q…]. <span class="kbd">Page Up</span>/<span class="kbd">Page Down</span> shift the computer keys by an octave. One note at a time; organ sound (audio starts on your first click or key press).</p>
+  </section>
+
+  <section class="card">
+    <h2>Recorder &amp; file</h2>
+    <div class="toolbar">
+      <button id="recBtn">● Record</button>
+      <button id="clearBtn">Clear</button>
+      <button id="playBtn">▶ Preview</button>
+      <button id="stopPlayBtn" disabled>■ Stop</button>
+      <button id="openBtn">Open .mid…</button>
+      <input type="file" id="fileIn" accept=".mid,.midi,audio/midi" hidden>
+      <button id="expBtn">Save / export .mid</button>
+      <span id="recBadge" class="badge off">Idle</span>
+      <span class="hint" id="recInfo" style="margin:0"></span>
+    </div>
+    <div class="grid"><div id="tempoHost"></div><div id="velHost"></div></div>
+    <p class="hint">Recorded phrases: timing is stored in ms at a 120 BPM reference (PPQ 480) and the tempo slider rescales it. Opened files keep their own tempo map.</p>
+  </section>
+
+  <section class="card">
+    <h2>Transposition</h2>
+    <div class="grid"><div id="semiHost"></div><div id="octHost"></div></div>
+    <div class="toolbar"><button id="trReset">Reset to 0</button><span id="trTxt" class="hint" style="margin:0"></span></div>
+    <p class="hint">Transposition is computed from the original notes (non-cumulative). Only note pitches change; timing, durations, velocities and other events are preserved. Channel 10 (drums) is not transposed.</p>
+  </section>
+
+  <section class="card">
+    <h2>Notes</h2>
+    <div class="tblwrap"><table><thead><tr><th>#</th><th>Note</th><th>Original → new</th><th>Ch</th><th>Vel</th><th>Start (ms)</th><th>Dur (ms)</th><th>Gap before (ms)</th></tr></thead><tbody id="noteRows"></tbody></table></div>
+  </section>
+</main>
+<footer>MADDE MIDI · Developed by Leonardo Fuks for MADDE-Allein</footer>
+
+<script>
+(() => {
+'use strict';
+const NOTES = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const MIDI_MIN = 36, MIDI_MAX = 91, PPQ = 480, REF_BPM = 120;
+const pc = m => ((Math.round(m) % 12) + 12) % 12;
+const noteName = m => (m < 0 || m > 127) ? '–' : NOTES[pc(m)] + (Math.floor(Math.round(m) / 12) - 1);
+const isBlackKey = m => [1, 3, 6, 8, 10].includes(pc(m));
+const $ = id => document.getElementById(id);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const showMsg = t => { $('msg').textContent = t; $('msg').hidden = !t; };
+const sgn = v => (v > 0 ? '+' : '') + v;
+
+/* ===== Organ sound (Web Audio, no dependencies) ===== */
+const organ = (() => {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const DRAW = [[0.5, .6], [1, 1], [1.5, .5], [2, .6], [3, .3], [4, .3]]; // 16' 8' 5⅓' 4' 2⅔' 2'
+  let ctx = null, out = null, live = null;
+  const sched = new Set();
+  function init() {
+    if (!AC) return null;
+    if (!ctx) {
+      try { ctx = new AC({latencyHint: 'interactive'}); } catch (e) { ctx = new AC(); }
+      const comp = ctx.createDynamicsCompressor();
+      out = ctx.createGain(); out.gain.value = 0.18;
+      out.connect(comp); comp.connect(ctx.destination);
+    }
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    return ctx;
+  }
+  function voice(midi, vel, t) {
+    const f = 440 * Math.pow(2, (midi - 69) / 12), lvl = 0.6 + 0.4 * vel / 127;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(lvl, t + 0.008);
+    env.connect(out);
+    const osc = DRAW.filter(([r]) => f * r < ctx.sampleRate * 0.45).map(([r, g]) => {
+      const o = ctx.createOscillator(), og = ctx.createGain();
+      o.frequency.value = f * r; og.gain.value = g / 3;
+      o.connect(og); og.connect(env); o.start(t); return o;
+    });
+    return {env, osc, lvl};
+  }
+  function releaseAt(v, t) {
+    v.env.gain.setValueAtTime(v.lvl, t); v.env.gain.linearRampToValueAtTime(0, t + 0.04);
+    v.osc.forEach(o => o.stop(t + 0.06));
+  }
+  function releaseNow(v) {
+    const t = ctx.currentTime, g = v.env.gain;
+    if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t); else g.cancelScheduledValues(t);
+    g.setTargetAtTime(0, t, 0.012);
+    v.osc.forEach(o => { try { o.stop(t + 0.08); } catch (e) {} });
+  }
+  return {
+    init,
+    on(midi, vel) { if (!init()) return; this.off(); live = voice(midi, vel, ctx.currentTime); },
+    off() { if (live && ctx) { releaseNow(live); live = null; } },
+    schedule(notes, leadMs) {
+      if (!init()) return;
+      const t0 = ctx.currentTime + leadMs / 1000;
+      notes.forEach(n => {
+        if (n.midi < 0 || n.midi > 127) return;
+        const v = voice(n.midi, n.vel, t0 + n.start / 1000);
+        releaseAt(v, t0 + (n.start + n.dur) / 1000);
+        sched.add(v); if (v.osc[0]) v.osc[0].onended = () => sched.delete(v);
+      });
+    },
+    stopAll() { if (ctx) sched.forEach(releaseNow); sched.clear(); }
+  };
+})();
+['pointerdown', 'keydown'].forEach(t => window.addEventListener(t, () => organ.init(), {capture: true}));
+if (!(window.AudioContext || window.webkitAudioContext)) showMsg('This browser does not support Web Audio; the organ sound is unavailable.');
+
+const state = {kbBase: 48, vel: 100, bpm: 120, semi: 0, oct: 0};
+const shift = () => state.semi + 12 * state.oct;
+const LOW_ROW = [['KeyZ',0],['KeyS',1],['KeyX',2],['KeyD',3],['KeyC',4],['KeyV',5],['KeyG',6],['KeyB',7],['KeyH',8],
+  ['KeyN',9],['KeyJ',10],['KeyM',11],['Comma',12],['KeyL',13],['Period',14],['Semicolon',15],['Slash',16]];
+const HIGH_ROW = [['KeyQ',12],['Digit2',13],['KeyW',14],['Digit3',15],['KeyE',16],['KeyR',17],['Digit5',18],['KeyT',19],
+  ['Digit6',20],['KeyY',21],['Digit7',22],['KeyU',23],['KeyI',24],['Digit9',25],['KeyO',26],['Digit0',27],
+  ['KeyP',28],['BracketLeft',29],['Equal',30],['BracketRight',31]];
+const KEYMAP = new Map([...LOW_ROW, ...HIGH_ROW]);
+const keys = {};
+
+let uid = 0;
+function slider(parent, {label, min, max, step, value, fmt, oninput}) {
+  const id = 'sl' + (uid++), row = document.createElement('div'); row.className = 'row';
+  const lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = label;
+  const out = document.createElement('output'), inp = document.createElement('input');
+  Object.assign(inp, {type: 'range', id, min, max, step}); inp.value = value;
+  const upd = () => { out.textContent = fmt(+inp.value); };
+  inp.addEventListener('input', () => { upd(); oninput(+inp.value); });
+  row.append(lab, out, inp); parent.append(row); upd();
+  return {inp, set(v) { inp.value = v; upd(); }};
+}
+
+/* ===== Monophonic performance + recording ===== */
+let cur = null;
+const rec = {on: false, t0: 0, open: null, notes: []};
+let fileSong = null, fileName = '';
+function showNote(m, cls = 'active') {
+  document.querySelectorAll('.key.' + cls).forEach(k => k.classList.remove(cls));
+  if (m == null) return;
+  if (keys[m]) keys[m].classList.add(cls);
+  $('noteRead').textContent = noteName(m);
+}
+function noteOn(m, vel, src) {
+  if (play.on) stopPlay();
+  const now = performance.now();
+  if (cur) endCur(now);
+  cur = {m, vel, src}; showNote(m);
+  organ.on(m, vel);
+  if (rec.on) rec.open = {midi: m, vel, start: now - rec.t0};
+}
+function endCur(now) {
+  if (rec.on && rec.open) {
+    rec.open.dur = Math.max(5, now - rec.t0 - rec.open.start);
+    rec.notes.push(rec.open); rec.open = null; refresh();
+  }
+  organ.off();
+  cur = null; showNote(null);
+}
+const noteOff = src => { if (cur && cur.src === src) endCur(performance.now()); };
+const liveOff = () => { if (cur) endCur(performance.now()); };
+
+/* ===== Piano ===== */
+(() => {
+  const kb = $('kb'); let total = 0, whites = 0;
+  for (let m = MIDI_MIN; m <= MIDI_MAX; m++) if (!isBlackKey(m)) total++;
+  const bw = 100 / total * 0.62;
+  for (let m = MIDI_MIN; m <= MIDI_MAX; m++) {
+    const k = document.createElement('div');
+    k.dataset.midi = m; k.tabIndex = 0; k.setAttribute('role', 'button'); k.setAttribute('aria-label', noteName(m));
+    if (isBlackKey(m)) { k.className = 'key black'; k.style.width = bw + '%'; k.style.left = (whites / total * 100 - bw / 2) + '%'; }
+    else { k.className = 'key white'; whites++; if (m % 12 === 0) k.textContent = noteName(m); }
+    keys[m] = k; kb.append(k);
+  }
+  const velAt = (k, y) => { const r = k.getBoundingClientRect(); return clamp(Math.round(40 + 87 * (y - r.top) / r.height), 1, 127); };
+  let down = false, last = null;
+  const pick = (k, e) => { last = k; noteOn(+k.dataset.midi, velAt(k, e.clientY), 'ptr'); };
+  kb.addEventListener('pointerdown', e => { const k = e.target.closest('.key'); if (!k || down) return; down = true; pick(k, e); e.preventDefault(); });
+  kb.addEventListener('pointermove', e => {
+    if (!down) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY), k = el && el.closest && el.closest('.key');
+    if (k && k !== last) pick(k, e);
+  });
+  const end = () => { if (down) noteOff('ptr'); down = false; last = null; };
+  ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, end));
+  kb.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('key') && !e.repeat) { e.preventDefault(); noteOn(+e.target.dataset.midi, state.vel, 'enter'); } });
+  kb.addEventListener('keyup', e => { if (e.key === 'Enter') noteOff('enter'); });
+})();
+function renderOct() { $('octTxt').textContent = `Z = ${noteName(state.kbBase)}, Q = ${noteName(state.kbBase + 12)}`; }
+renderOct();
+const isTyping = t => t && (t.isContentEditable || ['TEXTAREA', 'SELECT'].includes(t.tagName) || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'file'].includes(t.type)));
+window.addEventListener('keydown', e => {
+  if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'PageUp' || e.code === 'PageDown') {
+    e.preventDefault(); const nb = state.kbBase + (e.code === 'PageUp' ? 12 : -12);
+    if (nb >= MIDI_MIN && nb <= MIDI_MAX - 31) { state.kbBase = nb; renderOct(); } return;
+  }
+  const off = KEYMAP.get(e.code); if (off === undefined) return;
+  e.preventDefault(); if (e.repeat) return;
+  const m = state.kbBase + off; if (m < MIDI_MIN || m > MIDI_MAX) return;
+  noteOn(m, state.vel, e.code);
+});
+window.addEventListener('keyup', e => { if (KEYMAP.has(e.code)) noteOff(e.code); });
+window.addEventListener('blur', liveOff);
+
+/* ===== Song model ===== */
+function vlq(n) { const b = [n & 0x7f]; while ((n >>>= 7)) b.unshift((n & 0x7f) | 0x80); return b; }
+const u32 = n => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const toTicks = ms => Math.round(ms * PPQ * REF_BPM / 60000);
+
+function buildRecSong() {
+  const ev = [];
+  rec.notes.forEach(n => {
+    const on = toTicks(n.start), off = Math.max(on + 1, toTicks(n.start + n.dur));
+    ev.push({t: on, o: 1, d: [0x90, n.midi, clamp(n.vel, 1, 127)]});
+    ev.push({t: off, o: 0, d: [0x80, n.midi, 64]});
+  });
+  ev.sort((a, b) => a.t - b.t || a.o - b.o);
+  const uspq = Math.round(60000000 / state.bpm), name = [...'Madde MIDI phrase'].map(c => c.charCodeAt(0));
+  const head = [
+    {t: 0, d: [0xFF, 0x03, name.length, ...name]},
+    {t: 0, d: [0xFF, 0x51, 0x03, (uspq >> 16) & 255, (uspq >> 8) & 255, uspq & 255]},
+    {t: 0, d: [0xFF, 0x58, 0x04, 4, 2, 24, 8]}];
+  return {format: 0, division: PPQ, tracks: [[...head, ...ev.map(e => ({t: e.t, d: e.d}))]]};
+}
+const baseSong = () => fileSong || (rec.notes.length ? buildRecSong() : null);
+
+function transposeSong(s, k) {
+  return {...s, tracks: s.tracks.map(tr => tr.map(e => {
+    const hi = e.d[0] & 0xF0;
+    if ((hi === 0x80 || hi === 0x90 || hi === 0xA0) && (e.d[0] & 15) !== 9) return {t: e.t, d: [e.d[0], e.d[1] + k, e.d[2]]};
+    return e;
+  }))};
+}
+
+function parseMidi(buf) {
+  const b = new Uint8Array(buf); let p = 0;
+  const str = n => { const s = String.fromCharCode(...b.slice(p, p + n)); p += n; return s; };
+  const r32 = () => { const v = ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; p += 4; return v; };
+  const r16 = () => { const v = (b[p] << 8) | b[p + 1]; p += 2; return v; };
+  const rv = () => { let v = 0, c; do { c = b[p++]; v = (v << 7) | (c & 0x7f); } while (c & 0x80 && p < b.length); return v; };
+  if (str(4) !== 'MThd') throw new Error('Not a standard MIDI file.');
+  const hlen = r32(), format = r16(), ntr = r16(), division = r16(); p = 8 + hlen;
+  if (division & 0x8000) throw new Error('SMPTE-timed MIDI files are not supported.');
+  const tracks = [];
+  while (tracks.length < ntr && p + 8 <= b.length) {
+    const id = str(4), len = r32(), end = Math.min(b.length, p + len);
+    if (id !== 'MTrk') { p = end; continue; }
+    const tr = []; let t = 0, rs = 0;
+    while (p < end) {
+      t += rv();
+      let s = b[p];
+      if (s & 0x80) p++; else if (rs) s = rs; else throw new Error('Invalid running status.');
+      let d;
+      if (s === 0xFF) { const ty = b[p++], l = rv(); d = [0xFF, ty, ...vlq(l), ...b.slice(p, p + l)]; p += l; }
+      else if (s === 0xF0 || s === 0xF7) { const l = rv(); d = [s, ...vlq(l), ...b.slice(p, p + l)]; p += l; rs = 0; }
+      else { rs = s; const hi = s & 0xF0, n = (hi === 0xC0 || hi === 0xD0) ? 1 : 2; d = [s, ...b.slice(p, p + n)]; p += n; }
+      tr.push({t, d});
+    }
+    tracks.push(tr); p = end;
+  }
+  if (!tracks.length) throw new Error('No tracks found.');
+  return {format, division, tracks};
+}
+
+function serialize(s) {
+  const out = [0x4D, 0x54, 0x68, 0x64, ...u32(6), 0, s.tracks.length > 1 ? Math.max(1, s.format) : s.format,
+    (s.tracks.length >> 8) & 255, s.tracks.length & 255, (s.division >> 8) & 255, s.division & 255];
+  s.tracks.forEach(tr => {
+    const d = []; let prev = 0, endT = 0;
+    tr.forEach(e => {
+      if (e.d[0] === 0xFF && e.d[1] === 0x2F) { endT = Math.max(endT, e.t); return; }
+      for (const x of vlq(e.t - prev)) d.push(x);
+      for (const x of e.d) d.push(x);
+      prev = e.t;
+    });
+    for (const x of vlq(Math.max(0, endT - prev))) d.push(x);
+    d.push(0xFF, 0x2F, 0x00);
+    out.push(0x4D, 0x54, 0x72, 0x6B, ...u32(d.length));
+    for (const x of d) out.push(x);
+  });
+  return new Uint8Array(out);
+}
+
+function songNotes(s) {
+  const tempos = [];
+  s.tracks.forEach(tr => tr.forEach(e => {
+    if (e.d[0] === 0xFF && e.d[1] === 0x51 && e.d.length >= 6) tempos.push({t: e.t, us: (e.d[3] << 16) | (e.d[4] << 8) | e.d[5]});
+  }));
+  tempos.sort((a, b) => a.t - b.t);
+  if (!tempos.length || tempos[0].t > 0) tempos.unshift({t: 0, us: 500000});
+  const tick2ms = t => {
+    let ms = 0, lt = 0, us = tempos[0].us;
+    for (let i = 1; i < tempos.length && tempos[i].t < t; i++) { ms += (tempos[i].t - lt) * us / s.division / 1000; lt = tempos[i].t; us = tempos[i].us; }
+    return ms + (t - lt) * us / s.division / 1000;
+  };
+  const notes = [];
+  s.tracks.forEach(tr => {
+    const open = new Map();
+    tr.forEach(e => {
+      const st = e.d[0], hi = st & 0xF0; if (hi !== 0x80 && hi !== 0x90) return;
+      const key = (st & 15) * 512 + e.d[1];
+      if (hi === 0x90 && e.d[2] > 0) { if (!open.has(key)) open.set(key, []); open.get(key).push({t: e.t, vel: e.d[2]}); }
+      else { const l = open.get(key); if (l && l.length) { const o = l.shift(), a = tick2ms(o.t);
+        notes.push({midi: e.d[1], vel: o.vel, ch: (st & 15) + 1, start: a, dur: tick2ms(e.t) - a}); } }
+    });
+  });
+  notes.sort((a, b) => a.start - b.start);
+  return {notes, bpm: 60000000 / tempos[0].us};
+}
+
+/* ===== View ===== */
+let view = {notes: [], valid: true};
+function refresh() {
+  const k = shift(), s = baseSong();
+  const data = s ? songNotes(transposeSong(s, k)) : {notes: [], bpm: state.bpm};
+  const bad = data.notes.filter(n => n.midi < 0 || n.midi > 127).length;
+  view = {notes: data.notes, valid: !bad};
+  $('noteRows').innerHTML = data.notes.map((n, i) => {
+    const p = data.notes[i - 1], gap = p ? n.start - (p.start + p.dur) : n.start;
+    const orig = n.ch === 10 ? n.midi : n.midi - k;
+    return `<tr><td>${i + 1}</td><td>${noteName(n.midi)}</td><td>${orig} → ${n.midi}</td><td>${n.ch}</td><td>${n.vel}</td><td>${Math.round(n.start)}</td><td>${Math.round(n.dur)}</td><td>${Math.round(Math.max(0, gap))}</td></tr>`;
+  }).join('');
+  const last = data.notes[data.notes.length - 1];
+  $('recInfo').textContent = data.notes.length ? `${data.notes.length} notes · ${((last.start + last.dur) / 1000).toFixed(2)} s · ${Math.round(data.bpm)} BPM` : 'No melody.';
+  $('trTxt').innerHTML = `Total shift: <b>${sgn(k)} semitones</b>` + (bad ? ` <span class="warn">· ${bad} note(s) out of MIDI range 0–127 — export disabled</span>` : '');
+  $('srcTxt').textContent = 'Source: ' + (fileSong ? fileName : rec.notes.length ? 'recorded phrase' : '—');
+  tempoSl.inp.disabled = !!fileSong;
+  setRecUI();
+}
+function setRecUI() {
+  $('recBtn').textContent = rec.on ? '■ Stop rec' : '● Record';
+  $('recBtn').classList.toggle('on', rec.on); $('recBtn').classList.toggle('rec', rec.on);
+  const b = $('recBadge');
+  b.textContent = rec.on ? 'Recording' : play.on ? 'Previewing' : 'Idle';
+  b.className = 'badge ' + (rec.on ? 'rec' : play.on ? 'on' : 'off');
+  $('playBtn').disabled = rec.on || !view.notes.length || play.on;
+  $('expBtn').disabled = rec.on || !view.notes.length || !view.valid;
+  $('stopPlayBtn').disabled = !play.on;
+}
+
+$('recBtn').onclick = () => {
+  if (!rec.on) {
+    stopPlay(); liveOff(); fileSong = null; fileName = '';
+    rec.notes = []; rec.open = null; rec.t0 = performance.now(); rec.on = true;
+  } else {
+    if (cur) endCur(performance.now());
+    rec.on = false;
+    if (rec.notes.length) { const s = rec.notes[0].start; rec.notes.forEach(n => n.start -= s); }
+  }
+  refresh();
+};
+$('clearBtn').onclick = () => { stopPlay(); if (rec.on) { liveOff(); rec.on = false; } rec.notes = []; rec.open = null; fileSong = null; fileName = ''; refresh(); };
+
+/* ===== Preview (organ + key highlighting) ===== */
+const play = {on: false, timers: []};
+function playPhrase() {
+  if (!view.notes.length || rec.on) return;
+  stopPlay(); liveOff();
+  organ.schedule(view.notes, 50);
+  view.notes.forEach(n => {
+    play.timers.push(setTimeout(() => showNote(n.midi, 'play'), n.start + 50));
+    play.timers.push(setTimeout(() => keys[n.midi] && keys[n.midi].classList.remove('play'), n.start + n.dur + 50));
+  });
+  const last = view.notes[view.notes.length - 1];
+  play.timers.push(setTimeout(stopPlay, last.start + last.dur + 300));
+  play.on = true; setRecUI();
+}
+function stopPlay() {
+  organ.stopAll();
+  play.timers.forEach(clearTimeout); play.timers = [];
+  showNote(null, 'play'); play.on = false; setRecUI();
+}
+$('playBtn').onclick = playPhrase;
+$('stopPlayBtn').onclick = stopPlay;
+
+/* ===== Open / save ===== */
+$('openBtn').onclick = () => $('fileIn').click();
+$('fileIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const s = parseMidi(await f.arrayBuffer());
+    stopPlay(); if (rec.on) { liveOff(); rec.on = false; }
+    fileSong = s; fileName = f.name; rec.notes = [];
+    state.semi = 0; state.oct = 0; semiSl.set(0); octSl.set(0);
+    showMsg(''); refresh();
+  } catch (err) { showMsg('Could not open file: ' + (err && err.message || err)); }
+};
+$('expBtn').onclick = () => {
+  const s = baseSong(); if (!s || !view.valid) return;
+  const k = shift(), base = fileName ? fileName.replace(/\.midi?$/i, '') : `Madde-midi_${state.bpm}bpm`;
+  const url = URL.createObjectURL(new Blob([serialize(transposeSong(s, k))], {type: 'audio/midi'}));
+  const a = document.createElement('a'); a.href = url; a.download = base + (k ? `_tr${sgn(k)}` : '') + '.mid';
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+/* ===== Controls ===== */
+const tempoSl = slider($('tempoHost'), {label: 'Tempo (recorded phrase)', min: 30, max: 200, step: 1, value: state.bpm, fmt: v => v + ' BPM', oninput: v => { state.bpm = v; refresh(); }});
+slider($('velHost'), {label: 'Key velocity (computer keys)', min: 1, max: 127, step: 1, value: state.vel, fmt: v => v, oninput: v => { state.vel = v; }});
+const semiSl = slider($('semiHost'), {label: 'Semitones', min: -6, max: 6, step: 1, value: 0, fmt: v => sgn(v) + ' st', oninput: v => { state.semi = v; refresh(); }});
+const octSl = slider($('octHost'), {label: 'Octaves', min: -3, max: 3, step: 1, value: 0, fmt: v => sgn(v) + ' oct', oninput: v => { state.oct = v; refresh(); }});
+$('trReset').onclick = () => { state.semi = state.oct = 0; semiSl.set(0); octSl.set(0); refresh(); };
+refresh();
+})();
+</script>
+</body>
+</html>
