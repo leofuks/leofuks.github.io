@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Nokia Music 2026</title>
+<style>
+html,body{margin:0;height:100%;background:#111;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:Arial,sans-serif}
+#wrap{height:100%;display:flex;justify-content:center;align-items:center}
+svg{height:98vh;max-width:100vw}
+.key{cursor:pointer}
+.key.on .cap{fill:#9fd6ff}
+.tb{position:fixed;top:10px;font-size:24px;background:#333;color:#fff;border:none;border-radius:50%;width:48px;height:48px;z-index:5}
+#gear{right:10px}
+#micBtn{right:66px}
+#micBtn.rec{background:#c00;animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.5}}
+#cfg{position:fixed;inset:0;background:rgba(0,0,0,.92);color:#cfe8b0;display:none;padding:20px;overflow:auto;z-index:10;font-size:15px}
+#cfg h3{margin:24px 0 4px;border-top:1px solid #456;padding-top:12px}
+#cfg label{display:block;margin:14px 0 4px}
+#cfg select,#cfg input[type=range]{width:100%}
+#cfg button{margin:8px 6px 0 0;padding:10px 16px;font-size:15px}
+.note{color:#888;font-size:12px}
+#start{position:fixed;inset:0;background:rgba(0,0,0,.8);color:#b8d88a;display:flex;align-items:center;justify-content:center;font-size:24px;z-index:20;text-align:center}
+</style>
+</head>
+<body>
+<div id="start">TOQUE PARA LIGAR<br>🔊 Nokia Music 2026</div>
+<button id="micBtn" class="tb" title="Gravar microfone">🎙</button>
+<button id="gear" class="tb">⚙</button>
+
+<div id="cfg">
+  <h2>Configuração de Som</h2>
+  <label>Dispositivo de saída</label>
+  <select id="sink"><option value="">Padrão (alto-falante inferior)</option></select>
+  <div class="note">No S25, o alto-falante inferior é a saída de mídia principal. Desconecte fones/Bluetooth.</div>
+  <label><input type="checkbox" id="mono" checked> Saída mono (som concentrado)</label>
+  <label>Timbre</label><select id="timbre"></select>
+  <label>Transposição — faixa −12 a +12 semitons (atual: <span id="tV">0</span>)</label>
+  <select id="trans"></select>
+  <div class="note">0 = mapeamento original (1=C, 2=D, 3=E…). −1 faz a tecla 1 tocar B.</div>
+  <label>Volume <span id="vV"></span></label><input type="range" id="vol" min="0" max="1" step=".01" value=".6">
+  <label>Ataque (ms) <span id="aV"></span></label><input type="range" id="att" min="1" max="200" value="3">
+  <label>Release (ms) <span id="rV"></span></label><input type="range" id="rel" min="5" max="1500" value="60">
+  <label>Glissando (ms) <span id="gV"></span></label><input type="range" id="gli" min="0" max="300" value="40">
+  <label>Faixa de pitch bend (semitons) <span id="bV"></span></label><input type="range" id="bnd" min="1" max="12" value="2">
+  <label>Brilho / filtro (Hz) <span id="fV"></span></label><input type="range" id="flt" min="500" max="12000" value="4500">
+
+  <h3>🎙 Gravação de áudio (microfone)</h3>
+  <label>Formato do arquivo</label>
+  <select id="fmt">
+    <option value="wav">WAV — 44,1 kHz / 16 bit / estéreo (qualidade CD)</option>
+    <option value="mp3">MP3 — 44,1 kHz / 320 kbps</option>
+  </select>
+  <div class="note">Botão 🎙: toque para iniciar, toque de novo para parar. O arquivo vai para a pasta <b>Downloads</b>.</div>
+
+  <h3>🎹 MIDI</h3>
+  <div class="note">Tecla <b>0</b>: inicia/para a gravação MIDI.</div>
+  <div id="midiInfo" class="note">Nenhuma gravação.</div>
+  <button id="mPlay">▶ Tocar</button><button id="mStop">■ Parar</button>
+  <button id="mSave">💾 Salvar .mid</button><button id="mLoad">📂 Abrir .mid</button>
+  <input type="file" id="mFile" accept=".mid,.midi,audio/midi" hidden>
+  <div class="note" id="lat"></div>
+  <button id="close">Fechar</button>
+</div>
+
+<div id="wrap">
+<svg id="ph" viewBox="0 0 400 860" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bd" x1="0" x2="1"><stop offset="0" stop-color="#1c2333"/><stop offset=".5" stop-color="#2f3a52"/><stop offset="1" stop-color="#1c2333"/></linearGradient>
+    <linearGradient id="kc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8e8e8"/><stop offset="1" stop-color="#a9a9a9"/></linearGradient>
+  </defs>
+  <rect x="20" y="10" width="360" height="840" rx="80" fill="url(#bd)"/>
+  <path d="M60 60 Q200 10 340 60 L345 360 Q330 470 200 470 Q70 470 55 360 Z" fill="none" stroke="#9aa0a8" stroke-width="14"/>
+  <g fill="#0a0d14"><circle cx="200" cy="55" r="4"/><circle cx="200" cy="72" r="4"/><circle cx="200" cy="89" r="4"/><circle cx="200" cy="106" r="4"/><circle cx="200" cy="123" r="4"/></g>
+  <rect x="150" y="160" width="100" height="26" fill="#111"/>
+  <text x="200" y="181" fill="#ddd" font-size="22" font-weight="bold" text-anchor="middle">NOKIA</text>
+  <rect id="lcd" x="85" y="210" width="230" height="200" rx="6" fill="#879e5a" stroke="#222" stroke-width="3"/>
+  <g fill="#1f2a10" font-family="monospace" pointer-events="none">
+    <text id="tNote" x="200" y="290" font-size="56" text-anchor="middle">--</text>
+    <text id="tInfo" x="95" y="232" font-size="13">OCT 4</text>
+    <text id="tTim" x="305" y="232" font-size="13" text-anchor="end">NOKIA</text>
+    <text id="tRec" x="200" y="250" font-size="12" text-anchor="middle"></text>
+    <text id="tArt" x="95" y="400" font-size="12">NORMAL</text>
+    <text id="tTr" x="200" y="400" font-size="12" text-anchor="middle"></text>
+    <text id="tFx" x="305" y="400" font-size="12" text-anchor="end">VIB 0</text>
+    <line x1="200" y1="300" x2="200" y2="385" stroke="#1f2a10" stroke-dasharray="2 4"/>
+    <line x1="95" y1="342" x2="305" y2="342" stroke="#1f2a10" stroke-dasharray="2 4"/>
+    <circle id="dot" cx="200" cy="342" r="7" fill="#1f2a10" opacity="0"/>
+  </g>
+  <g class="key" data-k="navi"><path class="cap" d="M140 485 Q200 455 260 485 Q200 520 140 485Z" fill="url(#kc)"/><rect x="180" y="482" width="40" height="5" rx="2" fill="#2aa4e0"/></g>
+  <g class="key" data-k="clr"><path class="cap" d="M60 515 L120 495 L140 545 L80 570 Z" fill="url(#kc)"/><text x="100" y="540" font-size="20" fill="#333" text-anchor="middle">C</text></g>
+  <g class="key" data-k="up"><path class="cap" d="M280 495 L340 515 L335 545 L270 530 Z" fill="url(#kc)"/><text x="310" y="527" font-size="16" fill="#333" text-anchor="middle">▲</text></g>
+  <g class="key" data-k="down"><path class="cap" d="M270 535 L335 550 L320 575 L262 560 Z" fill="url(#kc)"/><text x="298" y="563" font-size="16" fill="#333" text-anchor="middle">▼</text></g>
+  <g id="pad"></g>
+</svg>
+</div>
+
+<script>
+// ---------- TECLADO ----------
+const $=id=>document.getElementById(id);
+const LAYOUT=[["1","2","3"],["4","5","6"],["7","8","9"],["*","0","#"]];
+const SUB={1:"oo",2:"abc",3:"def",4:"ghi",5:"jkl",6:"mno",7:"pqrs",8:"tuv",9:"wxyz",0:"●MIDI","*":"+","#":"⇧"};
+const SEMI={1:0,2:2,3:4,4:5,5:7,6:9,7:11,8:12,9:14};
+const NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+LAYOUT.forEach((row,r)=>row.forEach((k,c)=>{
+  const x=95+c*105,y=625+r*62;
+  $("pad").insertAdjacentHTML("beforeend",
+   `<g class="key" data-k="${k}"><ellipse class="cap" cx="${x}" cy="${y}" rx="44" ry="24" fill="url(#kc)" stroke="#111" stroke-width="2"/>
+    <text x="${x-8}" y="${y+8}" font-size="24" font-weight="bold" fill="#1d3a1d" text-anchor="middle">${k}</text>
+    <text x="${x+18}" y="${y+8}" font-size="${k==="0"?9:12}" fill="#1d3a1d" text-anchor="middle">${SUB[k]}</text></g>`);
+}));
+
+// ---------- ÁUDIO ----------
+let ctx,master,filt,bendSrc,lfo,lfoGain;
+const S={oct:4,timbre:0,art:0,vol:.6,att:3,rel:60,gli:40,bend:2,flt:4500,sharp:0,tr:0};
+const ARTS=["NORMAL","STACCATO","LEGATO"];
+const TIMBRES=[
+  {n:"NOKIA",d:.5,f:1},{n:"PULSE 25",d:.25,f:1},{n:"PULSE 12",d:.125,f:1},
+  {n:"BUZZER",d:.5,f:.5,q:6},{n:"TRIANGLE",t:"triangle",f:1},{n:"SINE",t:"sine",f:1},{n:"SAW",t:"sawtooth",f:.8}
+];
+const waves=[];
+function pulse(d){const N=64,re=new Float32Array(N),im=new Float32Array(N);
+  for(let n=1;n<N;n++)re[n]=(2/(n*Math.PI))*Math.sin(n*Math.PI*d);
+  return ctx.createPeriodicWave(re,im);}
+function initAudio(){
+  ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:"interactive"});
+  TIMBRES.forEach((t,i)=>waves[i]=t.d?pulse(t.d):null);
+  master=ctx.createGain();master.gain.value=S.vol;
+  filt=ctx.createBiquadFilter();filt.type="lowpass";filt.frequency.value=S.flt;
+  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;
+  filt.connect(master).connect(comp).connect(ctx.destination);
+  bendSrc=ctx.createConstantSource();bendSrc.offset.value=0;bendSrc.start();
+  lfo=ctx.createOscillator();lfo.frequency.value=6;
+  lfoGain=ctx.createGain();lfoGain.gain.value=0;lfo.connect(lfoGain);lfo.start();
+  setMono(true);
+  $("lat").textContent=`Latência base: ${((ctx.baseLatency||0)*1000).toFixed(1)} ms · saída: ${((ctx.outputLatency||0)*1000).toFixed(1)} ms`;
+  listSinks();
+}
+function setMono(m){const d=ctx.destination;d.channelCount=m?1:2;d.channelCountMode="explicit";}
+const voices=new Map();
+const midiOf=semi=>12*(S.oct+1)+semi+S.sharp+S.tr;
+const hz=m=>440*Math.pow(2,(m-69)/12);
+function startVoice(id,midi,vel=1){
+  const t=ctx.currentTime,tim=TIMBRES[S.timbre];
+  const o=ctx.createOscillator(),g=ctx.createGain();
+  if(waves[S.timbre])o.setPeriodicWave(waves[S.timbre]);else o.type=tim.t;
+  o.frequency.value=hz(midi);
+  bendSrc.connect(o.detune);lfoGain.connect(o.detune);
+  let out=g;
+  if(tim.q){const bp=ctx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=2500;bp.Q.value=tim.q;g.connect(bp);out=bp;}
+  out.connect(filt);
+  const peak=.35*tim.f*vel;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+S.att/1000);
+  if(S.art===1)g.gain.setTargetAtTime(peak*.3,t+.03,.05);
+  o.connect(g);o.start(t);
+  const v={o,g,midi};voices.set(id,v);showM(midi);return v;
+}
+function noteOn(id,key){
+  const semi=SEMI[key];if(semi===undefined)return;
+  const m=midiOf(semi),v=startVoice(id,m);v.semi=semi;v.key=key;rec(0x90,m,100);
+}
+function glideTo(id,key){
+  const v=voices.get(id),semi=SEMI[key];if(!v||semi===undefined||v.key===key)return;
+  const m=midiOf(semi);rec(0x80,v.midi,0);rec(0x90,m,100);
+  v.semi=semi;v.key=key;v.midi=m;
+  v.o.frequency.setTargetAtTime(hz(m),ctx.currentTime,Math.max(S.gli,1)/3000);showM(m);
+}
+function noteOff(id){
+  const v=voices.get(id);if(!v)return;voices.delete(id);
+  if(!v.fixed)rec(0x80,v.midi,0);
+  const t=ctx.currentTime,r=(S.art===2?S.rel*4:S.art===1?S.rel/3:S.rel)/1000;
+  v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(v.g.gain.value,t);
+  v.g.gain.setTargetAtTime(0,t,r/4);v.o.stop(t+r+.05);
+  if(!voices.size)$("tNote").textContent="--";
+}
+function retune(){
+  voices.forEach(v=>{if(v.fixed)return;const m=midiOf(v.semi);
+    if(m!==v.midi){rec(0x80,v.midi,0);rec(0x90,m,100);v.midi=m;}
+    v.o.frequency.setTargetAtTime(hz(m),ctx.currentTime,.005);});
+  if(voices.size)showM([...voices.values()].pop().midi);
+}
+
+// ---------- DISPLAY ----------
+function showM(m){$("tNote").textContent=NAMES[((m%12)+12)%12]+(Math.floor(m/12)-1);}
+function hud(){
+  $("tInfo").textContent="OCT "+S.oct+(S.sharp?" ♯":"");
+  $("tTim").textContent=TIMBRES[S.timbre].n;
+  $("tArt").textContent=ARTS[S.art];
+  $("tTr").textContent=S.tr?"TR "+(S.tr>0?"+":"")+S.tr:"";
+  $("tRec").textContent=(AR.on?"●MIC ":"")+(MR.on?"●MIDI ":"")+(PB.length?"▶MIDI":"");
+}
+
+// ---------- FUNÇÕES ----------
+let sharpCount=0;
+const isFunc=k=>["#","clr","up","down","navi","*","0"].includes(k);
+function func(k,down){
+  if(k==="#"||k==="clr"){sharpCount=Math.max(0,sharpCount+(down?1:-1));S.sharp=sharpCount>0?1:0;retune();hud();return;}
+  if(!down)return;
+  if(k==="up"){S.oct=Math.min(7,S.oct+1);retune();}
+  else if(k==="down"){S.oct=Math.max(1,S.oct-1);retune();}
+  else if(k==="navi"){S.timbre=(S.timbre+1)%TIMBRES.length;$("timbre").value=S.timbre;}
+  else if(k==="*"){S.art=(S.art+1)%3;}
+  else if(k==="0"){MR.on?stopMidiRec():startMidiRec();}
+  hud();
+}
+
+// ---------- TOQUE (multitouch) ----------
+let lastBend=8192,lastMod=0;
+const ptr=new Map();
+const lcd=$("lcd");
+const keyAt=(x,y)=>{const e=document.elementFromPoint(x,y);const g=e&&e.closest(".key");return g?g.dataset.k:null;};
+function lcdXY(e){const r=lcd.getBoundingClientRect();
+  return[Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))];}
+function lcdMove(e){
+  const[x,y]=lcdXY(e);
+  bendSrc.offset.setTargetAtTime((0.5-y)*2*S.bend*100,ctx.currentTime,.01);
+  lfoGain.gain.setTargetAtTime(x*60,ctx.currentTime,.02);lfo.frequency.value=4+x*4;
+  const pb=Math.round(8192+(0.5-y)*2*8191),md=Math.round(x*127);
+  if(pb!==lastBend){rec(0xE0,pb);lastBend=pb;}
+  if(md!==lastMod){rec(0xB0,1,md);lastMod=md;}
+  $("dot").setAttribute("cx",95+x*210);$("dot").setAttribute("cy",300+y*85);$("dot").setAttribute("opacity",1);
+  $("tFx").textContent="VIB "+Math.round(x*100);
+}
+function hl(k,on){document.querySelectorAll(`.key[data-k="${CSS.escape(k)}"]`).forEach(g=>g.classList.toggle("on",on));}
+$("ph").addEventListener("pointerdown",e=>{
+  if(!ctx)return;e.preventDefault();
+  if(e.target===lcd){ptr.set(e.pointerId,{type:"lcd"});lcdMove(e);return;}
+  const k=keyAt(e.clientX,e.clientY);if(!k)return;
+  hl(k,true);
+  if(isFunc(k)){func(k,true);ptr.set(e.pointerId,{type:"func",key:k});}
+  else{noteOn(e.pointerId,k);ptr.set(e.pointerId,{type:"note",key:k});}
+});
+window.addEventListener("pointermove",e=>{
+  const p=ptr.get(e.pointerId);if(!p)return;
+  if(p.type==="lcd")return lcdMove(e);
+  if(p.type==="note"){const k=keyAt(e.clientX,e.clientY);
+    if(k&&!isFunc(k)&&k!==p.key){hl(p.key,false);hl(k,true);glideTo(e.pointerId,k);p.key=k;}}
+});
+function up(e){
+  const p=ptr.get(e.pointerId);if(!p)return;ptr.delete(e.pointerId);
+  if(p.type==="lcd"){
+    bendSrc.offset.setTargetAtTime(0,ctx.currentTime,.03);$("dot").setAttribute("opacity",0);
+    if(lastBend!==8192){rec(0xE0,8192);lastBend=8192;}return;}
+  hl(p.key,false);
+  if(p.type==="func")func(p.key,false);else noteOff(e.pointerId);
+}
+window.addEventListener("pointerup",up);
+window.addEventListener("pointercancel",up);
+document.addEventListener("contextmenu",e=>e.preventDefault());
+
+// ---------- CONFIG ----------
+TIMBRES.forEach((t,i)=>$("timbre").insertAdjacentHTML("beforeend",`<option value="${i}">${t.n}</option>`));
+for(let i=-12;i<=12;i++)$("trans").insertAdjacentHTML("beforeend",
+  `<option value="${i}"${i===0?" selected":""}>${i>0?"+":""}${i} semitom${Math.abs(i)===1?"":"s"}${i===0?" (original)":""}</option>`);
+$("trans").onchange=e=>{S.tr=+e.target.value;$("tV").textContent=(S.tr>0?"+":"")+S.tr;if(ctx)retune();hud();};
+$("gear").onclick=()=>$("cfg").style.display="block";
+$("close").onclick=()=>$("cfg").style.display="none";
+$("timbre").onchange=e=>{S.timbre=+e.target.value;hud();};
+$("mono").onchange=e=>{if(ctx)setMono(e.target.checked);};
+const bind=(id,lab,key,fn)=>{const el=$(id),f=()=>{S[key]=+el.value;$(lab).textContent=el.value;if(fn&&ctx)fn();};el.oninput=f;f();};
+bind("vol","vV","vol",()=>master.gain.setTargetAtTime(S.vol,ctx.currentTime,.02));
+bind("att","aV","att");bind("rel","rV","rel");bind("gli","gV","gli");bind("bnd","bV","bend");
+bind("flt","fV","flt",()=>filt.frequency.setTargetAtTime(S.flt,ctx.currentTime,.02));
+async function listSinks(){
+  if(!ctx.setSinkId||!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices)return;
+  const d=await navigator.mediaDevices.enumerateDevices();
+  d.filter(x=>x.kind==="audiooutput"&&x.deviceId!=="default").forEach(x=>
+    $("sink").insertAdjacentHTML("beforeend",`<option value="${x.deviceId}">${x.label||"Saída "+x.deviceId.slice(0,6)}</option>`));
+}
+$("sink").onchange=e=>{if(ctx&&ctx.setSinkId)ctx.setSinkId(e.target.value).catch(()=>{});};
+$("start").onpointerdown=()=>{initAudio();ctx.resume();$("start").remove();hud();};
+
+// ---------- GRAVAÇÃO MIDI ----------
+const MR={on:false,t0:0,ev:[]};
+function rec(type,a,b=0){if(MR.on)MR.ev.push({t:performance.now()-MR.t0,type,a,b});}
+function startMidiRec(){MR.ev=[];MR.t0=performance.now();MR.on=true;
+  voices.forEach(v=>{if(!v.fixed)rec(0x90,v.midi,100);});}
+function stopMidiRec(){
+  voices.forEach(v=>{if(!v.fixed)rec(0x80,v.midi,0);});rec(0xE0,8192);MR.on=false;
+  try{localStorage.setItem("nm_midi",JSON.stringify(MR.ev));}catch(e){}
+  midiInfo();
+}
+function midiInfo(){
+  const n=MR.ev.filter(e=>e.type===0x90).length;
+  $("midiInfo").textContent=MR.ev.length?`Gravação: ${n} notas, ${(MR.ev[MR.ev.length-1].t/1000).toFixed(1)} s`:"Nenhuma gravação.";
+}
+// SMF tipo 0, 480 PPQ, 120 BPM
+function toSMF(ev){
+  const trk=[];let last=0;
+  const vlq=n=>{const s=[n&0x7f];while(n>>=7)s.unshift((n&0x7f)|0x80);trk.push(...s);};
+  const put=(tk,...b)=>{vlq(Math.max(0,tk-last));last=Math.max(last,tk);trk.push(...b);};
+  put(0,0xFF,0x51,3,0x07,0xA1,0x20);
+  put(0,0xB0,101,0);put(0,0xB0,100,0);put(0,0xB0,6,S.bend);
+  ev.forEach(e=>{const tk=Math.round(e.t*0.96);
+    if(e.type===0xE0)put(tk,0xE0,e.a&0x7f,(e.a>>7)&0x7f);else put(tk,e.type,e.a&0x7f,(e.b|0)&0x7f);});
+  put(last,0xFF,0x2F,0);
+  const L=trk.length;
+  return new Uint8Array([0x4D,0x54,0x68,0x64,0,0,0,6,0,0,0,1,0x01,0xE0,
+    0x4D,0x54,0x72,0x6B,(L>>>24)&255,(L>>16)&255,(L>>8)&255,L&255,...trk]);
+}
+function parseSMF(buf){
+  const d=new DataView(buf);let p=0;
+  const u8=()=>d.getUint8(p++),u16=()=>{const v=d.getUint16(p);p+=2;return v;},u32=()=>{const v=d.getUint32(p);p+=4;return v;};
+  const vlq=()=>{let v=0,c;do{c=u8();v=(v<<7)|(c&0x7f);}while(c&0x80);return v;};
+  if(u32()!==0x4D546864)throw new Error("Arquivo não é MIDI");
+  const hl=u32();u16();const nt=u16(),div=u16();p=8+hl;
+  const raw=[],tempos=[{tk:0,us:500000}];
+  for(let i=0;i<nt&&p<d.byteLength;i++){
+    const id=u32(),len=u32(),end=p+len;if(id!==0x4D54726B){p=end;continue;}
+    let tk=0,rs=0;
+    while(p<end){
+      tk+=vlq();let s=d.getUint8(p);if(s&0x80)p++;else s=rs;
+      if(s===0xFF){const ty=u8(),l=vlq();
+        if(ty===0x51)tempos.push({tk,us:(d.getUint8(p)<<16)|(d.getUint8(p+1)<<8)|d.getUint8(p+2)});p+=l;}
+      else if(s===0xF0||s===0xF7)p+=vlq();
+      else{rs=s;const hi=s&0xF0,a=u8(),b=(hi===0xC0||hi===0xD0)?0:u8();
+        if(hi===0x90&&b===0)raw.push({tk,type:0x80,a,b:0});
+        else if(hi===0x80||hi===0x90||hi===0xB0)raw.push({tk,type:hi,a,b});
+        else if(hi===0xE0)raw.push({tk,type:0xE0,a:a|(b<<7)});}
+    }
+    p=end;
+  }
+  tempos.sort((x,y)=>x.tk-y.tk);
+  const ms=tk=>{let t=0,lt=0,us=500000;
+    for(const x of tempos){if(x.tk>tk)break;t+=(x.tk-lt)*us/div/1000;lt=x.tk;us=x.us;}
+    return t+(tk-lt)*us/div/1000;};
+  return raw.sort((x,y)=>x.tk-y.tk).map(e=>({t:ms(e.tk),type:e.type,a:e.a,b:e.b}));
+}
+
+// ---------- REPRODUÇÃO MIDI ----------
+let PB=[];
+function pbEvent(e){
+  const id="pb"+e.a;
+  if(e.type===0x90){noteOff(id);const v=startVoice(id,e.a,(e.b||100)/127);v.fixed=true;}
+  else if(e.type===0x80)noteOff(id);
+  else if(e.type===0xE0)bendSrc.offset.setTargetAtTime((e.a-8192)/8192*S.bend*100,ctx.currentTime,.005);
+  else if(e.type===0xB0&&e.a===1)lfoGain.gain.setTargetAtTime(e.b/127*60,ctx.currentTime,.02);
+}
+function playMidi(ev){
+  stopPlay();if(!ev.length||!ctx)return;
+  PB=ev.map(e=>setTimeout(()=>pbEvent(e),e.t+50));
+  PB.push(setTimeout(stopPlay,ev[ev.length-1].t+600));hud();
+}
+function stopPlay(){
+  PB.forEach(clearTimeout);PB=[];
+  [...voices.keys()].filter(k=>typeof k==="string"&&k.startsWith("pb")).forEach(noteOff);
+  if(ctx){bendSrc.offset.setTargetAtTime(0,ctx.currentTime,.02);lfoGain.gain.setTargetAtTime(0,ctx.currentTime,.02);}
+  hud();
+}
+
+// ---------- GRAVAÇÃO DE ÁUDIO (MICROFONE) ----------
+const AR={on:false,stream:null,src:null,proc:null,mute:null,chunks:[]};
+async function startAudioRec(){
+  try{
+    AR.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+  }catch(e){alert("Microfone indisponível: "+e.message+"\nAbra via HTTPS e permita o microfone.");return;}
+  if($("fmt").value==="mp3")loadLame().catch(()=>{});
+  AR.chunks=[];
+  AR.src=ctx.createMediaStreamSource(AR.stream);
+  AR.proc=ctx.createScriptProcessor(4096,1,1);
+  AR.proc.onaudioprocess=e=>AR.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  AR.mute=ctx.createGain();AR.mute.gain.value=0;
+  AR.src.connect(AR.proc).connect(AR.mute).connect(ctx.destination);
+  AR.on=true;$("micBtn").classList.add("rec");hud();
+}
+async function stopAudioRec(){
+  AR.on=false;$("micBtn").classList.remove("rec");hud();
+  AR.src.disconnect();AR.proc.disconnect();AR.mute.disconnect();
+  AR.stream.getTracks().forEach(t=>t.stop());
+  const len=AR.chunks.reduce((s,c)=>s+c.length,0);if(!len)return;
+  const pcm=new Float32Array(len);let o=0;AR.chunks.forEach(c=>{pcm.set(c,o);o+=c.length;});AR.chunks=[];
+  const inBuf=ctx.createBuffer(1,len,ctx.sampleRate);inBuf.copyToChannel(pcm,0);
+  const off=new OfflineAudioContext(1,Math.ceil(len*44100/ctx.sampleRate),44100);
+  const bs=off.createBufferSource();bs.buffer=inBuf;bs.connect(off.destination);bs.start();
+  const data=(await off.startRendering()).getChannelData(0);
+  const name="nokia-music-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+  if($("fmt").value==="mp3"){
+    try{await loadLame();download(encMP3(data),name+".mp3","audio/mpeg");}
+    catch(e){alert("MP3 indisponível (sem internet?). Salvando em WAV.");download(encWAV(data),name+".wav","audio/wav");}
+  }else download(encWAV(data),name+".wav","audio/wav");
+}
+const i16=x=>(Math.max(-1,Math.min(1,x))*0x7fff)|0;
+function encWAV(d){
+  const n=d.length,b=new ArrayBuffer(44+n*4),v=new DataView(b);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,"RIFF");v.setUint32(4,36+n*4,true);w(8,"WAVE");w(12,"fmt ");v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,44100,true);v.setUint32(28,44100*4,true);
+  v.setUint16(32,4,true);v.setUint16(34,16,true);w(36,"data");v.setUint32(40,n*4,true);
+  for(let i=0,p=44;i<n;i++,p+=4){const s=i16(d[i]);v.setInt16(p,s,true);v.setInt16(p+2,s,true);}
+  return b;
+}
+let lameP=null;
+function loadLame(){
+  if(lameP)return lameP;
+  lameP=new Promise((res,rej)=>{
+    if(window.lamejs)return res();
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js";
+    s.onload=res;s.onerror=()=>{lameP=null;rej();};
+    document.head.appendChild(s);
+  });
+  return lameP;
+}
+function encMP3(d){
+  const enc=new lamejs.Mp3Encoder(2,44100,320),pcm=new Int16Array(d.length),out=[];
+  for(let i=0;i<d.length;i++)pcm[i]=i16(d[i]);
+  for(let i=0;i<pcm.length;i+=1152){const c=pcm.subarray(i,i+1152),m=enc.encodeBuffer(c,c);if(m.length)out.push(new Uint8Array(m));}
+  const f=enc.flush();if(f.length)out.push(new Uint8Array(f));
+  return new Blob(out,{type:"audio/mpeg"});
+}
+function download(data,name,type){
+  const blob=data instanceof Blob?data:new Blob([data],{type});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+$("micBtn").onclick=()=>{if(!ctx)return;AR.on?stopAudioRec():startAudioRec();};
+
+// ---------- BOTÕES MIDI ----------
+$("mPlay").onclick=()=>playMidi(MR.ev);
+$("mStop").onclick=stopPlay;
+$("mSave").onclick=()=>{if(!MR.ev.length)return alert("Nada gravado. Use a tecla 0.");
+  download(toSMF(MR.ev),"nokia-music-"+Date.now()+".mid","audio/midi");};
+$("mLoad").onclick=()=>$("mFile").click();
+$("mFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  try{MR.ev=parseSMF(await f.arrayBuffer());midiInfo();}catch(err){alert(err.message);}
+  e.target.value="";};
+try{MR.ev=JSON.parse(localStorage.getItem("nm_midi")||"[]");}catch(e){MR.ev=[];}
+midiInfo();
+</script>
+</body>
+</html>
