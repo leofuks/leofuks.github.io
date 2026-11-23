@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#9fbf3b">
+<title>Nokia Music 2026</title>
+<style>
+html,body{margin:0;height:100%;background:radial-gradient(circle at 50% 40%,#2a2f3a,#0b0d12);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:Arial,sans-serif}
+#wrap{height:100%;display:flex;justify-content:center;align-items:center}
+svg{height:98vh;max-width:100vw}
+.key{cursor:pointer}
+.key .cap{transition:fill .05s}
+.key.on .cap{fill:#9fd6ff}
+.tb{position:fixed;top:10px;font-size:24px;background:#333;color:#fff;border:none;border-radius:50%;width:48px;height:48px;z-index:5}
+#gear{right:10px}
+#micBtn{right:66px}
+#micBtn.rec{background:#c00;animation:bl 1s infinite}
+@keyframes bl{50%{opacity:.5}}
+#cfg{position:fixed;inset:0;background:rgba(0,0,0,.92);color:#cfe8b0;display:none;padding:20px;overflow:auto;z-index:10;font-size:15px;touch-action:pan-y}
+#cfg h3{margin:24px 0 4px;border-top:1px solid #456;padding-top:12px}
+#cfg label{display:block;margin:14px 0 4px}
+#cfg select,#cfg input[type=range]{width:100%}
+#cfg button{margin:8px 6px 0 0;padding:10px 16px;font-size:15px}
+.note{color:#888;font-size:12px}
+#start{position:fixed;inset:0;background:rgba(0,0,0,.8);color:#b8d88a;display:flex;align-items:center;justify-content:center;font-size:24px;z-index:20;text-align:center}
+</style>
+</head>
+<body>
+<div id="start">TOQUE PARA LIGAR<br>🔊 Nokia Music 2026<br><small style="font-size:13px;color:#889">ou pressione uma tecla numérica</small></div>
+<button id="micBtn" class="tb" title="Gravar microfone">🎙</button>
+<button id="gear" class="tb">⚙</button>
+
+<div id="cfg">
+  <h2>Configuração de Som</h2>
+  <label>Dispositivo de saída</label>
+  <select id="sink"><option value="">Padrão (alto-falante inferior)</option></select>
+  <button id="sinkScan">↻ Atualizar saídas</button>
+  <div class="note">No S25, o alto-falante inferior é a saída de mídia principal. Desconecte fones/Bluetooth.</div>
+  <label><input type="checkbox" id="mono" checked> Saída mono (som concentrado)</label>
+  <label><input type="checkbox" id="legato"> Modo monofônico (legato + glissando)</label>
+  <label>Timbre</label><select id="timbre"></select>
+  <label>Transposição — faixa −12 a +12 semitons (atual: <span id="tV">0</span>)</label>
+  <select id="trans"></select>
+  <div class="note">0 = mapeamento original (1=C, 2=D, 3=E…). −1 faz a tecla 1 tocar B.</div>
+  <label>Volume <span id="vV"></span></label><input type="range" id="vol" min="0" max="1" step=".01" value=".6">
+  <label>Ataque (ms) <span id="aV"></span></label><input type="range" id="att" min="1" max="200" value="3">
+  <label>Release (ms) <span id="rV"></span></label><input type="range" id="rel" min="5" max="1500" value="60">
+  <label>Glissando (ms) <span id="gV"></span></label><input type="range" id="gli" min="0" max="300" value="40">
+  <label>Faixa de pitch bend (semitons) <span id="bV"></span></label><input type="range" id="bnd" min="1" max="12" value="2">
+  <label>Brilho / filtro (Hz) <span id="fV"></span></label><input type="range" id="flt" min="500" max="12000" value="4500">
+  <label>Tempo (BPM) — sincroniza o tremolo <span id="pV"></span></label><input type="range" id="bpm" min="40" max="300" value="120">
+
+  <h3>🖐 Tela LCD expressiva</h3>
+  <div class="note">1º dedo: X = pitch bend · Y = expressão (crescendo/diminuendo).<br>2º dedo: X = vibrato · Y = tremolo (no tempo do BPM).</div>
+
+  <h3>⌨ Teclado do celular / computador</h3>
+  <div class="note">1–7 = notas · 8 = oitava − · 9 = oitava + · 0 = ruído/percussão · ✱ = ♭ (segure) · # = ♯ (segure) · Navi/Enter = timbre · C/Esc = pânico · ▲▼ = BPM ±5</div>
+
+  <h3>🎙 Gravação de áudio (microfone)</h3>
+  <label>Formato do arquivo</label>
+  <select id="fmt">
+    <option value="wav">WAV — 44,1 kHz / 16 bit / estéreo (qualidade CD)</option>
+    <option value="mp3">MP3 — 44,1 kHz / 320 kbps</option>
+  </select>
+  <div class="note">Botão 🎙: toque para iniciar, toque de novo para parar. O arquivo vai para a pasta <b>Downloads</b>.</div>
+
+  <h3>🎹 MIDI</h3>
+  <div id="midiInfo" class="note">Nenhuma gravação.</div>
+  <button id="mRec">● Gravar MIDI</button><button id="mPlay">▶ Tocar</button><button id="mStop">■ Parar</button>
+  <button id="mSave">💾 Salvar .mid</button><button id="mLoad">📂 Abrir .mid</button>
+  <input type="file" id="mFile" accept=".mid,.midi,audio/midi" hidden>
+  <div class="note" id="lat"></div>
+  <button id="close">Fechar</button>
+</div>
+<div id="wrap">
+<svg id="ph" viewBox="0 0 400 860" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bd" x1="0" x2="1"><stop offset="0" stop-color="#121827"/><stop offset=".3" stop-color="#28324b"/><stop offset=".55" stop-color="#2f3a56"/><stop offset="1" stop-color="#121827"/></linearGradient>
+    <linearGradient id="sv" x1="0" x2="1"><stop offset="0" stop-color="#7d848c"/><stop offset=".5" stop-color="#e4e7ea"/><stop offset="1" stop-color="#7d848c"/></linearGradient>
+    <linearGradient id="sv2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef0f2"/><stop offset="1" stop-color="#9aa1a8"/></linearGradient>
+    <linearGradient id="kc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1f3f4"/><stop offset="1" stop-color="#a3a9b0"/></linearGradient>
+    <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#93ab5c"/><stop offset="1" stop-color="#6e8a3a"/></linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity=".6"/></filter>
+    <filter id="in"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+
+  <!-- corpo -->
+  <path d="M70 18 Q200 0 330 18 Q372 26 376 92 L386 758 Q386 846 200 852 Q14 846 14 758 L24 92 Q28 26 70 18Z" fill="url(#bd)" stroke="#0a0e18" stroke-width="3"/>
+  <path d="M60 40 Q200 22 340 40" fill="none" stroke="#5a6788" stroke-width="2" opacity=".5" pointer-events="none"/>
+
+  <!-- moldura prateada -->
+  <path d="M76 38 Q200 14 324 38 Q348 44 348 82 L350 428 Q348 472 300 494 Q250 515 200 517 Q150 515 100 494 Q52 472 50 428 L52 82 Q52 44 76 38Z" fill="url(#sv)" filter="url(#sh)" pointer-events="none"/>
+  <path d="M90 56 Q200 36 310 56 Q330 61 330 90 L332 418 Q330 452 292 470 Q246 488 200 490 Q154 488 108 470 Q70 452 68 418 L70 90 Q70 61 90 56Z" fill="url(#bd)" pointer-events="none"/>
+
+  <!-- alto-falante -->
+  <g fill="#05070c" pointer-events="none"><circle cx="200" cy="72" r="4"/><circle cx="200" cy="88" r="4"/><circle cx="200" cy="104" r="4"/><circle cx="200" cy="120" r="4"/><circle cx="200" cy="136" r="4"/></g>
+
+  <!-- logo -->
+  <rect x="146" y="158" width="108" height="28" rx="2" fill="#0d0f14" stroke="#6b7280" stroke-width="1.5" pointer-events="none"/>
+  <text x="200" y="180" fill="#e6e8ea" font-size="21" font-weight="bold" letter-spacing="1.5" text-anchor="middle" pointer-events="none">NOKIA</text>
+
+  <!-- LCD -->
+  <rect x="88" y="194" width="224" height="204" rx="8" fill="#3b4150" stroke="#1a1d24" stroke-width="2" pointer-events="none"/>
+  <rect id="lcd" x="95" y="200" width="210" height="190" rx="4" fill="url(#lg)"/>
+  <rect x="97" y="202" width="206" height="186" rx="4" fill="none" stroke="#3d4f1c" stroke-width="5" opacity=".35" filter="url(#in)" pointer-events="none"/>
+  <g fill="#1f2a10" font-family="monospace" pointer-events="none">
+    <text id="tInfo" x="103" y="220" font-size="13">OCT 4</text>
+    <text id="tTim" x="297" y="220" font-size="13" text-anchor="end">NOKIA</text>
+    <text id="tRec" x="200" y="238" font-size="12" text-anchor="middle"></text>
+    <text id="tNote" x="200" y="288" font-size="52" text-anchor="middle">--</text>
+    <text id="tArt" x="103" y="382" font-size="12">EXP 100</text>
+    <text id="tTr" x="200" y="382" font-size="12" text-anchor="middle">120BPM</text>
+    <text id="tFx" x="297" y="382" font-size="12" text-anchor="end">V0 T0</text>
+    <line x1="200" y1="298" x2="200" y2="368" stroke="#1f2a10" stroke-dasharray="2 4"/>
+    <line x1="103" y1="333" x2="297" y2="333" stroke="#1f2a10" stroke-dasharray="2 4"/>
+    <circle id="dot1" cx="200" cy="333" r="7" fill="#1f2a10" opacity="0"/>
+    <circle id="dot2" cx="200" cy="333" r="8" fill="none" stroke="#1f2a10" stroke-width="3" opacity="0"/>
+  </g>
+
+  <!-- cluster de navegação -->
+  <path d="M148 540 Q200 585 252 540 L246 516 Q200 532 154 516Z" fill="url(#sv2)" stroke="#5d646c" stroke-width="1" pointer-events="none"/>
+  <g class="key" data-k="navi"><path class="cap" d="M138 506 Q200 482 262 506 Q200 534 138 506Z" fill="url(#sv2)" stroke="#5d646c" stroke-width="1.5" filter="url(#sh)"/><rect x="178" y="502" width="44" height="6" rx="3" fill="#2aa4e0" pointer-events="none"/></g>
+  <g class="key" data-k="clr"><path class="cap" d="M74 534 Q88 510 124 514 L150 544 Q134 574 100 578 Q70 566 74 534Z" fill="url(#sv2)" stroke="#5d646c" stroke-width="1.5" filter="url(#sh)"/><text x="110" y="552" font-size="22" fill="#222" text-anchor="middle" pointer-events="none">C</text></g>
+  <g class="key" data-k="up"><path class="cap" d="M276 514 Q312 510 326 534 L326 548 L254 542 Z" fill="url(#sv2)" stroke="#5d646c" stroke-width="1.5" filter="url(#sh)"/><text x="296" y="537" font-size="15" fill="#222" text-anchor="middle" pointer-events="none">▲</text></g>
+  <g class="key" data-k="down"><path class="cap" d="M254 547 L326 553 Q318 576 296 580 Q268 576 250 560Z" fill="url(#sv2)" stroke="#5d646c" stroke-width="1.5" filter="url(#sh)"/><text x="292" y="570" font-size="15" fill="#222" text-anchor="middle" pointer-events="none">▼</text></g>
+
+  <g id="pad"></g>
+</svg>
+</div>
+<script>
+// ---------- UTIL + TECLADO ----------
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const LAYOUT=[["1","2","3"],["4","5","6"],["7","8","9"],["*","0","#"]];
+const SUB={1:"oo",2:"abc",3:"def",4:"ghi",5:"jkl",6:"mno",7:"pqrs",8:"OCT−",9:"OCT+",0:"NOISE","*":"♭","#":"♯"};
+const SCALE=[0,2,4,5,7,9,11];
+const NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const COLX=[106,200,294],ROT=[-9,0,9];
+LAYOUT.forEach((row,r)=>row.forEach((k,c)=>{
+  const x=COLX[c],y=632+r*58+(c===1?6:0),long=SUB[k].length>3;
+  $("pad").insertAdjacentHTML("beforeend",
+   `<g class="key" data-k="${k}" transform="rotate(${ROT[c]} ${x} ${y})">
+    <ellipse class="cap" cx="${x}" cy="${y}" rx="41" ry="21" fill="url(#kc)" stroke="#070a12" stroke-width="3" filter="url(#sh)"/>
+    <ellipse cx="${x}" cy="${y-9}" rx="28" ry="6" fill="#fff" opacity=".35" pointer-events="none"/>
+    <text x="${x-11}" y="${y+8}" font-size="22" font-weight="bold" fill="#1a2a1a" text-anchor="middle" pointer-events="none">${k==="*"?"✱":k}</text>
+    <text x="${x+15}" y="${y+7}" font-size="${long?9:12}" fill="#1a2a1a" text-anchor="middle" pointer-events="none">${SUB[k]}</text></g>`);
+}));
+
+// ---------- ESTADO ----------
+const S={oct:4,timbre:0,vol:.6,att:3,rel:60,gli:40,bRange:2,flt:4500,bpm:120,sharp:0,flat:0,tr:0,
+  legato:false,bend:0,expr:1,vib:0,trm:0,last:null};
+const TIMBRES=[
+  {n:"NOKIA",d:.5,f:1},{n:"PULSE 25",d:.25,f:1},{n:"PULSE 12",d:.125,f:1},
+  {n:"BUZZER",d:.5,f:.5,q:6},{n:"TRIANGLE",t:"triangle",f:1},{n:"SINE",t:"sine",f:1},{n:"SAW",t:"sawtooth",f:.8}
+];
+
+// ---------- ÁUDIO ----------
+let ctx,master,exprG,tremG,filt,bendSrc,vibLfo,vibG,trmLfo,trmG,noiseBuf;
+const waves=[];
+function pulse(d){const N=64,re=new Float32Array(N),im=new Float32Array(N);
+  for(let n=1;n<N;n++)re[n]=(2/(n*Math.PI))*Math.sin(n*Math.PI*d);
+  return ctx.createPeriodicWave(re,im);}
+function initAudio(){
+  ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:"interactive"});
+  TIMBRES.forEach((t,i)=>waves[i]=t.d?pulse(t.d):null);
+  filt=ctx.createBiquadFilter();filt.type="lowpass";filt.frequency.value=S.flt;
+  exprG=ctx.createGain();tremG=ctx.createGain();master=ctx.createGain();master.gain.value=S.vol;
+  const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;
+  filt.connect(exprG).connect(tremG).connect(master).connect(comp).connect(ctx.destination);
+  bendSrc=ctx.createConstantSource();bendSrc.offset.value=0;bendSrc.start();
+  vibLfo=ctx.createOscillator();vibLfo.frequency.value=5;
+  vibG=ctx.createGain();vibG.gain.value=0;vibLfo.connect(vibG);vibLfo.start();
+  trmLfo=ctx.createOscillator();trmG=ctx.createGain();trmG.gain.value=0;
+  trmLfo.connect(trmG).connect(tremG.gain);trmLfo.start();
+  noiseBuf=ctx.createBuffer(1,ctx.sampleRate*.5,ctx.sampleRate);
+  const nd=noiseBuf.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+  setMono($("mono").checked);applyMod();
+  $("lat").textContent=`Latência base: ${((ctx.baseLatency||0)*1000).toFixed(1)} ms · saída: ${((ctx.outputLatency||0)*1000).toFixed(1)} ms`;
+  listSinks();
+}
+function setMono(m){const d=ctx.destination;d.channelCount=m?1:2;d.channelCountMode="explicit";}
+function applyMod(){
+  if(!ctx)return;const t=ctx.currentTime;
+  bendSrc.offset.setTargetAtTime(S.bend*S.bRange*100,t,.01);
+  exprG.gain.setTargetAtTime(.05+.95*S.expr,t,.02);
+  vibG.gain.setTargetAtTime(S.vib*60,t,.02);
+  vibLfo.frequency.setTargetAtTime(4+S.vib*4,t,.05);
+  const d=S.trm*.5;
+  tremG.gain.setTargetAtTime(1-d,t,.02);trmG.gain.setTargetAtTime(d,t,.02);
+  trmLfo.frequency.setTargetAtTime(S.bpm/60*2,t,.05);
+  master.gain.setTargetAtTime(S.vol,t,.02);
+  filt.frequency.setTargetAtTime(S.flt,t,.02);
+}
+
+// ---------- VOZES ----------
+const voices=new Map();
+const hz=m=>440*Math.pow(2,(m-69)/12);
+const midiOf=semi=>12*(S.oct+1)+semi+S.sharp-S.flat+S.tr;
+function startVoice(id,midi,vel=1,from=null){
+  const t=ctx.currentTime,tim=TIMBRES[S.timbre];
+  const o=ctx.createOscillator(),g=ctx.createGain();
+  if(waves[S.timbre])o.setPeriodicWave(waves[S.timbre]);else o.type=tim.t;
+  if(from!=null){o.frequency.setValueAtTime(hz(from),t);o.frequency.setTargetAtTime(hz(midi),t,Math.max(S.gli,1)/3000);}
+  else o.frequency.value=hz(midi);
+  bendSrc.connect(o.detune);vibG.connect(o.detune);
+  let out=g;
+  if(tim.q){const bp=ctx.createBiquadFilter();bp.type="bandpass";bp.frequency.value=2500;bp.Q.value=tim.q;g.connect(bp);out=bp;}
+  out.connect(filt);
+  const peak=.35*tim.f*vel;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+S.att/1000);
+  o.connect(g);o.start(t);
+  const v={o,g,midi};voices.set(id,v);S.last=midi;hud();return v;
+}
+function noteOn(id,key,vel=1){
+  const semi=SCALE[+key-1];if(semi===undefined)return;
+  const m=midiOf(semi);let from=null;
+  if(S.legato)voices.forEach((v,k)=>{if(!v.fixed){from=v.midi;noteOff(k,true);}});
+  noteOff(id,true);
+  const v=startVoice(id,m,vel,from);v.semi=semi;v.key=key;rec(0x90,m,Math.round(vel*100));
+}
+function glideTo(id,key){
+  const v=voices.get(id),semi=SCALE[+key-1];if(!v||semi===undefined||v.key===key)return;
+  const m=midiOf(semi);rec(0x80,v.midi,0);rec(0x90,m,100);
+  v.semi=semi;v.key=key;v.midi=m;S.last=m;
+  v.o.frequency.setTargetAtTime(hz(m),ctx.currentTime,Math.max(S.gli,1)/3000);hud();
+}
+function noteOff(id,fast){
+  const v=voices.get(id);if(!v)return;voices.delete(id);
+  if(!v.fixed)rec(0x80,v.midi,0);
+  const t=ctx.currentTime,r=fast?.01:S.rel/1000;
+  v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(v.g.gain.value,t);
+  v.g.gain.setTargetAtTime(0,t,r/4);v.o.stop(t+r+.05);
+  if(!voices.size){S.last=null;hud();}
+}
+function retune(){
+  if(!ctx)return;
+  voices.forEach(v=>{if(v.fixed)return;const m=midiOf(v.semi);
+    if(m!==v.midi){rec(0x80,v.midi,0);rec(0x90,m,100);v.midi=m;}
+    v.o.frequency.setTargetAtTime(hz(m),ctx.currentTime,.005);});
+  if(voices.size)S.last=[...voices.values()].pop().midi;
+}
+function noiseHit(vel=1){
+  const t=ctx.currentTime,s=ctx.createBufferSource(),hp=ctx.createBiquadFilter(),g=ctx.createGain();
+  s.buffer=noiseBuf;hp.type="highpass";hp.frequency.value=3000;
+  g.gain.setValueAtTime(.4*vel,t);g.gain.exponentialRampToValueAtTime(.001,t+.08);
+  s.connect(hp).connect(g).connect(filt);s.start(t);s.stop(t+.1);
+}
+function panic(){
+  if(!ctx)return;
+  [...voices.keys()].forEach(k=>noteOff(k,true));
+  stopPlay();S.bend=0;S.vib=0;S.trm=0;S.expr=1;applyMod();hud();
+}
+// ---------- FUNÇÕES DAS TECLAS ----------
+const isNoteKey=k=>/^[1-7]$/.test(k);
+let sharpN=0,flatN=0;
+function syncBpm(){$("bpm").value=S.bpm;$("pV").textContent=S.bpm;applyMod();}
+function func(k,down){
+  if(k==="#"){sharpN=Math.max(0,sharpN+(down?1:-1));S.sharp=sharpN?1:0;retune();hud();return;}
+  if(k==="*"){flatN=Math.max(0,flatN+(down?1:-1));S.flat=flatN?1:0;retune();hud();return;}
+  if(!down)return;
+  switch(k){
+    case"8":S.oct=Math.max(1,S.oct-1);retune();break;
+    case"9":S.oct=Math.min(7,S.oct+1);retune();break;
+    case"0":noiseHit();break;
+    case"navi":S.timbre=(S.timbre+1)%TIMBRES.length;$("timbre").value=S.timbre;break;
+    case"clr":panic();break;
+    case"up":S.bpm=clamp(S.bpm+5,40,300);syncBpm();break;
+    case"down":S.bpm=clamp(S.bpm-5,40,300);syncBpm();break;
+  }
+  hud();
+}
+
+// ---------- TOQUE (multitouch) ----------
+const ptr=new Map(),slots=[null,null],lcd=$("lcd");
+let lastBend=8192,lastMod=0,lastExp=127,lastTrm=0;
+const keyAt=(x,y)=>{const e=document.elementFromPoint(x,y);const g=e&&e.closest(".key");return g?g.dataset.k:null;};
+function hl(k,on){document.querySelectorAll(`.key[data-k="${CSS.escape(k)}"]`).forEach(g=>g.classList.toggle("on",on));}
+function lcdXY(e){const r=lcd.getBoundingClientRect();
+  return[clamp((e.clientX-r.left)/r.width,0,1),clamp((e.clientY-r.top)/r.height,0,1)];}
+function recCC(){
+  const pb=clamp(Math.round(8192+S.bend*8191),0,16383),md=Math.round(S.vib*127),
+        ex=Math.round(S.expr*127),tr=Math.round(S.trm*127);
+  if(pb!==lastBend){rec(0xE0,pb);lastBend=pb;}
+  if(md!==lastMod){rec(0xB0,1,md);lastMod=md;}
+  if(ex!==lastExp){rec(0xB0,11,ex);lastExp=ex;}
+  if(tr!==lastTrm){rec(0xB0,92,tr);lastTrm=tr;}
+}
+function lcdMove(e,i){
+  const[x,y]=lcdXY(e),ny=1-y,d=$(i?"dot2":"dot1");
+  d.setAttribute("cx",95+x*210);d.setAttribute("cy",200+y*190);d.setAttribute("opacity",.85);
+  if(i===0){let b=x*2-1;if(Math.abs(b)<.06)b=0;S.bend=b;S.expr=ny;}
+  else{S.vib=x;S.trm=ny;}
+  recCC();applyMod();hud();
+}
+$("ph").addEventListener("pointerdown",e=>{
+  if(!ctx)boot();e.preventDefault();
+  if(e.target===lcd){
+    const i=slots[0]===null?0:slots[1]===null?1:-1;if(i<0)return;
+    slots[i]=e.pointerId;ptr.set(e.pointerId,{type:"lcd",i});lcdMove(e,i);return;
+  }
+  const k=keyAt(e.clientX,e.clientY);if(!k)return;
+  hl(k,true);
+  const vel=(e.pressure&&e.pressure!==.5)?clamp(e.pressure*1.5,.3,1):1;
+  if(isNoteKey(k)){noteOn(e.pointerId,k,vel);ptr.set(e.pointerId,{type:"note",key:k});}
+  else{func(k,true);ptr.set(e.pointerId,{type:"func",key:k});}
+});
+window.addEventListener("pointermove",e=>{
+  const p=ptr.get(e.pointerId);if(!p)return;
+  if(p.type==="lcd")return lcdMove(e,p.i);
+  if(p.type==="note"){const k=keyAt(e.clientX,e.clientY);
+    if(k&&isNoteKey(k)&&k!==p.key){hl(p.key,false);hl(k,true);glideTo(e.pointerId,k);p.key=k;}}
+},{passive:true});
+function up(e){
+  const p=ptr.get(e.pointerId);if(!p)return;ptr.delete(e.pointerId);
+  if(p.type==="lcd"){
+    slots[p.i]=null;$(p.i?"dot2":"dot1").setAttribute("opacity",0);
+    if(p.i===0)S.bend=0;else{S.vib=0;S.trm=0;}
+    recCC();applyMod();hud();return;
+  }
+  hl(p.key,false);
+  if(p.type==="func")func(p.key,false);else noteOff(e.pointerId);
+}
+window.addEventListener("pointerup",up);
+window.addEventListener("pointercancel",up);
+
+// ---------- TECLADO DO COMPUTADOR ----------
+const held=new Map();
+function kbKey(e){
+  if(e.key==="#")return"#";
+  if(e.key==="*"||e.code==="NumpadMultiply")return"*";
+  if(/^(Digit|Numpad)[0-9]$/.test(e.code))return e.code.slice(-1);
+  return{ArrowUp:"up",ArrowDown:"down",Enter:"navi",NumpadEnter:"navi",Escape:"clr",Backspace:"clr"}[e.code]||null;
+}
+function kbPress(k,id){hl(k,true);if(isNoteKey(k))noteOn(id,k);else func(k,true);}
+function kbRelease(k,id){hl(k,false);if(isNoteKey(k))noteOff(id);else func(k,false);}
+window.addEventListener("keydown",e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.target.closest&&e.target.closest("input,select,textarea"))return;
+  if($("cfg").style.display==="block")return;
+  const k=kbKey(e);if(!k)return;
+  e.preventDefault();
+  if(e.repeat||held.has(e.code))return;
+  if(!ctx)boot();
+  held.set(e.code,k);kbPress(k,"kb"+e.code);
+});
+window.addEventListener("keyup",e=>{
+  const k=held.get(e.code);if(!k)return;
+  held.delete(e.code);kbRelease(k,"kb"+e.code);
+});
+function releaseAllKb(){held.forEach((k,c)=>kbRelease(k,"kb"+c));held.clear();}
+window.addEventListener("blur",releaseAllKb);
+
+// ---------- DISPLAY ----------
+let hudQ=false;
+function hud(){if(hudQ)return;hudQ=true;requestAnimationFrame(()=>{hudQ=false;drawHud();});}
+function drawHud(){
+  const m=S.last;
+  $("tInfo").textContent="OCT "+S.oct+(S.sharp?" ♯":"")+(S.flat?" ♭":"");
+  $("tTim").textContent=TIMBRES[S.timbre].n;
+  $("tNote").textContent=m==null?"--":NAMES[((m%12)+12)%12]+(Math.floor(m/12)-1);
+  $("tArt").textContent="EXP "+Math.round(S.expr*100);
+  $("tTr").textContent=S.bpm+"BPM"+(S.tr?" TR"+(S.tr>0?"+":"")+S.tr:"");
+  $("tFx").textContent="V"+Math.round(S.vib*100)+" T"+Math.round(S.trm*100);
+  const b=S.bend*S.bRange;
+  $("tRec").textContent=(AR.on?"●MIC ":"")+(MR.on?"●MIDI ":"")+(PB.length?"▶MIDI ":"")+(b?"B"+(b>0?"+":"")+b.toFixed(1):"");
+}
+// ---------- CONFIG ----------
+TIMBRES.forEach((t,i)=>$("timbre").insertAdjacentHTML("beforeend",`<option value="${i}">${t.n}</option>`));
+for(let i=-12;i<=12;i++)$("trans").insertAdjacentHTML("beforeend",
+  `<option value="${i}"${i===0?" selected":""}>${i>0?"+":""}${i} semitom${Math.abs(i)===1?"":"s"}${i===0?" (original)":""}</option>`);
+$("trans").onchange=e=>{S.tr=+e.target.value;$("tV").textContent=(S.tr>0?"+":"")+S.tr;retune();hud();};
+$("gear").onclick=()=>$("cfg").style.display="block";
+$("close").onclick=()=>$("cfg").style.display="none";
+$("timbre").onchange=e=>{S.timbre=+e.target.value;hud();};
+$("mono").onchange=e=>{if(ctx)setMono(e.target.checked);};
+$("legato").onchange=e=>S.legato=e.target.checked;
+const bind=(id,lab,key)=>{const el=$(id),f=()=>{S[key]=+el.value;$(lab).textContent=el.value;applyMod();hud();};el.oninput=f;f();};
+bind("vol","vV","vol");bind("att","aV","att");bind("rel","rV","rel");bind("gli","gV","gli");
+bind("bnd","bV","bRange");bind("flt","fV","flt");bind("bpm","pV","bpm");
+
+// ---------- SAÍDA DE ÁUDIO ----------
+async function listSinks(){
+  const sel=$("sink");
+  if(!ctx||!ctx.setSinkId||!navigator.mediaDevices?.enumerateDevices){sel.disabled=!ctx?.setSinkId;return;}
+  const cur=sel.value,d=await navigator.mediaDevices.enumerateDevices();
+  sel.innerHTML=`<option value="">Padrão (alto-falante inferior)</option>`;
+  d.filter(x=>x.kind==="audiooutput"&&x.deviceId!=="default").forEach(x=>
+    sel.insertAdjacentHTML("beforeend",`<option value="${x.deviceId}">${x.label||"Saída "+x.deviceId.slice(0,6)}</option>`));
+  sel.value=cur;
+}
+$("sinkScan").onclick=()=>{if(!ctx)boot();listSinks();};
+$("sink").onchange=e=>{if(ctx&&ctx.setSinkId)ctx.setSinkId(e.target.value).catch(err=>alert("Saída indisponível: "+err.message));};
+
+// ---------- GRAVAÇÃO MIDI ----------
+const MR={on:false,t0:0,ev:[]};
+let PB=[];
+function rec(type,a,b=0){if(MR.on)MR.ev.push({t:performance.now()-MR.t0,type,a,b});}
+function startMidiRec(){MR.ev=[];MR.t0=performance.now();MR.on=true;
+  voices.forEach(v=>{if(!v.fixed)rec(0x90,v.midi,100);});
+  $("mRec").textContent="■ Parar gravação";hud();}
+function stopMidiRec(){
+  voices.forEach(v=>{if(!v.fixed)rec(0x80,v.midi,0);});rec(0xE0,8192);MR.on=false;
+  try{localStorage.setItem("nm_midi",JSON.stringify(MR.ev));}catch(e){}
+  $("mRec").textContent="● Gravar MIDI";midiInfo();hud();
+}
+function midiInfo(){
+  const n=MR.ev.filter(e=>e.type===0x90).length;
+  $("midiInfo").textContent=MR.ev.length?`Gravação: ${n} notas, ${(MR.ev[MR.ev.length-1].t/1000).toFixed(1)} s`:"Nenhuma gravação.";
+}
+// SMF tipo 0, 480 PPQ, 120 BPM
+function toSMF(ev){
+  const trk=[];let last=0;
+  const vlq=n=>{const s=[n&0x7f];while(n>>=7)s.unshift((n&0x7f)|0x80);trk.push(...s);};
+  const put=(tk,...b)=>{vlq(Math.max(0,tk-last));last=Math.max(last,tk);trk.push(...b);};
+  put(0,0xFF,0x51,3,0x07,0xA1,0x20);
+  put(0,0xB0,101,0);put(0,0xB0,100,0);put(0,0xB0,6,S.bRange);
+  ev.forEach(e=>{const tk=Math.round(e.t*0.96);
+    if(e.type===0xE0)put(tk,0xE0,e.a&0x7f,(e.a>>7)&0x7f);else put(tk,e.type,e.a&0x7f,(e.b|0)&0x7f);});
+  put(last,0xFF,0x2F,0);
+  const L=trk.length;
+  return new Uint8Array([0x4D,0x54,0x68,0x64,0,0,0,6,0,0,0,1,0x01,0xE0,
+    0x4D,0x54,0x72,0x6B,(L>>>24)&255,(L>>16)&255,(L>>8)&255,L&255,...trk]);
+}
+function parseSMF(buf){
+  const d=new DataView(buf);let p=0;
+  const u8=()=>d.getUint8(p++),u16=()=>{const v=d.getUint16(p);p+=2;return v;},u32=()=>{const v=d.getUint32(p);p+=4;return v;};
+  const vlq=()=>{let v=0,c;do{c=u8();v=(v<<7)|(c&0x7f);}while(c&0x80);return v;};
+  if(u32()!==0x4D546864)throw new Error("Arquivo não é MIDI");
+  const hl=u32();u16();const nt=u16(),div=u16();p=8+hl;
+  const raw=[],tempos=[{tk:0,us:500000}];
+  for(let i=0;i<nt&&p<d.byteLength;i++){
+    const id=u32(),len=u32(),end=p+len;if(id!==0x4D54726B){p=end;continue;}
+    let tk=0,rs=0;
+    while(p<end){
+      tk+=vlq();let s=d.getUint8(p);if(s&0x80)p++;else s=rs;
+      if(s===0xFF){const ty=u8(),l=vlq();
+        if(ty===0x51)tempos.push({tk,us:(d.getUint8(p)<<16)|(d.getUint8(p+1)<<8)|d.getUint8(p+2)});p+=l;}
+      else if(s===0xF0||s===0xF7)p+=vlq();
+      else{rs=s;const hi=s&0xF0,a=u8(),b=(hi===0xC0||hi===0xD0)?0:u8();
+        if(hi===0x90&&b===0)raw.push({tk,type:0x80,a,b:0});
+        else if(hi===0x80||hi===0x90||hi===0xB0)raw.push({tk,type:hi,a,b});
+        else if(hi===0xE0)raw.push({tk,type:0xE0,a:a|(b<<7)});}
+    }
+    p=end;
+  }
+  tempos.sort((x,y)=>x.tk-y.tk);
+  const ms=tk=>{let t=0,lt=0,us=500000;
+    for(const x of tempos){if(x.tk>tk)break;t+=(x.tk-lt)*us/div/1000;lt=x.tk;us=x.us;}
+    return t+(tk-lt)*us/div/1000;};
+  return raw.sort((x,y)=>x.tk-y.tk).map(e=>({t:ms(e.tk),type:e.type,a:e.a,b:e.b}));
+}
+
+// ---------- REPRODUÇÃO MIDI ----------
+function pbEvent(e){
+  const id="pb"+e.a;
+  if(e.type===0x90){noteOff(id,true);const v=startVoice(id,e.a,(e.b||100)/127);v.fixed=true;}
+  else if(e.type===0x80)noteOff(id);
+  else if(e.type===0xE0){S.bend=(e.a-8192)/8192;applyMod();hud();}
+  else if(e.type===0xB0){
+    if(e.a===1)S.vib=e.b/127;else if(e.a===11)S.expr=e.b/127;else if(e.a===92)S.trm=e.b/127;else return;
+    applyMod();hud();
+  }
+}
+function playMidi(ev){
+  stopPlay();if(!ev.length)return;if(!ctx)boot();
+  PB=ev.map(e=>setTimeout(()=>pbEvent(e),e.t+50));
+  PB.push(setTimeout(stopPlay,ev[ev.length-1].t+600));hud();
+}
+function stopPlay(){
+  PB.forEach(clearTimeout);PB=[];
+  if(ctx){
+    [...voices.keys()].filter(k=>typeof k==="string"&&k.startsWith("pb")).forEach(k=>noteOff(k));
+    S.bend=0;S.vib=0;S.trm=0;S.expr=1;applyMod();
+  }
+  hud();
+}
+$("mRec").onclick=()=>{if(!ctx)boot();MR.on?stopMidiRec():startMidiRec();};
+$("mPlay").onclick=()=>playMidi(MR.ev);
+$("mStop").onclick=stopPlay;
+$("mSave").onclick=()=>{if(!MR.ev.length)return alert("Nada gravado. Use ● Gravar MIDI.");
+  download(toSMF(MR.ev),"nokia-music-"+Date.now()+".mid","audio/midi");};
+$("mLoad").onclick=()=>$("mFile").click();
+$("mFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  try{MR.ev=parseSMF(await f.arrayBuffer());midiInfo();}catch(err){alert(err.message);}
+  e.target.value="";};
+try{MR.ev=JSON.parse(localStorage.getItem("nm_midi")||"[]");}catch(e){MR.ev=[];}
+midiInfo();
+
+// ---------- GRAVAÇÃO DE ÁUDIO (MICROFONE) ----------
+const AR={on:false,stream:null,src:null,proc:null,mute:null,chunks:[]};
+async function startAudioRec(){
+  try{
+    AR.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}});
+  }catch(e){alert("Microfone indisponível: "+e.message+"\nAbra via HTTPS e permita o microfone.");return;}
+  if($("fmt").value==="mp3")loadLame().catch(()=>{});
+  AR.chunks=[];
+  AR.src=ctx.createMediaStreamSource(AR.stream);
+  AR.proc=ctx.createScriptProcessor(4096,1,1);
+  AR.proc.onaudioprocess=e=>AR.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  AR.mute=ctx.createGain();AR.mute.gain.value=0;
+  AR.src.connect(AR.proc).connect(AR.mute).connect(ctx.destination);
+  AR.on=true;$("micBtn").classList.add("rec");hud();
+}
+async function stopAudioRec(){
+  AR.on=false;$("micBtn").classList.remove("rec");hud();
+  AR.src.disconnect();AR.proc.disconnect();AR.mute.disconnect();
+  AR.stream.getTracks().forEach(t=>t.stop());
+  const len=AR.chunks.reduce((s,c)=>s+c.length,0);if(!len)return;
+  const pcm=new Float32Array(len);let o=0;AR.chunks.forEach(c=>{pcm.set(c,o);o+=c.length;});AR.chunks=[];
+  const inBuf=ctx.createBuffer(1,len,ctx.sampleRate);inBuf.copyToChannel(pcm,0);
+  const off=new OfflineAudioContext(1,Math.ceil(len*44100/ctx.sampleRate),44100);
+  const bs=off.createBufferSource();bs.buffer=inBuf;bs.connect(off.destination);bs.start();
+  const data=(await off.startRendering()).getChannelData(0);
+  const name="nokia-music-"+new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+  if($("fmt").value==="mp3"){
+    try{await loadLame();download(encMP3(data),name+".mp3","audio/mpeg");}
+    catch(e){alert("MP3 indisponível (sem internet?). Salvando em WAV.");download(encWAV(data),name+".wav","audio/wav");}
+  }else download(encWAV(data),name+".wav","audio/wav");
+}
+const i16=x=>(Math.max(-1,Math.min(1,x))*0x7fff)|0;
+function encWAV(d){
+  const n=d.length,b=new ArrayBuffer(44+n*4),v=new DataView(b);
+  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  w(0,"RIFF");v.setUint32(4,36+n*4,true);w(8,"WAVE");w(12,"fmt ");v.setUint32(16,16,true);
+  v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,44100,true);v.setUint32(28,44100*4,true);
+  v.setUint16(32,4,true);v.setUint16(34,16,true);w(36,"data");v.setUint32(40,n*4,true);
+  for(let i=0,p=44;i<n;i++,p+=4){const s=i16(d[i]);v.setInt16(p,s,true);v.setInt16(p+2,s,true);}
+  return b;
+}
+let lameP=null;
+function loadLame(){
+  if(lameP)return lameP;
+  lameP=new Promise((res,rej)=>{
+    if(window.lamejs)return res();
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js";
+    s.onload=res;s.onerror=()=>{lameP=null;rej();};
+    document.head.appendChild(s);
+  });
+  return lameP;
+}
+function encMP3(d){
+  const enc=new lamejs.Mp3Encoder(2,44100,320),pcm=new Int16Array(d.length),out=[];
+  for(let i=0;i<d.length;i++)pcm[i]=i16(d[i]);
+  for(let i=0;i<pcm.length;i+=1152){const c=pcm.subarray(i,i+1152),m=enc.encodeBuffer(c,c);if(m.length)out.push(new Uint8Array(m));}
+  const f=enc.flush();if(f.length)out.push(new Uint8Array(f));
+  return new Blob(out,{type:"audio/mpeg"});
+}
+function download(data,name,type){
+  const blob=data instanceof Blob?data:new Blob([data],{type});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+$("micBtn").onclick=()=>{if(!ctx)boot();AR.on?stopAudioRec():startAudioRec();};
+// ---------- INICIALIZAÇÃO DO ÁUDIO ----------
+function boot(){
+  if(ctx)return;
+  initAudio();ctx.resume();
+  const s=$("start");if(s)s.remove();
+  // Bipe de boas-vindas Nokia
+  [[76,0],[74,90],[66,180],[68,270]].forEach(([n,d])=>setTimeout(()=>{
+    const v=startVoice("boot"+n,n,.7);v.fixed=true;
+    setTimeout(()=>noteOff("boot"+n),80);
+  },d));
+  hud();
+}
+$("start").onpointerdown=boot;
+
+// Retomar áudio ao voltar ao app
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){releaseAllKb();panic();}
+  else if(ctx&&ctx.state!=="running")ctx.resume();
+});
+
+// ---------- MANIFESTO PWA (inline) ----------
+(function(){
+  const icon=`data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#1a2640"/><rect x="96" y="96" width="320" height="220" rx="20" fill="#9fbf3b"/><text x="256" y="230" font-family="monospace" font-weight="bold" font-size="72" text-anchor="middle" fill="#1e2a10">NOKIA</text><text x="256" y="420" font-family="monospace" font-size="56" text-anchor="middle" fill="#cfe08a">♪ 2026</text></svg>`)}`;
+  const mf={name:"Nokia Music 2026",short_name:"NokiaMusic",start_url:".",display:"standalone",
+    orientation:"portrait",background_color:"#0b0d12",theme_color:"#9fbf3b",
+    icons:[{src:icon,sizes:"512x512",type:"image/svg+xml",purpose:"any"}]};
+  const l=document.createElement("link");l.rel="manifest";
+  l.href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:"application/manifest+json"}));
+  document.head.appendChild(l);
+  const a=document.createElement("link");a.rel="apple-touch-icon";a.href=icon;document.head.appendChild(a);
+})();
+
+// ---------- WAKE LOCK ----------
+let wake=null;
+async function keepAwake(){
+  try{
+    if("wakeLock" in navigator&&!document.hidden&&!wake){
+      wake=await navigator.wakeLock.request("screen");
+      wake.addEventListener("release",()=>wake=null);
+    }
+  }catch(e){}
+}
+window.addEventListener("pointerdown",keepAwake);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)keepAwake();});
+
+// ---------- BLOQUEAR GESTOS DO NAVEGADOR ----------
+["gesturestart","gesturechange","gestureend"].forEach(t=>
+  document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("dblclick",e=>e.preventDefault(),{passive:false});
+document.addEventListener("touchmove",e=>{if(!e.target.closest("#cfg"))e.preventDefault();},{passive:false});
+let lastTap=0;
+document.addEventListener("touchend",e=>{
+  const n=Date.now();if(n-lastTap<300&&!e.target.closest("#cfg"))e.preventDefault();lastTap=n;
+},{passive:false});
+
+drawHud();
+</script>
+</body>
+</html>
+<!-- FIM -->
