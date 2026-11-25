@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Virtual Spring — Gesture-Controlled Wave Simulator</title>
+<!-- ═══════════════════════ BLOCO 1 — HTML / CSS ═══════════════════════ -->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#cfe;font-family:system-ui,sans-serif;overflow:hidden}
+canvas#gl{position:fixed;inset:0;display:block}
+#ui,#hud{position:fixed;background:rgba(5,10,25,.72);border:1px solid #234;border-radius:12px;padding:12px;font-size:12px;backdrop-filter:blur(6px);z-index:5}
+#ui{top:12px;left:12px;width:250px}
+#hud{top:12px;right:12px;width:250px}
+h1{font-size:14px;letter-spacing:2px;color:#7ff;margin-bottom:8px}
+label{display:block;margin:6px 0 2px}
+input[type=range]{width:100%}
+.row{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
+button{flex:1;background:#0b1830;color:#bdf;border:1px solid #2a4a7a;border-radius:6px;padding:5px;cursor:pointer;font-size:11px}
+button.on{background:#1b5;color:#000;border-color:#3f8}
+#type{font-size:18px;font-weight:700;text-align:center;padding:6px;border-radius:8px;margin:6px 0}
+.st{display:flex;justify-content:space-between;margin:2px 0}
+.ok{color:#4f8}.bad{color:#f66}
+#bars{display:flex;gap:4px;height:60px;align-items:flex-end;margin-top:6px}
+#bars div{flex:1;background:linear-gradient(#7ff,#06a);border-radius:3px 3px 0 0;height:2px;position:relative}
+#bars div span{position:absolute;bottom:-14px;width:100%;text-align:center;font-size:10px}
+#tbar{height:8px;background:#123;border-radius:4px;overflow:hidden}
+#tbar i{display:block;height:100%;background:linear-gradient(90deg,#08f,#f0f);width:50%}
+#prev{position:fixed;bottom:12px;right:12px;width:220px;height:165px;border:1px solid #234;border-radius:10px;z-index:5}
+#warn{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:#fa6;font-size:14px;z-index:5;text-shadow:0 0 8px #000}
+#start{position:fixed;inset:0;background:radial-gradient(#012,#000);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;gap:16px}
+#start button{flex:none;font-size:18px;padding:14px 32px}
+video{display:none}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<video id="vid" autoplay playsinline muted></video>
+<canvas id="gl"></canvas>
+<canvas id="prev" width="220" height="165"></canvas>
+
+<div id="ui">
+  <h1>VIRTUAL SPRING</h1>
+  <div class="row"><button id="bSound">🔇 Som OFF</button><button id="bReset">⟲ Reset</button></div>
+  <label>Tipo de onda</label>
+  <div class="row" id="types">
+    <button data-t="auto" class="on">Auto</button><button data-t="trans">Transv.</button>
+    <button data-t="long">Longit.</button><button data-t="tors">Torção</button>
+  </div>
+  <label>Sensibilidade <span id="vSens">1.0</span></label><input id="sSens" type="range" min="0.2" max="3" step="0.1" value="1">
+  <label>Amortecimento <span id="vDamp">0.6</span></label><input id="sDamp" type="range" min="0" max="4" step="0.05" value="0.6">
+  <label>Tensão base (sem rosto) <span id="vTen">0.5</span></label><input id="sTen" type="range" min="0" max="1" step="0.01" value="0.5">
+  <label>Modos normais (clique = excitar, combina)</label>
+  <div class="row" id="modes"></div>
+  <div class="row"><button id="bImp">⚡ Impulso</button><button id="bDrive">Drive: gesto</button></div>
+</div>
+
+<div id="hud">
+  <div id="type">TRANSVERSAL</div>
+  <div class="st"><span>Mãos</span><b id="hHands" class="bad">0/2</b></div>
+  <div class="st"><span>Rosto</span><b id="hFace" class="bad">não</b></div>
+  <div class="st"><span>Modo dirigido</span><b id="hDrive">—</b></div>
+  <div class="st"><span>f₁ (som)</span><b id="hF">0 Hz</b></div>
+  <div class="st"><span>Comprimento</span><b id="hL">0</b></div>
+  <label>Tensão</label><div id="tbar"><i></i></div>
+  <label>Amplitudes modais (1–6)</label>
+  <div id="bars"></div><br>
+</div>
+<div id="warn"></div>
+<div id="start"><h1 style="font-size:28px">VIRTUAL SPRING</h1><p>Câmera + áudio necessários</p><button id="bStart">▶ Iniciar</button><p id="load"></p></div>
+
+<script type="module">
+/* ═══════════════════════ BLOCO 2 — ESTADO / UI ═══════════════════════ */
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {FilesetResolver,HandLandmarker,FaceLandmarker} from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+
+const $=id=>document.getElementById(id);
+const S={sound:false,forced:'auto',type:'trans',sens:1,damp:0.6,tenBase:0.5,tension:0.5,
+  faceOK:false,hands:0,torsDetect:false,driveMode:0,gestureDrive:true,manualDrive:0,selMode:1,
+  A:new THREE.Vector3(-3,0,0),B:new THREE.Vector3(3,0,0),L:6,time:0,pluck:null};
+const TYPE_COL={trans:'#2ef',long:'#fa3',tors:'#e4f'};
+const TYPE_NAME={trans:'TRANSVERSAL',long:'LONGITUDINAL',tors:'TORÇÃO'};
+
+document.querySelectorAll('#types button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#types button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');S.forced=b.dataset.t;});
+const bind=(id,key,lbl)=>$(id).oninput=e=>{S[key]=+e.target.value;$(lbl).textContent=(+e.target.value).toFixed(2);};
+bind('sSens','sens','vSens');bind('sDamp','damp','vDamp');bind('sTen','tenBase','vTen');
+for(let n=1;n<=6;n++){const b=document.createElement('button');b.textContent=n;
+  b.onclick=()=>{S.selMode=n;exciteMode(n);};$('modes').appendChild(b);
+  const d=document.createElement('div');d.innerHTML=`<span>${n}</span>`;$('bars').appendChild(d);}
+$('bImp').onclick=()=>impulse(0.15+Math.random()*0.2,1);
+$('bDrive').onclick=()=>{ // alterna: gesto -> modo 1..6 -> off
+  S.manualDrive=(S.manualDrive+1)%7;S.gestureDrive=S.manualDrive===0;
+  $('bDrive').textContent=S.gestureDrive?'Drive: gesto':'Drive: modo '+S.manualDrive;};
+$('bReset').onclick=()=>resetPhys();
+$('bSound').onclick=()=>{if(!AC)initAudio();AC.resume();S.sound=!S.sound;
+  $('bSound').textContent=S.sound?'🔊 Som ON':'🔇 Som OFF';$('bSound').classList.toggle('on',S.sound);};
+const activeDofs=t=>t==='trans'?['v','w']:t==='long'?['u']:['p'];
+
+/* ═══════════════════════ BLOCO 3 — FÍSICA (massa-mola discretizada) ═══════════════════════ */
+// Coordenadas normalizadas x∈[0,1]. DOFs: u (longitudinal), v,w (transversais), p (ângulo de torção)
+const N=64,DX=1/N,DOFS=['u','v','w','p'];
+const P={};DOFS.forEach(k=>P[k]={y:new Float64Array(N+1),v:new Float64Array(N+1),b0:0,b1:0});
+// velocidade de onda c=√(T/μ) (em L/s); longitudinal ~√(k/m), torção ~√(GJ/I)
+const speed=k=>{const c=2*(0.5+2.2*S.tension);return k==='u'?c*1.35:k==='p'?c*0.8:c;};
+const omega=(k,n)=>n*Math.PI*speed(k);
+const AMP={u:0.03,v:0.08,w:0.05,p:1.6};
+
+function resetPhys(){DOFS.forEach(k=>{P[k].y.fill(0);P[k].v.fill(0);P[k].b0=P[k].b1=0;});}
+function exciteMode(n){activeDofs(S.type).forEach(k=>{if(k==='w')return;
+  for(let i=1;i<N;i++)P[k].y[i]+=AMP[k]*Math.sin(n*Math.PI*i/N)/Math.sqrt(n);});}
+function impulse(s,str){activeDofs(S.type).forEach(k=>{
+  for(let i=1;i<N;i++){const x=i/N;P[k].v[i]+=str*AMP[k]*25*Math.exp(-((x-s)**2)/0.002);}});}
+
+function step(dt){
+  const drv=S.gestureDrive?S.driveMode:S.manualDrive, act=activeDofs(S.type);
+  for(const k of DOFS){
+    const d=P[k],y=d.y,v=d.v,c2=speed(k)**2,g=S.damp+0.02;
+    y[0]=d.b0;y[N]=d.b1;
+    let F0=0,wn=0;
+    if(drv&&act.includes(k)&&k!=='w'){wn=omega(k,drv);F0=AMP[k]*0.6*S.sens*Math.max(g,0.15)*wn*Math.sin(wn*S.time);}
+    for(let i=1;i<N;i++){
+      const lap=(y[i+1]-2*y[i]+y[i-1])/(DX*DX);
+      const vl=(v[i+1]-2*v[i]+v[i-1])/(DX*DX);           // amortecimento dependente da frequência
+      let f=c2*lap-g*v[i]+4e-5*g*vl;
+      if(F0)f+=F0*Math.sin(drv*Math.PI*i/N);
+      if(S.pluck&&S.pluck.k===k){const x=i/N;f+=900*(S.pluck.off*Math.exp(-((x-S.pluck.s)**2)/0.004)-y[i])*Math.exp(-((x-S.pluck.s)**2)/0.01);}
+      v[i]+=f*dt;
+    }
+    const lim=k==='p'?12:0.45;
+    for(let i=1;i<N;i++){y[i]+=v[i]*dt;if(y[i]>lim){y[i]=lim;v[i]=0;}else if(y[i]<-lim){y[i]=-lim;v[i]=0;}}
+  }
+}
+// projeção modal: a_n = √(q² + (q̇/ω)²)
+function modal(k){const a=[],d=P[k];
+  for(let n=1;n<=6;n++){let q=0,qd=0;
+    for(let i=1;i<N;i++){const s=Math.sin(n*Math.PI*i/N);q+=d.y[i]*s;qd+=d.v[i]*s;}
+    q*=2/N;qd*=2/N;a.push(Math.hypot(q,qd/omega(k,n)));}
+  return a;}
+const energy=k=>{let e=0;const d=P[k];for(let i=1;i<N;i++)e+=d.v[i]**2+speed(k)**2*((d.y[i+1]-d.y[i])/DX)**2;return e/N;};
+
+/* ═══════════════════════ BLOCO 4 — RASTREAMENTO (Hands + Face) ═══════════════════════ */
+const video=$('vid'),pctx=$('prev').getContext('2d');
+let handLM,faceLM,lastVT=-1,lastHands=[],lastFace=null;
+const EP=[0,1].map(()=>({sm:null,smZ:0,roll:0,rollSm:0,flex:0,flexSm:0}));
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+let torsHyst=0;
+
+async function initTracking(){
+  $('load').textContent='Carregando modelos MediaPipe…';
+  const fs=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  handLM=await HandLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numHands:2});
+  faceLM=await FaceLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'GPU'},runningMode:'VIDEO',numFaces:1,outputFaceBlendshapes:true});
+  const st=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+  video.srcObject=st;await video.play();
+}
+function fingers(l){ // contagem de dedos estendidos
+  const ext=[[8,6],[12,10],[16,14],[20,18]].map(([t,p])=>dist(l[t],l[0])>dist(l[p],l[0])*1.15);
+  const th=dist(l[4],l[9])>dist(l[3],l[9])*1.12;
+  if(th&&ext[3]&&!ext[0]&&!ext[1]&&!ext[2])return 6;     // 🤙 = modo 6
+  return ext.filter(Boolean).length+(th?1:0);}
+function toWorld(x,y){const v=viewSize();return new THREE.Vector3((0.5-x)*v.w*0.95,(0.5-y)*v.h*0.95,0);}
+
+function track(){
+  if(!handLM||video.readyState<2||video.currentTime===lastVT)return;
+  lastVT=video.currentTime;const ts=performance.now();
+  const hr=handLM.detectForVideo(video,ts);lastHands=hr.landmarks||[];
+  const fr=faceLM.detectForVideo(video,ts);lastFace=fr.faceBlendshapes?.[0];
+  // --- rosto → tensão
+  S.faceOK=!!lastFace;let tT=S.tenBase;
+  if(lastFace){const m={};lastFace.categories.forEach(c=>m[c.categoryName]=c.score);
+    const brow=(m.browInnerUp+m.browOuterUpLeft+m.browOuterUpRight)/3,wide=(m.eyeWideLeft+m.eyeWideRight)/2,blink=(m.eyeBlinkLeft+m.eyeBlinkRight)/2;
+    tT=Math.min(1,Math.max(0,S.tenBase*0.5+0.15+1.3*brow+0.9*wide-0.45*blink));}
+  S.tension+=(tT-S.tension)*0.06;
+  // --- mãos → pontas, tipo de onda, excitação
+  const hs=lastHands.slice().sort((a,b)=>b[9].x-a[9].x); // espelhado: esquerda da tela primeiro
+  S.hands=hs.length;
+  if(hs.length===2){
+    const palm=hs.map(l=>dist(l[5],l[17])/dist(l[0],l[9]));
+    torsHyst+=((palm[0]>0.6&&palm[1]>0.6)?1:-1)*0.1;torsHyst=Math.max(0,Math.min(1,torsHyst));
+    if(torsHyst>0.7)S.torsDetect=true;else if(torsHyst<0.3)S.torsDetect=false;
+    const fc=hs.map(fingers);
+    S.driveMode=fc[0]===0&&fc[1]>0?fc[1]:fc[1]===0&&fc[0]>0?fc[0]:0;
+    const raw=hs.map(l=>toWorld(l[9].x*0.7+l[8].x*0.3,l[9].y*0.7+l[8].y*0.3));
+    hs.forEach((l,i)=>{const e=EP[i];if(!e.sm)e.sm=raw[i].clone();
+      e.raw=raw[i];e.sm.lerp(raw[i],0.1);
+      e.z=l[0].z*40;e.smZ+=(e.z-e.smZ)*0.1;
+      e.roll=Math.atan2(l[9].y-l[0].y,l[9].x-l[0].x);
+      let dr=e.roll-e.rollSm;dr=Math.atan2(Math.sin(dr),Math.cos(dr));e.rollSm+=dr*0.1;e.dRoll=dr;
+      e.flex=[8,12,16,20].reduce((s,t)=>s+dist(l[t],l[0]),0)/(4*dist(l[0],l[9]));e.flexSm+=(e.flex-e.flexSm)*0.1;});
+    S.A.lerp(EP[0].sm,0.5);S.B.lerp(EP[1].sm,0.5);
+  }else{EP.forEach(e=>e.sm=null);S.driveMode=0;}
+  drawPreview();
+}
+function applyBoundaries(){
+  const L=S.L,ax=new THREE.Vector3().subVectors(S.B,S.A).normalize(),p1=new THREE.Vector3(-ax.y,ax.x,0);
+  const act=activeDofs(S.type),k=S.sens;
+  const target={u:[0,0],v:[0,0],w:[0,0],p:[0,0]};
+  if(S.hands===2&&EP[0].sm&&EP[1].sm)EP.forEach((e,i)=>{
+    const d=new THREE.Vector3().subVectors(e.raw,e.sm);
+    target.u[i]=d.dot(ax)/L*k;target.v[i]=d.dot(p1)/L*k;target.w[i]=(e.z-e.smZ)/L*k*0.5;
+    target.p[i]=(e.dRoll*2.5+(e.flex-e.flexSm)*6)*k;});
+  for(const d of DOFS){const on=S.forced==='auto'?(S.torsDetect?d==='p':d!=='p'):act.includes(d);
+    const P_=P[d];P_.b0+=((on?target[d][0]:0)-P_.b0)*0.5;P_.b1+=((on?target[d][1]:0)-P_.b1)*0.5;}
+}
+function drawPreview(){
+  pctx.save();pctx.scale(-1,1);pctx.drawImage(video,-220,0,220,165);pctx.restore();
+  pctx.fillStyle='rgba(0,0,0,.35)';pctx.fillRect(0,0,220,165);
+  lastHands.forEach(l=>l.forEach(p=>{pctx.fillStyle='#0ff';pctx.fillRect((1-p.x)*220-1.5,p.y*165-1.5,3,3);}));
+}
+
+/* ═══════════════════════ BLOCO 5 — RENDERIZAÇÃO (Three.js + Bloom) ═══════════════════════ */
+const renderer=new THREE.WebGLRenderer({canvas:$('gl'),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,0.1,100);cam.position.z=10;
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,cam));
+const bloom=new UnrealBloomPass(new THREE.Vector2(1,1),1.4,0.5,0.0);composer.addPass(bloom);
+function viewSize(){const h=2*10*Math.tan(THREE.MathUtils.degToRad(25));return{w:h*innerWidth/innerHeight,h};}
+function resize(){renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();}
+addEventListener('resize',resize);resize();
+
+const M=1400,TURNS=42,R=0.34;
+const mkLine=(n,op,Type=THREE.Line)=>{const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*3),3));
+  g.setAttribute('color',new THREE.BufferAttribute(new Float32Array(n*3),3));
+  const o=new Type(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}));
+  scene.add(o);return o;};
+const helix=mkLine(M,1),core=mkLine(N+1,0.35),SPOKES=16,spokes=mkLine(SPOKES*2,0.9,THREE.LineSegments);
+const endMat=new THREE.MeshBasicMaterial({color:0x88ffff});
+const ends=[0,1].map(()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(0.16,16,16),endMat);scene.add(m);return m;});
+const nodeG=new THREE.BufferGeometry();nodeG.setAttribute('position',new THREE.BufferAttribute(new Float32Array(13*3),3));
+nodeG.setAttribute('color',new THREE.BufferAttribute(new Float32Array(13*3),3));
+scene.add(new THREE.Points(nodeG,new THREE.PointsMaterial({size:0.18,vertexColors:true,transparent:true,blending:THREE.AdditiveBlending})));
+
+const ax=new THREE.Vector3(),p1=new THREE.Vector3(),p2=new THREE.Vector3(0,0,1),tmp=new THREE.Vector3();
+const CT=new THREE.Color(TYPE_COL.trans),CL=new THREE.Color(TYPE_COL.long),CR=new THREE.Color(TYPE_COL.tors);
+function samp(k,i,fr){const y=P[k].y;return y[i]*(1-fr)+y[i+1]*fr;}
+function pointAt(s,rad,th,out){
+  const f=Math.min(N-1e-6,s*N),i=Math.floor(f),fr=f-i,L=S.L;
+  const u=samp('u',i,fr),v=samp('v',i,fr),w=samp('w',i,fr);
+  out.copy(S.A).addScaledVector(ax,(s+u)*L).addScaledVector(p1,v*L+rad*Math.cos(th)).addScaledVector(p2,w*L+rad*Math.sin(th));
+  return{i,fr};}
+
+function render(){
+  ax.subVectors(S.B,S.A);S.L=Math.max(ax.length(),0.5);ax.normalize();p1.set(-ax.y,ax.x,0);
+  const tc=new THREE.Color(TYPE_COL[S.type]),pos=helix.geometry.attributes.position.array,col=helix.geometry.attributes.color.array;
+  for(let j=0;j<M;j++){
+    const s=j/(M-1),f=Math.min(N-1e-6,s*N),i=Math.floor(f),fr=f-i;
+    const ph=samp('p',i,fr),th=2*Math.PI*TURNS*s+ph;
+    pointAt(s,R,th,tmp);pos.set([tmp.x,tmp.y,tmp.z],j*3);
+    const strain=(P.u.y[i+1]-P.u.y[i])/DX;
+    const iT=Math.min(1,(Math.abs(samp('v',i,fr))+Math.abs(samp('w',i,fr)))*7+Math.abs(P.v.v[i])*0.6);
+    const iL=Math.min(1,Math.abs(strain)*2.5),iR=Math.min(1,Math.abs(ph)*0.6+Math.abs(P.p.v[i])*0.05);
+    const shade=0.45+0.55*(0.5+0.5*Math.sin(th)),comp=1+Math.max(0,-strain)*2;
+    col[j*3]=(0.08+tc.r*0.25+CT.r*iT+CL.r*iL+CR.r*iR)*shade*comp;
+    col[j*3+1]=(0.12+tc.g*0.25+CT.g*iT+CL.g*iL+CR.g*iR)*shade*comp;
+    col[j*3+2]=(0.25+tc.b*0.25+CT.b*iT+CL.b*iL+CR.b*iR)*shade*comp;}
+  helix.geometry.attributes.position.needsUpdate=helix.geometry.attributes.color.needsUpdate=true;
+  const cp=core.geometry.attributes.position.array,cc=core.geometry.attributes.color.array;
+  for(let i=0;i<=N;i++){pointAt(i/N,0,0,tmp);cp.set([tmp.x,tmp.y,tmp.z],i*3);cc.set([tc.r,tc.g,tc.b],i*3);}
+  core.geometry.attributes.position.needsUpdate=core.geometry.attributes.color.needsUpdate=true;
+  // raios de torção: mostram o ângulo local φ(x)
+  const sp=spokes.geometry.attributes.position.array,sc=spokes.geometry.attributes.color.array,show=S.type==='tors'?1:0.15;
+  for(let k=0;k<SPOKES;k++){const s=(k+0.5)/SPOKES,f=s*N,i=Math.floor(f),ph=samp('p',i,f-i);
+    pointAt(s,0,0,tmp);sp.set([tmp.x,tmp.y,tmp.z],k*6);pointAt(s,R*1.9,ph+Math.PI/2,tmp);sp.set([tmp.x,tmp.y,tmp.z],k*6+3);
+    sc.set([CR.r*show,CR.g*show,CR.b*show,CR.r*show,CR.g*show,CR.b*show],k*6);}
+  spokes.geometry.attributes.position.needsUpdate=spokes.geometry.attributes.color.needsUpdate=true;
+  // nós (branco) e antinós (cor do tipo) do modo selecionado
+  const n=S.selMode,np=nodeG.attributes.position.array,nc=nodeG.attributes.color.array;np.fill(0);nc.fill(0);let q=0;
+  const put=(s,c)=>{tmp.copy(S.A).addScaledVector(ax,s*S.L).addScaledVector(p1,-R*2.2);np.set([tmp.x,tmp.y,tmp.z],q*3);nc.set(c,q*3);q++;};
+  for(let k=0;k<=n;k++)put(k/n,[1,1,1]);for(let k=0;k<n;k++)put((k+0.5)/n,[tc.r,tc.g,tc.b]);
+  nodeG.attributes.position.needsUpdate=nodeG.attributes.color.needsUpdate=true;
+  pointAt(0,0,0,ends[0].position);pointAt(1,0,0,ends[1].position);
+  bloom.strength=1.1+Math.min(1.2,(energy('v')+energy('u')*4+energy('p')*0.02)*0.5);
+  composer.render();
+}
+// beliscar com o mouse
+const ray=new THREE.Raycaster(),plane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
+function mouseWorld(e){ray.setFromCamera(new THREE.Vector2(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1),cam);return ray.ray.intersectPlane(plane,new THREE.Vector3());}
+function pluckFrom(e){const w=mouseWorld(e);if(!w)return;const d=w.sub(S.A),s=d.dot(ax)/S.L,off=d.dot(p1)/S.L;
+  if(s<0.03||s>0.97)return;const k=activeDofs(S.type)[0];
+  S.pluck={s,k,off:k==='p'?off*12:k==='u'?off*0.35:off};}
+$('gl').addEventListener('pointerdown',pluckFrom);
+$('gl').addEventListener('pointermove',e=>{if(S.pluck)pluckFrom(e);});
+addEventListener('pointerup',()=>S.pluck=null);
+
+/* ═══════════════════════ BLOCO 6 — ÁUDIO (síntese modal) + LOOP ═══════════════════════ */
+let AC,banks;
+const SND={trans:{wave:'sine',ratio:1,inh:0.0006,lp:7000,K:3},long:{wave:'triangle',ratio:1.5,inh:0,lp:2600,K:9},tors:{wave:'sawtooth',ratio:0.75,inh:0.004,lp:1500,K:0.18}};
+function initAudio(){
+  AC=new AudioContext();const comp=AC.createDynamicsCompressor(),master=AC.createGain();master.gain.value=0.6;master.connect(comp).connect(AC.destination);
+  banks={};
+  for(const t in SND){const c=SND[t],f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=c.lp;f.Q.value=t==='tors'?6:1;f.connect(master);
+    if(t==='tors'){const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=5.5;lg.gain.value=500;lfo.connect(lg).connect(f.frequency);lfo.start();}
+    if(t==='long'){const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=9;lg.gain.value=300;lfo.connect(lg).connect(f.frequency);lfo.start();}
+    const ws=[];for(let n=1;n<=6;n++){const o=AC.createOscillator(),g=AC.createGain();o.type=c.wave;g.gain.value=0;o.connect(g).connect(f);o.start();ws.push({o,g});}
+    banks[t]={...c,ws,f};}
+}
+function updateAudio(A,f1){
+  if(!AC)return;const now=AC.currentTime;
+  for(const t in banks){const b=banks[t];
+    b.f.frequency.setTargetAtTime(b.lp*(0.6+S.tension*0.8)/(1+S.damp*0.3),now,0.05);
+    b.ws.forEach((w,i)=>{const n=i+1;
+      w.o.frequency.setTargetAtTime(f1*b.ratio*n*Math.sqrt(1+b.inh*n*n),now,0.02);
+      const g=S.sound?Math.min(0.22,A[t][i]*b.K)/Math.pow(n,0.35):0;
+      w.g.gain.setTargetAtTime(g,now,0.03);});}
+}
+let last=performance.now(),frame=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const fdt=Math.min(0.05,(now-last)/1000);last=now;
+  track();
+  if(S.forced==='auto'){if(S.torsDetect)S.type='tors';else S.type=energy('u')*3>energy('v')+energy('w')?'long':'trans';}else S.type=S.forced;
+  if(S.hands<2){S.A.lerp(new THREE.Vector3(-3,0,0),0.03);S.B.lerp(new THREE.Vector3(3,0,0),0.03);}
+  applyBoundaries();
+  const sub=Math.min(60,Math.ceil(fdt*1200)),dt=fdt/sub;
+  for(let i=0;i<sub;i++){S.time+=dt;step(dt);}
+  render();
+  const A={trans:modal('v').map((a,i)=>Math.hypot(a,modal('w')[i])),long:modal('u'),tors:modal('p')};
+  const f1=55*Math.pow(2,S.tension*2.5)*(6/Math.max(S.L,2))**0.3;
+  updateAudio(A,f1);
+  if(frame++%4===0){
+    $('type').textContent=TYPE_NAME[S.type]+(S.forced==='auto'?' (auto)':'');
+    $('type').style.background=TYPE_COL[S.type]+'33';$('type').style.color=TYPE_COL[S.type];
+    $('hHands').textContent=S.hands+'/2';$('hHands').className=S.hands===2?'ok':'bad';
+    $('hFace').textContent=S.faceOK?'sim':'não';$('hFace').className=S.faceOK?'ok':'bad';
+    const d=S.gestureDrive?S.driveMode:S.manualDrive;$('hDrive').textContent=d?'modo '+d:'—';
+    $('hF').textContent=f1.toFixed(1)+' Hz';$('hL').textContent=S.L.toFixed(2);
+    document.querySelector('#tbar i').style.width=(S.tension*100)+'%';
+    const K=SND[S.type].K;[...$('bars').children].forEach((el,i)=>{el.style.height=Math.min(60,2+A[S.type][i]*K*250)+'px';el.style.background=TYPE_COL[S.type];});
+    $('warn').textContent=S.hands<2?'✋ Mostre as DUAS mãos para a câmera':!S.faceOK?'🙂 Rosto não detectado — usando tensão base':'';
+  }
+}
+$('bStart').onclick=async()=>{
+  try{initAudio();await AC.resume();await initTracking();$('start').style.display='none';}
+  catch(e){$('load').textContent='Erro: '+e.message+' (use HTTPS/localhost)';}
+};
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
